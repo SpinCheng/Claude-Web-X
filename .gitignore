@@ -1,0 +1,25 @@
+# deps / build
+node_modules/
+dist/
+
+# runtime data (tokens, locks, trash, probe cache - never commit)
+bridge/data/
+
+# local secrets / env
+.env
+.env.*
+*.local.json
+
+# phase0 field-test artifacts (contains transcript excerpts; keep local)
+phase0/PHASE0-REPORT.md
+phase0/tmp/
+phase0/uia-selectors.json
+
+# editor / OS / scratch
+.claude/
+*.log
+*.bak
+*.bak-*
+.tmp*
+Thumbs.db
+.DS_Store

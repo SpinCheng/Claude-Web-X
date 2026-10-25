@@ -1,0 +1,14 @@
+{
+  "name": "claude-remote",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Remote view & control for local Claude Code / Cowork sessions from a phone (LAN bridge + PWA)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node bridge/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
