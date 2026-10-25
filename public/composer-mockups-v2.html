@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>输入框工具栏设计稿 v2 · claude-remote</title>
+<style>
+/* ============ claude-remote Claude-dark tokens (与主应用一致) ============ */
+:root {
+  --bg: #1D1C1A; --panel: #26241F; --panel2: #2E2B26; --raise: #36332D;
+  --ink-hi: rgba(255,255,255,.045);
+  --fg: #F2EEE7; --dim: #A79F92; --faint: #6E675D; --line: #36332D;
+  --acc: #D97757; --acc-strong: #E8926F; --acc-tint: rgba(217,119,87,.14);
+  --ok: #8FB98D; --warn: #D9A262; --err: #DB6B5E;
+  --sh-1: 0 1px 2px rgba(12,10,8,.3), inset 0 1px 0 var(--ink-hi);
+  --sh-2: 0 2px 10px rgba(12,10,8,.35), inset 0 1px 0 var(--ink-hi);
+  --sh-3: 0 -6px 28px rgba(12,10,8,.45);
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: #141311; color: var(--fg); font-family: var(--sans); padding: 28px 16px 60px; }
+.intro { max-width: 900px; margin: 0 auto 26px; }
+.intro h1 { font-size: 19px; font-weight: 600; }
+.intro p { color: var(--dim); font-size: 13px; margin-top: 6px; line-height: 1.6; }
+.intro .hint { color: var(--acc-strong); font-size: 12.5px; margin-top: 4px; }
+.frames { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; }
+.frame-wrap { display: flex; flex-direction: column; gap: 10px; }
+.frame-label { text-align: center; }
+.frame-label b { font-size: 14px; }
+.frame-label span { display: block; color: var(--faint); font-size: 11.5px; margin-top: 2px; }
+.frame { position: relative; width: 360px; height: 660px; background: var(--bg); border-radius: 26px; overflow: hidden; box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 1px 0 var(--ink-hi); display: flex; flex-direction: column; }
+
+/* ---- 画布内的假聊天 ---- */
+.chat-tail { flex: 1; padding: 18px 14px; overflow: hidden; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; }
+.msg-user { align-self: flex-end; max-width: 78%; background: var(--raise); border-radius: 14px 14px 4px 14px; padding: 9px 12px; font-size: 13.5px; line-height: 1.5; }
+.msg-bot { align-self: flex-start; max-width: 86%; color: var(--dim); font-size: 13.5px; line-height: 1.6; }
+.pill-proc { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; color: var(--faint); font: 10.5px var(--mono); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; }
+.pill-proc::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--acc); }
+
+/* ---- 共享构件 ---- */
+.dock { position: relative; padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 78%, transparent); }
+.dock-card { background: var(--panel); border-radius: 18px; box-shadow: var(--sh-3), inset 0 1px 0 var(--ink-hi); }
+.dock textarea { width: 100%; border: 0; background: none; color: var(--fg); resize: none; height: 44px; padding: 12px 4px 6px; font: 15px/1.4 var(--sans); outline: none; }
+.dock textarea::placeholder { color: var(--faint); }
+.send { width: 34px; height: 34px; border-radius: 50%; background: var(--acc); color: #fff; border: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; box-shadow: 0 2px 10px rgba(217,119,87,.35); transition: transform .12s; }
+.send:active { transform: scale(.9); }
+.ring-svg { width: 15px; height: 15px; transform: rotate(-90deg); flex: none; }
+.ring-bg { fill: none; stroke: var(--raise); stroke-width: 3; }
+.ring-fg { fill: none; stroke: var(--acc); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 19.7 56.55; }
+.scrim { position: absolute; inset: 0; background: rgba(10,9,7,.45); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 5; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+
+/* 弹层内容片段（共享）——行式布局：无底色无阴影，细分隔线 + 右侧对勾（与明细行同语言） */
+.pop-title { font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+.pop-note { color: var(--faint); font-size: 10.5px; margin-top: 8px; line-height: 1.5; }
+.opt { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; border-bottom: 1px solid rgba(54,51,45,.5); border-radius: 0; padding: 12px 4px; cursor: pointer; color: var(--fg); font: inherit; text-align: left; transition: background .12s; }
+.opt:last-of-type { border-bottom: 0; }
+.opt:active { background: var(--panel2); }
+.opt .o-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.opt .o-label { font-weight: 600; font-size: 14px; }
+.opt .o-sub { font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opt .o-check { flex: none; color: var(--acc); opacity: 0; transform: scale(.5); transition: opacity .15s, transform .25s cubic-bezier(.34,1.56,.64,1); }
+.opt.active .o-check { opacity: 1; transform: scale(1); }
+.opt.active .o-label { color: var(--acc-strong); }
+.seg2 { display: flex; gap: 6px; }
+.seg2 button { flex: 1; padding: 11px 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel2); color: var(--dim); font: 13px var(--sans); cursor: pointer; }
+.seg2 button.active { border-color: var(--acc); color: var(--acc-strong); box-shadow: 0 0 0 3px var(--acc-tint); }
+.seg2 small { display: block; color: var(--faint); font-size: 10px; margin-top: 3px; }
+/* 上下文明细（v14 同款） */
+.ctx-hero { display: flex; align-items: baseline; gap: 6px; margin-bottom: 10px; }
+.ctx-hero b { font: 600 21px var(--mono); letter-spacing: -.02em; }
+.ctx-hero .cap { font: 11.5px var(--mono); color: var(--faint); }
+.ctx-hero .pct { margin-left: auto; font: 600 11px var(--mono); color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 3px 9px; }
+.ctx-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 4px; background: repeating-linear-gradient(90deg, var(--raise) 0 6px, transparent 6px 9px); }
+.ctx-bar span { height: 100%; }
+.s-sys{background:#D9A262}.s-tools{background:#B08D57}.s-mcp{background:#8FA8B8}.s-mcpin{background:#6E8794}.s-mem{background:#8FB98D}.s-skill{background:#A79F92}.s-msg{background:#7FA3B8}
+.ctx-rows { margin: 2px -4px 0; }
+.ctx-row { display: flex; align-items: center; gap: 9px; padding: 6.5px 4px; border-bottom: 1px solid rgba(54,51,45,.4); }
+.ctx-row .sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.ctx-row .nm { font-size: 12px; }
+.ctx-row b { margin-left: auto; font: 600 10.5px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+.ctx-row.dim, .ctx-row.dim b { color: var(--faint); font-weight: 400; }
+
+/* ============ A · 胶囊组 + 气泡弹层 ============ */
+.vA .toolbar { display: flex; align-items: center; gap: 6px; padding: 2px 6px 6px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 11px; border-radius: 999px; background: var(--panel2); border: 0; color: var(--dim); font: 600 11.5px var(--sans); cursor: pointer; box-shadow: var(--sh-1); transition: transform .12s; flex: none; }
+.pill:active { transform: scale(.94); }
+.pill svg { flex: none; }
+.pill .pv { font-family: var(--mono); font-weight: 400; }
+.pill.warn { color: var(--warn); }
+.vA .send { margin-left: auto; }
+
+/* ============ A2 · 无框胶囊 + 气泡弹层（A 的去盒化） ============ */
+.vE .toolbar { display: flex; align-items: center; gap: 2px; padding: 2px 8px 6px; }
+.flat { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 8px; border: 0; background: none; color: var(--faint); font: 600 11.5px var(--sans); cursor: pointer; border-radius: 9px; flex: none; transition: background .12s, color .12s; }
+.flat:active { background: var(--panel2); }
+.flat svg { flex: none; }
+.flat .pv { font-family: var(--mono); font-weight: 400; font-size: 11px; }
+.flat.mode { color: var(--acc-strong); }
+.flat.mode[data-v="ask"] { color: var(--warn); }
+.vE .dot { width: 2px; height: 2px; border-radius: 50%; background: var(--line); margin: 0 3px; flex: none; }
+.vE .send { margin-left: auto; }
+.pop-bubble { position: absolute; bottom: 118px; left: 12px; right: 12px; background: var(--panel); border-radius: 16px; padding: 14px 14px 12px; box-shadow: var(--sh-3), 0 10px 40px rgba(0,0,0,.5), inset 0 1px 0 var(--ink-hi); z-index: 6; transform-origin: 50% 100%; transform: scaleY(.6) translateY(14px); opacity: 0; pointer-events: none; transition: transform .26s cubic-bezier(.34,1.4,.5,1), opacity .16s; }
+.pop-bubble.on { transform: none; opacity: 1; pointer-events: auto; }
+.pop-bubble::after { content: ""; position: absolute; bottom: -5px; width: 12px; height: 12px; background: var(--panel); transform: rotate(45deg); border-radius: 2px; }
+
+/* ============ B · 图标轨 + 泊位联板 ============ */
+.vB .toolbar { display: flex; align-items: stretch; gap: 2px; padding: 2px 4px 6px; }
+.tbtn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 44px; border: 0; background: none; color: var(--dim); cursor: pointer; border-radius: 10px; transition: background .12s; }
+.tbtn:active { background: var(--panel2); }
+.tbtn .tv { font: 9.5px var(--mono); color: var(--faint); max-width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tbtn .tv.warm { color: var(--warn); }
+.vB .send { align-self: center; margin-left: 4px; }
+.pop-dock { position: absolute; left: 12px; right: 12px; bottom: 96px; background: var(--panel); border-radius: 16px 16px 8px 8px; padding: 14px 14px 12px; box-shadow: var(--sh-3), 0 10px 40px rgba(0,0,0,.5), inset 0 1px 0 var(--ink-hi); z-index: 6; transform: translateY(24px); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.22,1,.36,1), opacity .18s; }
+.pop-dock.on { transform: none; opacity: 1; pointer-events: auto; }
+.pop-dock::before { content: ""; position: absolute; top: -6px; left: 50%; width: 34px; height: 6px; transform: translateX(-50%); background: var(--raise); border-radius: 3px; }
+
+/* ============ C · 单行融合 + 浮卡 ============ */
+.vC .inline-bar { display: flex; align-items: center; gap: 0; padding: 0 4px 4px; }
+.ibtn { width: 36px; height: 32px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: var(--faint); cursor: pointer; border-radius: 8px; transition: background .12s, color .12s; }
+.ibtn:active { background: var(--panel2); color: var(--dim); }
+.ibtn.warm { color: var(--warn); }
+.vC .divider { width: 1px; height: 16px; background: var(--line); margin: 0 5px; }
+.vC .mchip { display: inline-flex; align-items: center; height: 26px; padding: 0 9px; border-radius: 8px; border: 0; background: none; color: var(--faint); font: 10.5px var(--mono); cursor: pointer; }
+.vC .send { margin-left: auto; width: 32px; height: 32px; }
+.pop-card { position: absolute; bottom: 108px; left: 50%; width: 292px; background: var(--panel); border-radius: 16px; padding: 14px; box-shadow: var(--sh-3), 0 14px 44px rgba(0,0,0,.55), inset 0 1px 0 var(--ink-hi); z-index: 6; transform: translateX(-50%) scale(.88); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.34,1.45,.5,1), opacity .16s; }
+.pop-card.on { transform: translateX(-50%) scale(1); opacity: 1; pointer-events: auto; }
+
+/* ============ D · 状态条 + 居中卡 ============ */
+.vD .meter { display: flex; align-items: center; gap: 8px; padding: 0 4px 8px; }
+.meter .mtxt { font: 9.5px var(--mono); color: var(--faint); white-space: nowrap; }
+.meter .mbar { flex: 1; height: 5px; border-radius: 3px; background: var(--raise); overflow: hidden; }
+.meter .mbar span { display: block; height: 100%; width: 46%; background: linear-gradient(90deg, var(--warn), var(--acc)); border-radius: 3px; }
+.vD .toolbar { display: flex; align-items: center; gap: 6px; padding: 0 6px 6px; }
+.vD .tchip { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: none; color: var(--dim); font-size: 11.5px; cursor: pointer; }
+.vD .tchip .mono { font: 10.5px var(--mono); color: var(--faint); }
+.vD .send { margin-left: auto; }
+.pop-center { position: absolute; left: 50%; top: 38%; transform: translate(-50%,-50%) scale(.9); width: 300px; background: var(--panel); border-radius: 18px; padding: 16px; box-shadow: var(--sh-3), 0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 var(--ink-hi); z-index: 6; opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.34,1.45,.5,1), opacity .18s; }
+.pop-center.on { transform: translate(-50%,-50%) scale(1); opacity: 1; pointer-events: auto; }
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>输入框工具栏 · 四版交互设计稿</h1>
+  <p>主题规范与主应用一致（Claude 暗色 / 珊瑚橘单主色 / 阴影分层）。每版的三个工具（权限、上下文、模型）都可点击，弹层形态随版式变化；上下文弹层内容即 v14 已上线的细分类明细。</p>
+  <p class="hint">▸ 点击每个手机框里的工具按钮查看弹层效果</p>
+</div>
+<div class="frames" id="frames"></div>
+
+<script>
+/* ---------- 共享片段模板 ---------- */
+const ICON = {
+  shield: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>',
+  chip: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>',
+  gauge: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M4 19a9 9 0 0 1 16 0"/></svg>',
+  send: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  check: '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+  ring: (cls) => `<svg viewBox="0 0 24 24" class="ring-svg ${cls||''}"><circle class="ring-bg" cx="12" cy="12" r="9"/><circle class="ring-fg" cx="12" cy="12" r="9"/></svg>`,
+};
+const ctxRows = [
+  ['s-sys','系统提示','3.0k · 1%'],
+  ['s-tools','系统工具','33.1k · 7%'],
+  ['s-mcp','MCP 工具','5.6k · 1%'],
+  ['s-mcpin','MCP 指令','206 · <1%'],
+  ['s-mem','记忆文件','4.2k · 1%'],
+  ['s-skill','技能','2.5k · 1%'],
+  ['s-msg','消息','426.9k · 90%'],
+];
+const ctxHTML = `
+  <div class="pop-title">上下文</div>
+  <div class="ctx-hero"><b>475.5k</b><span class="cap">/ 1.0M</span><span class="pct">48%</span></div>
+  <div class="ctx-bar">
+    <span class="s-sys" style="width:0.3%"></span><span class="s-tools" style="width:3.3%"></span>
+    <span class="s-mcp" style="width:0.6%"></span><span class="s-mcpin" style="width:.03%"></span>
+    <span class="s-mem" style="width:0.4%"></span><span class="s-skill" style="width:0.25%"></span>
+    <span class="s-msg" style="width:42.7%"></span>
+  </div>
+  <div class="ctx-rows">
+    ${ctxRows.map(r=>`<div class="ctx-row"><span class="sw ${r[0]}"></span><span class="nm">${r[1]}</span><b>${r[2]}</b></div>`).join('')}
+    <div class="ctx-row dim"><span class="sw" style="background:var(--raise);box-shadow:inset 0 0 0 1px rgba(217,162,98,.45)"></span><span class="nm">自动压缩保留</span><b>33.0k</b></div>
+    <div class="ctx-row dim"><span class="sw" style="background:var(--raise)"></span><span class="nm">剩余可用</span><b>491.5k</b></div>
+  </div>
+  <p class="pop-note">口径与桌面端一致（实测）· 已用 = 最近一次请求的输入 tokens（含缓存）</p>`;
+const permHTML = `
+  <div class="pop-title">权限模式</div>
+  <button class="opt active"><span class="o-main"><span class="o-label">自动执行</span><span class="o-sub">YOLO · 工具免审批</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <button class="opt"><span class="o-main"><span class="o-label">需要时手机审批</span><span class="o-sub">弹卡确认后继续</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <p class="pop-note">仅对之后发送的消息生效</p>`;
+const effortHTML = `
+  <div class="pop-title">推理等级</div>
+  <button class="opt"><span class="o-main"><span class="o-label">默认</span><span class="o-sub">跟随会话 / CLI 配置</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <button class="opt"><span class="o-main"><span class="o-label">低</span><span class="o-sub">low · 快速直接，几乎不深想</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <button class="opt active"><span class="o-main"><span class="o-label">中</span><span class="o-sub">medium · 常规任务平衡之选</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <button class="opt"><span class="o-main"><span class="o-label">高</span><span class="o-sub">high · 更彻底的推理</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <button class="opt"><span class="o-main"><span class="o-label">超高</span><span class="o-sub">xhigh · 复杂任务</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <button class="opt"><span class="o-main"><span class="o-label">最高</span><span class="o-sub">max · 最难任务，可能显著变慢</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <p class="pop-note">等级越高思考越充分，耗时与用量也越大</p>`;
+const modelHTML = `
+  <div class="pop-title">选择模型</div>
+  <button class="opt"><span class="o-main"><span class="o-label">默认</span><span class="o-sub">跟随会话 · 当前 glm-5.3</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <div style="height:7px"></div>
+  <button class="opt active"><span class="o-main"><span class="o-label">glm-5.3</span><span class="o-sub">1.0M 上下文 · claude-opus-5[1M]</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <div style="height:7px"></div>
+  <button class="opt"><span class="o-main"><span class="o-label">glm-5.3-flash</span><span class="o-sub">1.0M 上下文 · claude-sonnet-5[1M]</span></span>${ICON.check.replace('class="','class="o-check ')}</button>
+  <p class="pop-note">再次点击已选项恢复默认</p>`;
+
+const chatTail = `
+  <div class="msg-user">把底部工具栏重新设计几版，注意弹窗样式</div>
+  <div class="pill-proc">过程 · 8 步</div>
+  <div class="msg-bot">已按主题规范出四版：胶囊组、图标轨、单行融合、状态条。每版弹层形态不同，点工具按钮即可预览……</div>`;
+
+const frames = [
+  { id:'A', name:'胶囊组 · 气泡弹层', tag:'三枚圆角胶囊各带图标与当前值；弹层为锚定气泡（带小尾巴、自底部弹簧展开）——轻快、归属感强',
+    toolbar: `
+      <div class="toolbar">
+        <button class="pill warn" data-pop="0">${ICON.shield}<span class="pv">自动</span></button>
+        <button class="pill" data-pop="1">${ICON.ring()}<span class="pv">48%</span></button>
+        <button class="pill" data-pop="2">${ICON.chip}<span class="pv">glm-5.3</span></button>
+        <button class="send">${ICON.send}</button>
+      </div>`,
+    popCls: 'pop-bubble', pops: [permHTML, ctxHTML, modelHTML] },
+  { id:'E', name:'无框胶囊 · 气泡弹层（A 细化）', tag:'A 的去盒化：去掉胶囊底色与描边，仅图标+数值直接坐在 dock 上，中点分隔；按下才浮现轻底色——更轻、更贴 v8 工艺语言。含推理等级（--effort）',
+    toolbar: `
+      <div class="toolbar">
+        <button class="flat mode" data-pop="0">${ICON.shield}<span class="pv">自动</span></button>
+        <span class="dot"></span>
+        <button class="flat" data-pop="1">${ICON.ring()}<span class="pv">48%</span></button>
+        <span class="dot"></span>
+        <button class="flat" data-pop="2">${ICON.chip}<span class="pv">glm-5.3</span></button>
+        <span class="dot"></span>
+        <button class="flat" data-pop="3">${ICON.gauge}<span class="pv">中</span></button>
+        <button class="send">${ICON.send}</button>
+      </div>`,
+    popCls: 'pop-bubble', pops: [permHTML, ctxHTML, modelHTML, effortHTML] },
+  { id:'B', name:'图标轨 · 泊位联板', tag:'44px 图标按钮带下方微型值标，等宽铺开；弹层为与 dock 相连的联板（顶部抓手条，自 dock 滑升）——沉稳、信息密度高',
+    toolbar: `
+      <div class="toolbar">
+        <button class="tbtn" data-pop="0">${ICON.shield}<span class="tv warm">自动</span></button>
+        <button class="tbtn" data-pop="1">${ICON.ring()}<span class="tv">475k / 1M</span></button>
+        <button class="tbtn" data-pop="2">${ICON.chip}<span class="tv">glm-5.3</span></button>
+        <button class="send">${ICON.send}</button>
+      </div>`,
+    popCls: 'pop-dock', pops: [permHTML, ctxHTML, modelHTML] },
+  { id:'C', name:'单行融合 · 浮卡', tag:'全部控件压进一行：左端纯图标簇 + 分隔线 + 模型短标，发送钮收小；弹层为居中浮卡（缩放弹簧入场）——紧凑、专业工具感',
+    toolbar: `
+      <div class="inline-bar">
+        <button class="ibtn warm" data-pop="0" title="权限">${ICON.shield}</button>
+        <button class="ibtn" data-pop="1" title="上下文">${ICON.ring()}</button>
+        <span class="divider"></span>
+        <button class="mchip" data-pop="2">glm-5.3 ▾</button>
+        <button class="send">${ICON.send}</button>
+      </div>`,
+    popCls: 'pop-card', pops: [permHTML, ctxHTML, modelHTML] },
+  { id:'D', name:'状态条 · 居中卡', tag:'输入区下方常驻一条上下文计量条（线性渐变进度 + 数值），工具钮弱化为边框芯片；弹层为屏幕居中卡片（同桌面端 popover 习惯）——直读、克制',
+    toolbar: `
+      <div class="meter"><span class="mtxt">上下文 48%</span><span class="mbar"><span></span></span><span class="mtxt">475.5k / 1M</span></div>
+      <div class="toolbar">
+        <button class="tchip" data-pop="0">${ICON.shield}自动</button>
+        <button class="tchip" data-pop="2"><span class="mono">glm-5.3</span> ▾</button>
+        <button class="tchip" data-pop="1">48% ▾</button>
+        <button class="send">${ICON.send}</button>
+      </div>`,
+    popCls: 'pop-center', pops: [permHTML, ctxHTML, modelHTML] },
+];
+
+const host = document.getElementById('frames');
+for (const f of frames) {
+  const wrap = document.createElement('div');
+  wrap.className = 'frame-wrap';
+  wrap.innerHTML = `
+    <div class="frame v${f.id}">
+      <div class="chat-tail">${chatTail}</div>
+      <div class="dock">
+        <div class="dock-card">
+          <textarea placeholder="提出后续修改要求"></textarea>
+          ${f.toolbar}
+        </div>
+      </div>
+      <div class="scrim"></div>
+      ${f.pops.map((p, i) => `<div class="${f.popCls}" data-i="${i}">${p}</div>`).join('')}
+    </div>
+    <div class="frame-label"><b>${f.id} · ${f.name}</b><span>${f.tag}</span></div>`;
+  host.appendChild(wrap);
+  const frame = wrap.querySelector('.frame');
+  const scrim = wrap.querySelector('.scrim');
+  const pops = [...wrap.querySelectorAll('.' + f.popCls)];
+  const open = (i) => {
+    pops.forEach((p, j) => p.classList.toggle('on', i === j));
+    scrim.classList.toggle('on', i != null);
+  };
+  frame.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pop]');
+    if (b) { const i = +b.dataset.pop; open(pops[i].classList.contains('on') ? null : i); return; }
+    if (e.target.closest('.opt') || e.target.closest('.seg2 button')) return; // let option taps feel alive
+    open(null);
+  });
+}
+</script>
+</body>
+</html>

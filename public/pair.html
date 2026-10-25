@@ -1,0 +1,232 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1F1E1D">
+  <title>claude-remote 配对</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#1F1E1D; --panel:#2A2927; --raise:#33312D; --line:#3D3A36;
+      --fg:#F0EEE6; --dim:#A39E94;
+      --acc:#D97757; --ok:#7DAB7E; --warn:#D9A262; --fail:#DB6B5E;
+      --mono: ui-monospace,Consolas,monospace;
+      --sans: -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:15px/1.6 var(--sans); display:flex; justify-content:center; padding:32px 16px; }
+    .card { width:min(92vw,470px); }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .brand-word { font-family:var(--mono); font-weight:600; font-size:22px; }
+    .brand-dim { color:var(--dim); }
+    .brand-lamp { width:12px; height:12px; border-radius:50%; background:var(--acc); animation:breathe 2.4s ease-in-out infinite; }
+    @keyframes breathe { 50% { opacity:.3 } }
+    @media (prefers-reduced-motion: reduce) { .brand-lamp { animation:none } }
+    .sub { color:var(--dim); font-size:13px; margin:6px 0 0 22px; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; margin-top:18px; }
+    .panel h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
+    .panel .note { font-size:12px; color:var(--dim); margin:10px 0 0; word-break:break-all; }
+    .qrbox { display:flex; justify-content:center; padding:14px; background:#fff; border-radius:12px; }
+    canvas { display:block; }
+    select { width:100%; padding:11px; border-radius:12px; border:1px solid var(--line); background:var(--raise); color:var(--fg); font:13px var(--mono); margin-top:12px; }
+    .row { display:flex; gap:10px; margin-top:14px; }
+    button { flex:1; padding:13px; border:0; border-radius:13px; font-size:14.5px; font-weight:600; cursor:pointer; }
+    button.primary { background:var(--acc); color:#fff; }
+    button.primary:active { background:#3f78e0; }
+    button.ghost { flex:0 0 auto; background:none; border:1px solid var(--line); color:var(--dim); font-weight:400; }
+    .badge { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; border:1px solid var(--line); border-radius:999px; padding:3px 10px; margin-left:8px; vertical-align:2px; font-weight:400; }
+    .badge .lamp { width:7px; height:7px; border-radius:50%; }
+    .badge.on .lamp { background:var(--ok); animation:breathe 2s ease-in-out infinite; }
+    .badge.off .lamp { background:var(--warn); }
+    .lamp { display:inline-block; }
+    #msg { font-size:13px; margin-top:14px; min-height:20px; font-family:var(--mono); }
+    #msg.ok { color:var(--ok); } #msg.err { color:var(--fail); }
+    .status-line { display:flex; align-items:center; gap:9px; font-size:13.5px; margin:0 0 12px; }
+    .status-line .lamp { width:9px; height:9px; border-radius:50%; }
+    .status-line .lamp.ok { background:var(--ok); box-shadow:0 0 6px var(--ok); }
+    .status-line .lamp.warn { background:var(--warn); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <span class="brand-lamp"></span>
+      <span class="brand-word">claude<span class="brand-dim">-remote</span> <span class="dim" style="font-size:13px">配对面板</span></span>
+    </div>
+    <p class="sub">仅本机可访问 · 手机扫码即连</p>
+
+    <div class="panel">
+      <h2>手机连接</h2>
+      <div class="qrbox"><canvas id="qr" width="280" height="280"></canvas></div>
+      <select id="url-sel"></select>
+      <div class="row" style="margin-top:10px">
+        <button id="copy-url" class="ghost" style="flex:1">复制完整链接</button>
+      </div>
+      <p class="note">扫码或点开链接一次即完成配对，token 不变则永久有效。离开家时用 Tailscale 地址。</p>
+    </div>
+
+    <div class="panel">
+      <h2>token 轮换</h2>
+      <div class="row"><button id="rotate" class="primary">轮换并刷新二维码</button></div>
+      <p class="note">怀疑泄露或想作废旧链接时用。即时生效；hooks 自动同步（先备份）；已连接的手机会被断开，扫新码即可。</p>
+    </div>
+
+    <div class="panel">
+      <h2>开机自启</h2>
+      <div class="status-line">
+        <span class="lamp warn" id="as-lamp"></span>
+        <span id="as-text">检测中…</span>
+      </div>
+      <div class="row">
+        <button id="autostart" class="primary">安装开机自启</button>
+        <button id="open-startup" class="ghost">启动文件夹</button>
+      </div>
+      <p class="note">把隐藏启动器复制进启动文件夹，登录后 bridge 自动后台运行；重复安装无害。</p>
+    </div>
+
+    <div id="msg"></div>
+  </div>
+  <script src="/vendor/qrcode.js?v=2"></script>
+  <script>
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  let urls = [];
+
+  function drawQr(text) {
+    const g = qrcode(0, 'M');
+    g.addData(text);
+    g.make();
+    const n = g.getModuleCount();
+    const quiet = 4, size = 280;
+    const cell = Math.floor(size / (n + quiet * 2));
+    const c = $('qr');
+    c.width = c.height = cell * (n + quiet * 2);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+      if (g.isDark(r, col)) ctx.fillRect((col + quiet) * cell, (r + quiet) * cell, cell, cell);
+    }
+  }
+  function fillSelect(sel) {
+    const s = $('url-sel');
+    s.innerHTML = '';
+    urls.forEach((u, i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = u.replace(/\?token=.*/, '?token=***');
+      s.appendChild(o);
+    });
+    s.value = String(sel);
+  }
+  function msg(text, cls) { const m = $('msg'); m.textContent = text; m.className = cls || ''; }
+
+  async function load() {
+    try {
+      const r = await fetch('/api/pair/info');
+      if (r.status === 403) {
+        $('as-text').textContent = '此面板仅限在这台电脑上使用';
+        msg('仅限本机访问：手机/其他设备请扫二维码，或让电脑端用 localhost 打开', 'err');
+        return;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      urls = j.urls;
+      fillSelect(0);
+      drawQr(urls[0]);
+      $('as-lamp').className = 'lamp ' + (j.autostart ? 'ok' : 'warn');
+      $('as-text').textContent = j.autostart
+        ? '已安装 — 登录后 bridge 自动后台运行'
+        : '未安装 — bridge 不会随开机自动启动';
+      $('autostart').textContent = j.autostart ? '重新安装 / 修复' : '安装开机自启';
+      msg('');
+    } catch (e) {
+      msg('读取失败：' + e.message + '（bridge 在运行吗？）', 'err');
+    }
+  }
+
+  $('url-sel').onchange = () => drawQr(urls[Number($('url-sel').value)]);
+
+  async function copyUrl() {
+    const btn = $('copy-url');
+    const url = urls[Number($('url-sel').value) || 0] || urls[0];
+    if (!url) return;
+    const flash = () => {
+      btn.textContent = '✓ 已复制';
+      btn.style.color = 'var(--ok)';
+      btn.style.borderColor = 'var(--ok)';
+      setTimeout(() => {
+        btn.textContent = '复制完整链接';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 2000);
+    };
+    // 1) async clipboard API, raced against a timeout: in embedded preview
+    //    iframes it can hang forever with no permission decision
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      const ok = await Promise.race([
+        navigator.clipboard.writeText(url).then(() => true, () => false),
+        new Promise((r) => setTimeout(() => r(false), 1200)),
+      ]);
+      if (ok) { flash(); msg('已复制完整链接（当前选中地址）', 'ok'); return; }
+    }
+    // 2) execCommand fallback (works under click activation in most contexts)
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      const ok2 = document.execCommand('copy');
+      ta.remove();
+      if (ok2) { flash(); msg('已复制完整链接（当前选中地址）', 'ok'); return; }
+    } catch (e) { /* fall through */ }
+    // 3) last resort: show a selectable box (preview panes block both paths)
+    const old = document.getElementById('manual-copy');
+    if (old) old.remove();
+    const box = document.createElement('div');
+    box.id = 'manual-copy';
+    const inp = document.createElement('input');
+    inp.readOnly = true;
+    inp.value = url;
+    inp.style.cssText = 'width:100%;background:var(--raise);color:var(--fg);border:1px solid var(--acc);border-radius:10px;padding:10px 12px;font:12px var(--mono);margin-bottom:6px';
+    inp.onclick = () => inp.select();
+    const tip = document.createElement('p');
+    tip.className = 'note';
+    tip.style.margin = '0';
+    tip.textContent = '点上面输入框全选，再 Ctrl+C 或长按复制';
+    box.append(inp, tip);
+    document.querySelector('#copy-url').closest('.row').after(box);
+    inp.focus(); inp.select();
+    msg('自动复制不可用（预览窗格限制），已列出链接供手动复制', '');
+  }
+  $('copy-url').onclick = copyUrl;
+  $('rotate').onclick = async () => {
+    if (!window.confirm('轮换 token？旧二维码立即失效，已连接的手机会断开。')) return;
+    msg('轮换中…');
+    try {
+      const r = await fetch('/api/pair/rotate', { method: 'POST' });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'unknown');
+      urls = j.urls;
+      fillSelect(0); drawQr(urls[0]);
+      msg('已轮换，新二维码就绪 · 备份 ' + (j.backup || '').split(/[\\/]/).pop(), 'ok');
+    } catch (e) { msg('轮换失败：' + e.message, 'err'); }
+  };
+  $('autostart').onclick = async () => {
+    if (!window.confirm('把 start-bridge.vbs 复制进启动文件夹？')) return;
+    try {
+      const r = await fetch('/api/pair/autostart', { method: 'POST' });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'unknown');
+      msg('自启已安装：' + j.installedTo, 'ok');
+      load();
+    } catch (e) { msg('安装失败：' + e.message, 'err'); }
+  };
+  $('open-startup').onclick = () => msg('浏览器禁止直接打开本地文件夹：Win+R → shell:startup 回车', '');
+
+  load();
+  setInterval(load, 15000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1F1E1D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>claude-remote</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/style.css?v=16">
+</head>
+<body>
+
+  <!-- token gate -->
+  <div id="gate" class="page gate hidden">
+    <div class="gate-inner">
+      <div class="brand">
+        <span class="brand-lamp"></span>
+        <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
+      </div>
+      <p class="gate-sub">连接你电脑上的 bridge</p>
+      <div class="gate-form">
+        <input id="token-input" type="password" placeholder="bridge 令牌" autocomplete="off" spellcheck="false">
+        <button id="token-save" class="icon-btn" title="连接">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3.4 20.4 20.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"/></svg>
+        </button>
+      </div>
+      <p id="gate-err" class="gate-err"></p>
+      <p class="gate-hint">令牌在电脑端 <span class="mono">bridge/data/config.json</span>，或访问配对面板扫码</p>
+    </div>
+  </div>
+
+  <!-- session list -->
+  <div id="list" class="page hidden">
+    <header class="bar">
+      <div class="brand small">
+        <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
+        <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
+        <span id="build" class="build-badge">v16</span>
+      </div>
+      <button id="new-session" class="icon-btn" title="新建任务">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+      </button>
+    </header>
+    <main id="groups" class="groups"></main>
+  </div>
+
+  <!-- transcript detail -->
+  <div id="detail" class="page hidden">
+    <header class="bar detail-bar">
+      <button id="back" class="icon-btn" title="返回列表">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+      </button>
+      <div class="d-title">
+        <b id="d-title"></b>
+        <span id="d-meta" class="mono dim"></span>
+      </div>
+      <span id="d-driver" class="chip">…</span>
+      <button id="del" class="icon-btn danger" title="删除会话">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>
+      </button>
+    </header>
+    <main id="chat" class="chat"></main>
+    <button id="jump" class="fab hidden" title="跳到最新">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 4h2v12l5.5-5.5 1.42 1.42L12 19.84l-7.92-7.92L5.5 10.5 11 16z"/></svg>
+    </button>
+    <div id="composer" class="composer">
+      <div id="queue-badge" class="queue-badge hidden">已排队 <b id="queue-n">0</b> 条 · 点击取消</div>
+      <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
+      <div class="composer-dock">
+        <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
+        <div class="composer-toolbar" id="toolbar">
+          <button id="perm" class="cbtn mode" title="权限模式：点击选择">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>
+            <span id="perm-label">自动</span>
+          </button>
+          <span class="tdot"></span>
+          <span id="token-ring" class="cbtn ring" title="上下文占用（点击看明细）">
+            <svg viewBox="0 0 24 24" class="ring-svg"><circle class="ring-bg" cx="12" cy="12" r="9"/><circle id="ring-fg" class="ring-fg" cx="12" cy="12" r="9"/></svg>
+            <span id="ring-val" class="pv mono">—</span>
+          </span>
+          <span class="tdot"></span>
+          <button id="c-model" class="cbtn model" title="模型（点击选择）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>
+            <span class="ellipsis" id="c-model-name"></span>
+          </button>
+          <span class="tdot"></span>
+          <button id="c-effort" class="cbtn effort" title="推理等级（点击选择）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M4 19a9 9 0 0 1 16 0"/></svg>
+            <span id="c-effort-name">默认</span>
+          </button>
+          <button id="stop" class="send stop hidden" title="停止">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
+          </button>
+          <button id="send" class="send" title="发送">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- remote permission approval card -->
+    <div id="approval" class="overlay hidden">
+      <div class="sheet approval-card">
+        <div class="sheet-title">⚠ 权限请求</div>
+        <div class="ap-session dim" id="ap-session"></div>
+        <div class="ap-tool mono" id="ap-tool"></div>
+        <pre class="ap-input mono" id="ap-input"></pre>
+        <div class="sheet-actions">
+          <button id="ap-deny" class="btn deny">拒绝</button>
+          <button id="ap-allow" class="btn primary">允许一次</button>
+        </div>
+        <p class="sheet-note">3 分钟无响应自动拒绝</p>
+      </div>
+    </div>
+
+    <!-- new-session modal -->
+    <div id="new-modal" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-title">新建任务</div>
+        <textarea id="new-text" rows="3" placeholder="要 claude 做什么"></textarea>
+        <p class="sheet-note">工作目录决定任务归属的项目：选电脑上打开过的文件夹，否则桌面端看不到它</p>
+        <select id="new-cwd"></select>
+        <input id="new-cwd-custom" type="text" placeholder="或输入其他路径" spellcheck="false">
+        <p class="sheet-note">权限模式</p>
+        <div class="seg" id="new-perm">
+          <button class="seg-btn active" data-v="auto">自动执行</button>
+          <button class="seg-btn" data-v="ask">需要时手机审批</button>
+        </div>
+        <div class="sheet-actions">
+          <button id="new-cancel" class="btn ghost">取消</button>
+          <button id="new-go" class="btn primary">开始</button>
+        </div>
+        <p id="new-err" class="gate-err"></p>
+      </div>
+    </div>
+    <!-- context detail bubble -->
+    <div id="ctx-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">上下文</div>
+        <div class="ctx-hero">
+          <span class="ctx-hero-num" id="ctx-used">—</span>
+          <span class="ctx-hero-cap" id="ctx-total">/ —</span>
+          <span class="ctx-hero-pct" id="ctx-pct">—</span>
+        </div>
+        <div class="ctx-bar" id="ctx-bar" role="img" aria-label="上下文构成"></div>
+        <div class="ctx-cats" id="ctx-cats"></div>
+        <p class="sheet-note" id="ctx-note">口径与桌面端一致：已用 = 最近一次请求的输入 tokens（含缓存）</p>
+      </div>
+    </div>
+
+    <!-- model picker bubble -->
+    <div id="model-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">选择模型</div>
+        <div id="model-list"></div>
+        <p class="sheet-note">对之后发送的消息生效；再次点击已选项恢复默认</p>
+      </div>
+    </div>
+
+    <!-- permission mode bubble -->
+    <div id="perm-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">权限模式</div>
+        <div id="perm-list"></div>
+        <p class="sheet-note">仅对之后发送的消息生效</p>
+      </div>
+    </div>
+
+    <!-- effort picker bubble -->
+    <div id="effort-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">推理等级</div>
+        <div id="effort-list"></div>
+        <p class="sheet-note">等级越高思考越充分，耗时与用量也越大</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js?v=15"></script>
+</body>
+</html>
