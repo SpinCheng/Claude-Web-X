@@ -27,6 +27,27 @@ npm start          # node bridge/index.js，端口 3742
 前提：本机装有可用的 Claude Code CLI 并已完成登录（第三方客户端内置的 CLI 亦可，runner 会自动发现）；
 API 凭证按你环境的惯例放在 `~/.claude/settings.json` 的 `env` 块，spawn 时由 bridge 显式注入子进程。
 
+## 运行环境（与 CLI 版本强关联）
+
+本工程直接消费 Claude Code CLI 的行为与数据格式，**与 CLI 版本强耦合**。以下为实测通过的组合：
+
+| 组件 | 实测版本 | 说明 |
+|---|---|---|
+| OS | Windows 11（10.0.22631+） | 启动器/PowerShell/路径均按 Windows 设计 |
+| Node.js | ≥ 20（实测 22.x） | ESM、`fs.watch(recursive)`、降级轮询 |
+| Claude Code CLI | **2.1.308** | 第三方客户端内置副本；runner 自动取 mtime 最新版，升级即跟随 |
+| 第三方客户端 | Claude 3.6556.x（商店版） | 提供 CLI 安装布局（`%LOCALAPPDATA%\Claude-3p\claude-code\<版本>\<hash>\`）与登录态 |
+
+**强关联点**（CLI 升级后若出问题，先对照这份清单排查）：
+
+- 转录 JSONL 行格式：`user`/`assistant`/`system`/`cost-state` 的字段形状、`origin.kind`、`message.usage`、`message.model`
+- `--resume <id> -p` 追加写原 JSONL（不新建文件）；`--output-format stream-json` 行序列（`system/init` 携带 `session_id`）
+- 旗标名：`--dangerously-skip-permissions`、`--permission-prompt-tool`（+内联 `--mcp-config`）、`--model`、`--effort`
+- `/context` 命令的 markdown 输出结构（上下文探针按表格式解析）
+- Stop/Notification hooks 回调格式
+
+CLI 自动升级后若行为异常，可在 `bridge/data/config.json` 设 `claudePath` 钉住指定版本。
+
 ## 能做什么
 
 **手机端（PWA，可"添加到主屏幕"）**
