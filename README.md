@@ -35,8 +35,9 @@ API 凭证按你环境的惯例放在 `~/.claude/settings.json` 的 `env` 块，
 |---|---|---|
 | OS | Windows 11（10.0.22631+） | 启动器/PowerShell/路径均按 Windows 设计 |
 | Node.js | ≥ 20（实测 22.x） | ESM、`fs.watch(recursive)`、降级轮询 |
-| Claude Code CLI | **2.1.308** | 第三方客户端内置副本；runner 自动取 mtime 最新版，升级即跟随 |
-| 第三方客户端 | Claude 3.6556.x（商店版） | 提供 CLI 安装布局（`%LOCALAPPDATA%\Claude-3p\claude-code\<版本>\<hash>\`）与登录态 |
+| Claude Code CLI | **2.1.308** | 来源任意：npm 全局安装、或第三方桌面客户端内置副本（runner 按 mtime 自动发现，升级即跟随） |
+
+> **桌面客户端不是依赖**：bridge 从不与桌面 App 通信。桌面会话之所以在列表里可见，是因为桌面版底层运行同一 CLI、写同一份 `~/.claude/projects` 转录。第三方客户端在本工程中的唯一角色是**提供了一个已配好登录态的 CLI 分发渠道**（`%LOCALAPPDATA%\Claude-3p\claude-code\...`，且其实测环境无需官方订阅）——你也可以完全用官方渠道安装的 CLI。
 
 **强关联点**（CLI 升级后若出问题，先对照这份清单排查）：
 
