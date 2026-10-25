@@ -95,8 +95,40 @@ claude-remote/
 | Phase 0 | 环境勘探六项实测，冻结 adapter 接口 | ✅ |
 | Phase 1 | CC 只读 + hooks 通知 | ✅ |
 | Phase 2 | CC 全双工 + 双向接管 + 产品化 PWA + 配对面板 + 上下文/模型/等级控制 | ✅ |
-| Phase 3 | Cowork 数据面接入统一模型 | ◀ 下一步 |
+| **PWA·P0** | **核心闭环补全**（见下方 Backlog P0 组） | ◀ 候选下一批 |
+| Phase 3 | Cowork 数据面接入统一模型 | 待开始 |
 | Phase 4 | Cowork 控制（UIA 主路线，deep link 已实测不可用） | 待开始 |
+
+### Backlog（功能补全清单）
+
+对标 CLI/桌面版与其他 Harness 工具（OpenCode/Aider 等）梳理的能力缺口，按优先级分组。
+
+**P0 · 核心场景断点**（"远程派活"闭环缺口）
+
+- [ ] **锁屏/后台完成通知**：ntfy 推送代码已就绪（`notify.ntfyTopic` 配置即用），进阶 Web Push（SW + VAPID）
+- [ ] **手动 /compact**：上下文自救按钮——`-p` 模式斜杠命令路线已由 `/context` 探针验证；勘测压缩后返回行为
+- [ ] **审批卡 diff 视图**：ask 模式审批 Edit/Write 时渲染 +/- diff（复用时间线 toolDiff 逻辑），替代 JSON 原文
+- [ ] **历史回看分页**：去掉 `readTranscript` 400 事件硬上限，加"加载更早"
+- [ ] **手机发图**（拍照/相册）：`--input-format stream-json` 从 stdin 发含 image block 的 user turn；先勘测中转模型多模态支持
+
+**P1 · 明显缺失**
+
+- [ ] always-allow 工具白名单（审批疲劳：ask 模式下按 tool_name 自动放行，存 config）
+- [ ] 会话改动文件总览（聚合转录 Edit/Write，或 bridge 跑 `git status --porcelain`）
+- [ ] 会话重命名（本地覆盖标题）
+- [ ] 队列单条管理（查看/删单条/编辑，现为整队清空）
+- [ ] 会话搜索（标题 + 最近事件）
+- [ ] 导出 Markdown
+
+**P2 · 体验增强**
+
+- [ ] 斜杠命令快捷面板（/cost /model /clear…）
+- [ ] token/费用累计统计面板（cost-state 数据已聚合，缺汇总视图）
+- [ ] 配额/速率显示（探测 statusline 的 rate_limits 字段）
+- [ ] 离线 PWA shell（service worker）
+- [ ] `cr.ps1 status/watch`
+- [ ] 检查点回滚（勘测 CC checkpoint 在 headless 的可用性）
+- [ ] 多设备/多 token（安全模型需重估，缓行）
 
 ## 注意
 

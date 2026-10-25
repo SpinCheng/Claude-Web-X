@@ -72,8 +72,15 @@ CC 会话转录在 `%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.j
 - 锁文件 `bridge/data/locks/<id>.json`（PC 端 advisory claim，TTL 12h）；手机侧驱动态由 runner 内存跟踪。单会话全局并发 ≤4。
 - **消息排队（2026-10-25 v6）**：运行中发送不再拒绝/禁言——`runner.send` busy 时入队（`queues` Map，上限 5 条），run 结束 800ms 后 `_drainQueue` 自动派发（WS `queue-dispatched` 帧 + sessions 帧带 `queued` 计数；`DELETE /api/sessions/:id/queue` 清队，PWA 队列徽章点击取消）。**自己的活 run 在跑时跳过 mtime 仲裁**（server 消息路由先查 `runner.activeRunFor`，否则 recent-local-write 会误拦自己的排队）。PWA：输入框运行中保持可用；触屏设备 Enter=换行（`IS_TOUCH` = pointer:coarse）。**v10 输入区四件**：① 代码块复制按钮=图标+`.codeblock` 包裹钉住（代码滚动按钮不动）；② token 圆环只显示环不显示数字——进度=**最近一次请求的上下文占用**（assistant 行 `message.usage` 的 in+cacheRead+cacheCreate，adapter 传 `s.usage`；无 usage 时回退累计输出占比），点击弹**上下文明细面板**（当前上下文/累计 in·out/缓存读/费用/转录体积构成条：工具·思考·对话字符占比）；③ cost-state **跨模型聚合**（旧版只读第一个模型的用量，多模型会话数值错；且 cost-state 不再覆盖 model 标签——assistant 行的 `message.model` 是唯一显示来源，曾致 glm-5.3/opus-5.5 闪烁）；④ 模型芯片点击弹**模型选择列表**（`GET /api/models` 从 settings.json env 的 `ANTHROPIC_MODEL` + `ANTHROPIC_DEFAULT_*_MODEL` 解析；选中存 localStorage `cr_model`，发送/新建/排队都带 `model`，runner 加 `--model` 旗标）。
 
-## 路线图（下一步 = Phase 3）
+## 路线图（候选下一批 = PWA·P0 能力补全）
 
 Phase 2 收尾已基本完成（cwd 选择器、自检优化、可安装 PWA 均已落地）；剩余：手机真机长期手感反馈。
+
+**PWA 能力补全（2026-10-26 梳理，对标 CLI/桌面/OpenCode 等定档，详细清单以 README Backlog 为准）**：
+
+- **P0 核心闭环**：①锁屏/后台完成通知（ntfy 代码已就绪，`notify.ntfyTopic` 配置即用；进阶 Web Push）；②手动 /compact 按钮（`-p` 斜杠命令路线已被 /context 探针验证，勘测压缩返回行为）；③审批卡 diff 视图（复用 toolDiff 渲染 Edit 的 old/new_string）；④历史回看分页（去 `readTranscript` 的 400 事件上限）；⑤手机发图（`--input-format stream-json` 发 image block，**先勘测中转多模态**）。
+- **P1**：always-allow 工具白名单（approve-mcp 按 tool_name 放行）、会话改动文件总览（转录聚合或 git status）、会话重命名（本地覆盖）、队列单条管理、会话搜索、导出 Markdown。
+- **P2**：斜杠命令面板、token/费用统计面板、配额/速率显示（statusline rate_limits 探测）、离线 PWA shell、cr.ps1 status/watch、检查点回滚（勘测 headless 可用性）、多设备 token（安全模型需重估，缓行）。
+
 Phase 3：`adapter-cowork.js` 接入统一模型（字段已实测），轮询状态机（Cowork 无 hooks）。
 Phase 4：Cowork 控制面——deep link 已判不可用，主路线 UIA（07 号勘探），CLI 接管（`cliSessionId`）为备选；Tailscale HTTPS（当前 http 局域网下 Chrome 不给安装提示，"添加到主屏幕"可用）。
