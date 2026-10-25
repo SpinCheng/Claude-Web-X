@@ -1,0 +1,255 @@
+// runner.js - non-resident CC executor (Plan D3).
+// One `claude --resume <id> -p --output-format stream-json` child per phone
+// message; the child exits when the turn ends, so between messages no process
+// holds the session and the PC can take over via `claude --resume` any time.
+//
+// Transcript content is NOT streamed from here: the adapter already tails the
+// session files and pushes 'append' frames. This module only manages run
+// lifecycle: start / capture session_id (new sessions) / end / cancel.
+//
+// Env: Claude Code on this machine does NOT self-apply the `env` block of
+// ~/.claude/settings.json for auth (bare spawn => "Not logged in"), so we read
+// that block once and inject it into the child env. Secrets stay in memory.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { EventEmitter } from 'node:events';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MAX_CONCURRENT_RUNS = 4;
+
+export class Runner extends EventEmitter {
+  constructor(opts = {}) {
+    super();
+    this.store = opts.store; // Store (for cwd lookup); optional but expected
+    this.claudePathOverride = opts.claudePath || '';
+    // YOLO mode: phone-dispatched turns run with permission checks skipped --
+    // nobody is at the PC to approve prompts, so without this any tool use
+    // stalls the run forever. Default on; cfg.yolo=false opts out.
+    this.yolo = opts.yolo !== false;
+    this.port = opts.port || 3742; // for the approve-mcp callback URL
+    this.runs = new Map(); // runId -> run record
+    this.outcomes = new Map(); // sessionId -> { state, exitCode, cancelled, at } (last finished run)
+    this.queues = new Map(); // sessionId -> [{text, perm, at}] (pending while busy)
+    this._seq = 0;
+    this._claudeExe = null;
+    this._settingsEnv = null;
+  }
+
+  // live or recently-finished run record (for approval routing)
+  getRun(runId) { return this.runs.get(runId) || null; }
+
+  // Resolution order: config override -> PATH -> newest bundled CLI under
+  // %LOCALAPPDATA%\Claude-3p\claude-code\<ver>\<hash>\claude.exe (3rd-party
+  // desktop client keeps its own copy there and upgrades create new dirs).
+  resolveClaude() {
+    if (this._claudeExe) return this._claudeExe;
+    if (this.claudePathOverride && fs.existsSync(this.claudePathOverride)) {
+      this._claudeExe = this.claudePathOverride;
+      return this._claudeExe;
+    }
+    const roots = [
+      path.join(process.env.LOCALAPPDATA || '', 'Claude-3p', 'claude-code'),
+      path.join(process.env.LOCALAPPDATA || '', 'Claude', 'claude-code'),
+    ];
+    let best = null; // newest claude.exe by mtime
+    for (const root of roots) {
+      let versionDirs = [];
+      try { versionDirs = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
+      for (const vd of versionDirs) {
+        if (!vd.isDirectory()) continue;
+        let hashDirs = [];
+        try { hashDirs = fs.readdirSync(path.join(root, vd.name), { withFileTypes: true }); } catch { continue; }
+        for (const hd of hashDirs) {
+          if (!hd.isDirectory()) continue;
+          const exe = path.join(root, vd.name, hd.name, 'claude.exe');
+          try {
+            const st = fs.statSync(exe);
+            if (st.isFile() && (!best || st.mtimeMs > best.mtimeMs)) best = { exe, mtimeMs: st.mtimeMs };
+          } catch { /* not there */ }
+        }
+      }
+    }
+    if (best) { this._claudeExe = best.exe; return this._claudeExe; }
+    // fall back to PATH lookup (spawn will fail visibly if missing)
+    this._claudeExe = 'claude';
+    return this._claudeExe;
+  }
+
+  // `env` block of ~/.claude/settings.json (relay base URL + auth token...).
+  // Read lazily and cached; never logged, never returned to clients.
+  settingsEnv() {
+    if (this._settingsEnv) return this._settingsEnv;
+    this._settingsEnv = {};
+    try {
+      const p = path.join(os.homedir(), '.claude', 'settings.json');
+      const env = JSON.parse(fs.readFileSync(p, 'utf8')).env;
+      if (env && typeof env === 'object') this._settingsEnv = env;
+    } catch { /* no settings / no env block */ }
+    return this._settingsEnv;
+  }
+
+  // Continue an existing session from the phone ("resume" path).
+  // opts.perm: 'auto' (yolo, default) | 'ask' (route permission prompts to
+  // the phone via the approve-mcp tool).
+  send(sessionId, text, opts = {}) {
+    if (!sessionId || !text) return { error: 'bad-request' };
+    const cwd = (this.store.get(sessionId) || {}).cwd || os.homedir();
+    const r = this._spawnRun(['--resume', sessionId], text, cwd, sessionId, opts.perm || 'auto', opts.model || '', opts.effort || '');
+    if (r.error === 'busy') {
+      // queue instead of rejecting: phone users type follow-ups while a turn
+      // is still running; they dispatch automatically when it finishes
+      const q = this.queues.get(sessionId) || [];
+      if (q.length >= 5) return { error: 'queue-full' };
+      q.push({ text, perm: opts.perm || 'auto', model: opts.model || '', effort: opts.effort || '', at: Date.now() });
+      this.queues.set(sessionId, q);
+      return { queued: true, position: q.length, runId: null };
+    }
+    return r;
+  }
+
+  queuedFor(sessionId) { return this.queues.get(sessionId) || []; }
+
+  clearQueue(sessionId) {
+    const n = (this.queues.get(sessionId) || []).length;
+    this.queues.delete(sessionId);
+    return n;
+  }
+
+  // dispatch the next queued message for a session (called when its run ends)
+  _drainQueue(sessionId) {
+    if (!sessionId) return;
+    const q = this.queues.get(sessionId);
+    if (!q || q.length === 0) return;
+    const next = q.shift();
+    if (q.length === 0) this.queues.delete(sessionId);
+    this.emit('queued-dispatch', { sessionId, text: next.text, remaining: q.length });
+    const cwd = (this.store.get(sessionId) || {}).cwd || os.homedir();
+    this._spawnRun(['--resume', sessionId], next.text, cwd, sessionId, next.perm, next.model || '', next.effort || '');
+  }
+
+  // Start a fresh session from the phone; sessionId is captured from the
+  // stream's init line and reported via an 'update' event.
+  start(text, cwd, opts = {}) {
+    if (!text) return { error: 'bad-request' };
+    return this._spawnRun([], text, cwd || os.homedir(), null, opts.perm || 'auto', opts.model || '', opts.effort || '');
+  }
+
+  cancel(runId) {
+    const run = this.runs.get(runId);
+    if (!run || run.state !== 'running') return false;
+    run.cancelled = true;
+    try { run.child.kill(); } catch { /* already gone */ }
+    return true;
+  }
+
+  activeRunFor(sessionId) {
+    for (const run of this.runs.values()) {
+      if (run.state === 'running' && run.sessionId === sessionId) return run;
+    }
+    return null;
+  }
+
+  // last finished phone-run outcome for a session (undefined = never ran)
+  recallOutcome(sessionId) {
+    return this.outcomes.get(sessionId);
+  }
+
+  _spawnRun(resumeArgs, text, cwd, sessionId, perm, model, effort) {
+    if (sessionId && this.activeRunFor(sessionId)) return { error: 'busy', sessionId };
+    let live = 0;
+    for (const r of this.runs.values()) if (r.state === 'running') live++;
+    if (live >= MAX_CONCURRENT_RUNS) return { error: 'overloaded' };
+
+    const runId = 'r' + Date.now().toString(36) + (++this._seq).toString(36);
+    const args = [...resumeArgs, '-p', text, '--output-format', 'stream-json', '--verbose'];
+    if (model) args.push('--model', model);
+    // reasoning effort (CLI: --effort low|medium|high|xhigh|max)
+    if (['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) args.push('--effort', effort);
+    if (perm === 'ask') {
+      // route permission prompts to the phone: minimal MCP server, spawned by
+      // the CLI itself via --mcp-config, calls back into the bridge
+      const script = path.join(__dirname, 'approve-mcp.mjs').split(path.sep).join('/');
+      const mcpCfg = JSON.stringify({
+        mcpServers: {
+          crapprove: { command: process.execPath, args: [script, '--run', runId, '--port', String(this.port)], env: {} },
+        },
+      });
+      args.push('--permission-prompts', 'host', '--permission-prompt-tool', 'mcp__crapprove__phone_approve', '--mcp-config', mcpCfg);
+    } else if (this.yolo) {
+      args.push('--dangerously-skip-permissions');
+    }
+    const child = spawn(this.resolveClaude(), args, {
+      cwd,
+      env: { ...process.env, ...this.settingsEnv() },
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const run = {
+      runId, sessionId, child, state: 'running', startedAt: Date.now(),
+      exitCode: null, stderrTail: '', cancelled: false,
+    };
+    this.runs.set(runId, run);
+
+    const onLine = (line) => {
+      if (!line) return;
+      let o; try { o = JSON.parse(line); } catch { return; }
+      // session_id rides on every stream-json line; adopt it as soon as seen
+      // (matters for `start` where we don't know the id up front).
+      if (o.session_id && !run.sessionId) {
+        run.sessionId = o.session_id;
+        this._emit(run);
+      }
+    };
+    let stdoutBuf = '';
+    child.stdout.on('data', (chunk) => {
+      stdoutBuf += chunk.toString('utf8');
+      const lines = stdoutBuf.split('\n');
+      stdoutBuf = lines.pop(); // keep partial last line
+      for (const l of lines) onLine(l.trim());
+    });
+    child.stderr.on('data', (chunk) => {
+      run.stderrTail = (run.stderrTail + chunk.toString('utf8')).slice(-400);
+    });
+    child.on('error', (err) => {
+      run.state = 'error';
+      run.error = String((err && err.message) || err);
+      this._emit(run);
+      this.runs.delete(runId);
+    });
+    child.on('close', (code) => {
+      run.state = 'end';
+      run.exitCode = code == null ? (run.cancelled ? 'cancelled' : 0) : code;
+      this._emit(run);
+      if (run.sessionId) {
+        this.outcomes.set(run.sessionId, {
+          state: run.cancelled ? 'stopped' : (run.exitCode === 0 ? 'ok' : 'failed'),
+          exitCode: run.exitCode, cancelled: run.cancelled, at: Date.now(),
+        });
+      }
+      // keep the record around briefly for status polls, then forget it
+      setTimeout(() => this.runs.delete(runId), 60_000);
+      // dispatch the next queued phone message for this session, if any
+      if (run.sessionId) setTimeout(() => this._drainQueue(run.sessionId), 800);
+    });
+
+    this._emit(run);
+    return { runId };
+  }
+
+  _emit(run) {
+    this.emit('update', {
+      runId: run.runId,
+      sessionId: run.sessionId,
+      state: run.state,
+      exitCode: run.exitCode,
+      error: run.error,
+      cancelled: run.cancelled,
+      startedAt: run.startedAt,
+      stderrTail: run.state === 'error' || (run.state === 'end' && run.exitCode !== 0)
+        ? run.stderrTail : undefined,
+    });
+  }
+}
