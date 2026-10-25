@@ -13,19 +13,19 @@
 - **上下文口径对齐桌面端（v13 定稿，2026-10-25）**：**决定性发现——CLI 的 `/context` 命令在 `-p` 模式下可用**（`claude -p --model <id> /context --output-format stream-json --verbose`）：init 行带 session_id、result 行带 markdown 表格，一次拿全 Desktop 弹窗同源的精确数字。本机实测（claude-remote 项目 + claude-opus-5[1M]）：**窗口 1M**、固定开销 = 系统提示 3k + 系统工具 33.1k + MCP 工具 5.6k + MCP 指令 206 + 记忆 4.2k + 技能 2.5k = **48.6k**、**autocompact buffer 33k**；Free space = 窗口 − used − buffer（v12 推断已被实测证实）。`bridge/ctxprobe.js`：`GET /api/sessions/:id/context` → 按 (cwd, modelId) 缓存（内存 + `bridge/data/ctx-probe.json`）跑一次性 `-p /context` 丢弃会话（解析完即 `adapter.archiveSession` 回收，不残留列表），首次 ~6s、缓存后 28ms；固定段只取决于 (cwd,model) 与会话无关。PWA 面板（v13）：打开先显示首请求估算 + "正在测量"，探针返回后原位替换为**实测值**——系统与工具（含 系统/MCP/记忆技能 子注）/ 消息（= used − 固定）/ 自动压缩保留（buffer）/ 剩余可用（= 窗口 − used − buffer）；`state.ctxProbe` 命中时圆环分母也用实测窗口。CDP 8/8 过（含探针落地+子注+buffer 行）。**勿用 statusline 方案**（仅交互会话触发、配置不热加载、SendKeys 驱动不可靠——均已实测踩坑；探针已从 settings.json 移除，备份 `settings.json.bak-slprobe` 保留）。垃圾会话注意：手工跑 `/context` 或交互探针测试会留 jsonl，用 `DELETE /api/sessions/:id` 回收。
 - **上下文面板细化 + 工具栏设计稿（v14，2026-10-25）**：明细分类按探针逐项拆开（系统提示/系统工具/MCP 工具/MCP 指令/记忆文件/技能/消息/自动压缩保留/剩余可用，行与堆叠条均 JS 动态生成——`renderContextSheet` 用 `CTX_CATS` 表驱动 + 分类色板 `.sw-sys/.seg-sys` 等：暖色系=固定开销、石板蓝=消息）；**删除了与上下文无关的行**（当前模型/累计 tokens/缓存读取/费用——费用仍在会话头 meta）。**输入框工具栏四版交互设计稿**：`public/composer-mockups-v2.html`（免鉴权可直接访问，手机也能开）——A 胶囊组+锚定气泡弹层 / B 图标轨(44px+微型值标)+泊位联板 / C 单行融合+居中浮卡 / D 常驻状态条+居中卡；每版三个工具（权限/上下文/模型）可点击、弹层内容为 v14 同款真实数据，CDP 12 项几何校验全过（框内/不遮 dock/高度适配）。待用户选定后落地。
 - **方案 E 落地 + 推理等级（v15，2026-10-25，用户裁定）**：输入框工具栏 = **无框胶囊**（图标+数值直接坐在 dock 上，`.tdot` 中点分隔 ×3，按下才现轻底色；权限=珊瑚/琥珀、其余弱灰）+ 四工具：**权限/上下文(%值)/模型/推理等级**。所有工具弹层改为**锚定气泡**（`.overlay.bub` + `.sheet.bubble`：margin-bottom 104px 悬于 dock 上方、底部小尾巴、bubIn 弹簧动画、max-height 62dvh 内滚）——**勿回退为底部全宽 sheet**。弹层行样式全面**去拟物**（用户点名）：`.opt` 平铺行（透明底、无阴影、hairline 分隔、右对勾弹簧、active 仅 label 变珊瑚色），权限/模型/推理等级三弹层共用。**推理等级**：CLI 实测旗标 `--effort low|medium|high|xhigh|max`；runner `_spawnRun` 白名单校验后追加旗标（send/start/queue 全链路传 effort）；PWA `cr_effort` localStorage + 中文等级（低/中/高/超高/最高）。**气泡历史管理（防竞态，勿回退）**：open/close 均**不动 history**；popstate 时若有气泡开着→只关气泡并 `pushState({cr:'detail'},'#s')` 补回条目（"返回键先关弹层"），**不要**在 closeBubble 里 history.back()——异步 back 会与快速切换气泡竞态误关新弹层（v15 开发中实测踩坑）。气泡宽度用 `flex:1 1 auto` 填主轴（**勿用 align-self:stretch**——row-flex 下那是竖向拉伸，会把所有弹层拉到同高）。CDP 16 项全过。设计稿存档：`public/composer-mockups-v2.html`（A/B/C/D/E 五帧可交互）。
-- Phase 0 六项实测**已完成**，报告：`phase0/PHASE0-REPORT.md`。bridge 常驻后台（端口 3742，开机自启装好后随登录拉起）。
+- Phase 0 六项实测**已完成**，报告：`docs/phase0/PHASE0-REPORT.md`。bridge 常驻后台（端口 3742，开机自启装好后随登录拉起）。
 
 ## 快速开始
 
 ```powershell
-cd D:\dev_workspaces\claude-remote
+cd claude-remote
 npm install
 npm start          # node bridge/index.js
 ```
 
 启动日志打印局域网 URL 与 token（存于 `bridge/data/config.json`，已 gitignore；新增键 `claudePath`/`defaultCwd` 会自动迁移合并）。手机浏览器打开 URL 输 token。电脑端接管：`powershell -ExecutionPolicy Bypass -File cli\cr.ps1 list` → `cr attach <序号>`。
 
-**token 与配对（配对面板）**：PC 浏览器打开 `http://localhost:3742/pair`（**同机任意地址均可**：`/api/pair/*` 校验 `remoteAddress === localAddress`（含 loopback），电脑上用局域网 IP/Tailscale IP 打开也行；手机/其他设备仍 403——页面会提示"仅限本机访问"，建议收藏）——页面用 `public/vendor/qrcode.js`（vendored 的 MIT 库 qrcode-generator@1.4.4，客户端渲染，非后端依赖）渲染当前配对链接二维码（可切换网卡），并提供：**token 轮换**（`POST /api/pair/rotate`：免重启热轮换——同一 cfg 对象内存换 token + 写回 config.json + 自动同步 settings.json hooks（先备份 `.bak-rotate-*`）+ 踢掉全部旧 WS 客户端；已实测含 LAN 403 拒绝）与**开机自启安装**（`POST /api/pair/autostart`：复制 start-bridge.vbs 进 shell:startup，bridge 有 EADDRINUSE 双开保护）。token 不轮换就永不变化，手机配对链接永久有效。CLI 备选：`cli\cr.ps1 url`、`scripts\rotate-token.ps1`。
+**token 与配对（配对面板）**：PC 浏览器打开 `http://localhost:3742/pair`（**同机任意地址均可**：`/api/pair/*` 校验 `remoteAddress === localAddress`（含 loopback），电脑上用局域网 IP/Tailscale IP 打开也行；手机/其他设备仍 403——页面会提示"仅限本机访问"，建议收藏）——页面用 `public/vendor/qrcode.js`（vendored 的 MIT 库 qrcode-generator@1.4.4，客户端渲染，非后端依赖）渲染当前配对链接二维码（可切换网卡），并提供：**token 轮换**（`POST /api/pair/rotate`：免重启热轮换——同一 cfg 对象内存换 token + 写回 config.json + 自动同步 settings.json hooks（先备份 `.bak-rotate-*`）+ 踢掉全部旧 WS 客户端；已实测含 LAN 403 拒绝）与**开机自启安装**（`POST /api/pair/autostart`：**生成**绝对路径版 vbs 进 shell:startup——仓库里的 `scripts/start-bridge.vbs` 是自定位模板（node 取 PATH、项目根按脚本位置推导），启动文件夹里的副本由 pairing.js 用 `process.execPath` + 实际项目路径现场生成，两份职责不同勿合并；bridge 有 EADDRINUSE 双开保护）。token 不轮换就永不变化，手机配对链接永久有效。CLI 备选：`cli\cr.ps1 url`、`scripts\rotate-token.ps1`。
 
 **hooks 推送已配置**（Stop + Notification 已写入 `~/.claude/settings.json`，原文件备份 `settings.json.bak-pre-claude-remote`）。关键实现事实：本机 CC 用 **PowerShell 执行 hook 命令**，curl 的 `--data-binary @-` 会炸（`@-` 是 PS 语法）；命令必须指向 `bridge/hook-post.cmd`（.cmd 恒由 cmd.exe 解析），且路径用**正斜杠**（反斜杠会被多层转义吃掉——手工改配置时切记）。hook-post.cmd 内写死端口 3742，改端口需同步改它。
 
@@ -34,7 +34,7 @@ npm start          # node bridge/index.js
 **环境（Phase 0，2026-10-25）**
 
 - `claude` CLI **不在 PATH**。第三方客户端内置完整 CLI：`%LOCALAPPDATA%\Claude-3p\claude-code\<版本>\<hash>\claude.exe`（当前 2.1.308；升级换目录，runner.js 动态取 mtime 最新）。
-- 直接 spawn 该 CLI 报 "Not logged in"：`~/.claude/settings.json` 的 `env` 块（ANTHROPIC_BASE_URL=open.bigmodel.cn + ANTHROPIC_AUTH_TOKEN）不用于鉴权，**必须显式注入子进程 env**（runner.js/cr.ps1 均已实现，密钥只进内存）。
+- 直接 spawn 该 CLI 报 "Not logged in"：`~/.claude/settings.json` 的 `env` 块（`ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`，中转端点与密钥名见 `LOCAL.md`，不入库）不用于鉴权，**必须显式注入子进程 env**（runner.js/cr.ps1 均已实现，密钥只进内存）。
 - `claude --resume <id> -p` 追加写原 JSONL、不新建文件（含对 Desktop 活跃会话注入的压力测试）；跨 resume 上下文保持。
 - **Desktop 会话列表按工作目录（项目）分组**：手机/CLI 新建的会话只在 Desktop 中"打开该文件夹对应项目"时可见（**用户已实测确认**：claude-remote 工作区内手机新建的会话刷新后出现在 Desktop 列表）；cwd 落在未打开目录（如默认主目录）的会话 Desktop 不显示（数据仍在 JSONL）。Desktop 正打开的会话视图不会实时重放外部追加，**重开会话即见**（用户实测确认）。PWA 新建会话为 cwd 选择器（列出已知项目，默认最近活跃会话的 cwd）。
 - **会话删除**：`DELETE /api/sessions/:id` → 转录移入 `bridge/data/trash/`（可找回）+ 墓碑机制防 fs.watch 删除事件复活记录（PWA 详情页 🗑 按钮）。运行中的会话拒绝删除（409 busy）。

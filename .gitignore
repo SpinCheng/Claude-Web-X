@@ -11,12 +11,13 @@ bridge/data/
 *.local.json
 
 # phase0 field-test artifacts (contains transcript excerpts; keep local)
-phase0/PHASE0-REPORT.md
-phase0/tmp/
-phase0/uia-selectors.json
+docs/phase0/PHASE0-REPORT.md
+docs/phase0/tmp/
+docs/phase0/uia-selectors.json
 
 # editor / OS / scratch
 .claude/
+LOCAL.md
 *.log
 *.bak
 *.bak-*

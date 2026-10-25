@@ -1,0 +1,10 @@
+# normalize text files in repo (LF); working copy per platform
+* text=auto
+# Windows scripts must stay CRLF on checkout
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf
+# binaries
+*.png binary
+*.ico binary

@@ -1,0 +1,21 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: syntax check (bridge + pwa)
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem bridge/*.js, bridge/*.mjs, public/app.js, scripts/*.mjs
+          foreach ($f in $files) { node --check $f.FullName; if ($LASTEXITCODE -ne 0) { exit 1 } }
+      - name: import smoke (module graph loads)
+        run: node -e "Promise.all(['./bridge/server.js','./bridge/runner.js','./bridge/ctxprobe.js','./bridge/adapter-cc.js'].map(m=>import(m))).then(()=>console.log('imports ok'))"
