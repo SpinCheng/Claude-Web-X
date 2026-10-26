@@ -101,6 +101,10 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 安全取舍：html/svg 即使白名单也**按 text/plain 出**（模型写的文件当 markup 渲染=自造 XSS）；图片直出；≤2MB；cwd 外不可预览（~/.claude 等故意排除）。测试：隔离实例（:3799，不碰生产 bridge，规避红线 6）curl 9 断言（401/200/415/403×3/404）+ CDP headless E2E（badge v23、4 条链接、txt 弹层含正文、png 灯箱 blob URL）全过。教训：**「显示层缺功能」先分清数据在不在转录里**——内联结果在（v22 够），磁盘文件不在（需要服务端取，v23）。
 
+## 2026-10-26 · 压缩摘要折叠 v24
+
+用户报：某种状态下一大串生成文本以右侧气泡上屏——即上下文耗尽压缩后的**续传摘要**。取证（本会话文件 3 处）：该行 `type=user`、**origin 字段缺失**、`isCompactSummary:true`、`isVisibleInTranscriptOnly:true`、纯字符串 content；现有门只查 `origin.kind`，缺失即漏进真人分支渲染成大气泡。关键坑：**origin 缺失 ≠ 可折叠**——手机经 runner 发的消息（promptSource/turnOrigin=sdk）同样没有 origin 字段，按缺失折叠会把真消息吞掉，只能认显式 `isCompactSummary`。另发现 66 条 sdk 探针类 user 行（如 passphrase 探测）与手机消息同签名，无法字段区分，维持气泡。PWA 渲染为 sysline 标记「⟲ 上下文已压缩（续传摘要 N 字，已折叠）」。隔离实例验证：API 层 compact=1/user=2/零泄漏 + CDP DOM 六断言全过。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

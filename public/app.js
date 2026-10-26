@@ -346,6 +346,11 @@ function applyEventToTurns(ev) {
   } else if (ev.k === 'stats') {
     T.push({ role: 'sys', text: '成本 $' + (ev.stats.usd != null ? Number(ev.stats.usd).toFixed(2) : '?') +
       ' · in ' + (ev.stats.inTok ?? '?') + ' / out ' + (ev.stats.outTok ?? '?') + ' tok' });
+  } else if (ev.k === 'compact') {
+    // compaction continuation summary folded by the adapter (isCompactSummary
+    // flag) - one marker line instead of a giant machine-generated bubble
+    const n = ev.n || 0;
+    T.push({ role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
   } else if (ev.k === 'title') { /* meta only */ }
 }
 function markLiveTurn() {

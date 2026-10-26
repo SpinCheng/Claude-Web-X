@@ -173,6 +173,16 @@ export class CcAdapter extends EventEmitter {
   _applyLine(id, obj, patch, events) {
     switch (obj.type) {
       case 'user': {
+        // compaction continuation (2.1.308): the CLI injects the resume
+        // summary as a user line with origin ABSENT and isCompactSummary:
+        // true - machine context for the model, not a human message. Fold to
+        // a marker. Phone-sent prompts ALSO lack origin (promptSource=sdk)
+        // and must stay bubbles, so fold on the explicit flag only.
+        if (obj.isCompactSummary) {
+          const sc = typeof ((obj.message || {}).content) === 'string' ? obj.message.content : '';
+          if (patch.est) patch.est.prose += sc.length;
+          return { k: 'compact', ts: obj.timestamp || '', n: sc.length };
+        }
         const cRaw = obj.message && obj.message.content;
         // 2.1.308: local-tool results carry origin=null (only MCP results set
         // origin.kind) - classify by CONTENT, not origin: a tool_result block
