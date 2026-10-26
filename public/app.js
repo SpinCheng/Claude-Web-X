@@ -359,6 +359,10 @@ function applyEventToTurns(ev) {
     // flag) - one marker line instead of a giant machine-generated bubble
     const n = ev.n || 0;
     T.push({ role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
+  } else if (ev.k === 'skill') {
+    // skill body injected by the CLI on invocation - folded to a marker too
+    const n = ev.n || 0;
+    T.push({ role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
   } else if (ev.k === 'title') { /* meta only */ }
 }
 function markLiveTurn() {

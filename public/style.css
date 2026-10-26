@@ -186,7 +186,8 @@ button { font-family: inherit; }
 .final > *:last-child, .final-card > *:last-child { margin-bottom: 0; }
 .final p, .final-card p { margin: 7px 0; }
 .final pre, .final-card pre { font-weight: 400; background: #171613; border-radius: 9px; padding: 9px; overflow-x: auto; font-size: 12px; }
-.final code, .final-card code { font-family: var(--mono); font-size: 12.5px; }
+.final code, .final-card code { font-family: var(--mono); font-size: 12.5px; font-weight: 400; background: rgba(255, 250, 240, .07); border-radius: 5px; padding: 1.5px 5px; overflow-wrap: anywhere; }
+.final pre code, .final-card pre code { background: none; padding: 0; border-radius: 0; overflow-wrap: normal; }
 .final .mdh1, .final-card .mdh1 { font-size: 17px; font-weight: 700; margin: 13px 0 6px; }
 .final .mdh2, .final-card .mdh2 { font-size: 15.5px; font-weight: 650; margin: 11px 0 5px; }
 .final .mdh3, .final-card .mdh3 { font-size: 14px; font-weight: 650; margin: 9px 0 4px; }

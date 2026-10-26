@@ -119,6 +119,12 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 跑 ui-ux-pro-max 审计（重点：v22-v26 落地的详情页/结论卡）。**对比度实测全部达标**：正文 13-14、次级 dim 5.4-6.9（含表头/工具输出）、链接 4.5-5.0、warn 7.5；仅两个次级 token 低于 AA——`--faint` 3.05（10px 机注行/队列头/徽章）、`--err` 4.21（错误输出）——均为 v8 定稿设计语言（最弱层/错误红），记录在案未擅动。修了四处机械问题：① 链接 `word-break: break-all` → `overflow-wrap: anywhere`（break-all 会把英文链接文本从词中切断，违反 long-token-wrapping；机串场景的 tool-chip/ap-input 保留 break-all 是对的）；② 8 个图标钮补 aria-label（原来只有 title）；③ `.flink`/结论卡链接补 `:focus-visible` 焦点环（触屏永不见）；④ Esc 关闭灯箱/文本预览（键盘逃生口，输入框聚焦时不劫持）。CDP 断言 9 项全过。教训：断言裸 `return` 在 Runtime.evaluate 顶层非法；`word-break:break-word` 是 final-card 既有继承值（等价 overflow-wrap 旧行为），断言目标应是"不再是 break-all"而非"必须是 normal"。
 
+## 2026-10-26 · 技能注入折叠 + 命令信封归一 + 行内码 chip v28
+
+用户报两问题：① 行内代码无"被包裹"观感——CSS 只有 mono 字体，无底色/内边距；加 `rgba(255,250,240,.07)` tint + 5px 圆角内边距（**pre 内 code 必须重置**，否则块代码双重底色）；② 调用技能时技能描述以右侧大气泡出现——与压缩摘要同族：**技能体注入行 = origin 缺失 + 纯 text 数组 + 首段 "Base directory for this skill:"**（实测 54k 字），折叠为 `✧ 技能 <名> 已注入（N 字，已折叠）` sysline（名取路径末段）。连带修复：`<command-*>` 信封原来只剥 command-name，用户 `/命令` 气泡显示标签汤——现归一成 `/名 参数`（/goal、/model、/compact 全受益）。
+
+测试坑（记两次了）：**bash 内联双引号里的 `\\\\` 会被逐层吃光**——fixture 路径反斜杠全丢、技能名提取跟着"假错"；含反斜杠的合成数据一律 Write 脚本文件 + `String.raw` 生成，勿 node -e 内联。隔离实例断言：unit（name=sample-skill）+ API（skill=1/零泄漏/命令归一）+ CDP（标记行/无大气泡/干净命令气泡/chip 底色 5px 字重 400）。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

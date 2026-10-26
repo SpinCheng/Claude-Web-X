@@ -184,6 +184,24 @@ export class CcAdapter extends EventEmitter {
           return { k: 'compact', ts: obj.timestamp || '', n: sc.length };
         }
         const cRaw = obj.message && obj.message.content;
+        // skill expansion (2.1.308): invoking a Skill injects its whole body
+        // as a user line - origin absent, array of pure text parts, starting
+        // with the base-dir header. Machine context like the compact summary:
+        // fold to a marker, never a 50k-char bubble.
+        if (Array.isArray(cRaw) && cRaw.length && cRaw.some((p) => p && p.type === 'text' && /^Base directory for this skill:/.test(p.text))
+            && !cRaw.some((p) => p && p.type !== 'text')) {
+          let n = 0; let name = '';
+          for (const p of cRaw) {
+            if (!p || !p.text) continue;
+            n += p.text.length;
+            if (!name) {
+              const m = p.text.match(/^Base directory for this skill:\s*(\S+)/);
+              if (m) name = m[1].split(/[\\/]/).filter(Boolean).pop() || '';
+            }
+          }
+          if (patch.est) patch.est.prose += n;
+          return { k: 'skill', ts: obj.timestamp || '', name, n };
+        }
         // 2.1.308: local-tool results carry origin=null (only MCP results set
         // origin.kind) - classify by CONTENT, not origin: a tool_result block
         // means machine turn regardless
@@ -400,9 +418,20 @@ function briefJson(input) {
 }
 
 // Drop <system-reminder>...</system-reminder> blocks (huge injected context).
+// Slash-command envelopes (<command-name>/<command-message>/<command-args>)
+// collapse to a clean "/name args" - the raw tag soup used to render in the
+// user bubble.
 function stripReminder(text) {
+  const cm = text.match(/<command-name>\s*\/?([^<]+?)\s*<\/command-name>/);
+  if (cm) {
+    const am = text.match(/<command-args>([\s\S]*?)<\/command-args>/);
+    const args = am ? am[1].trim() : '';
+    return ('/' + cm[1].trim() + (args ? ' ' + args : '')).trim();
+  }
   return text
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
-    .replace(/<command-name>[\s\S]*?<\/command-name>/g, '')
+    .replace(/<command-message>[\s\S]*?<\/command-message>/g, '')
+    .replace(/<command-args>[\s\S]*?<\/command-args>/g, '')
+    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
     .trim();
 }
