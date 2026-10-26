@@ -3,45 +3,14 @@
    运行中的轮次思考区展开并带光标；结束后收起。 */
 // v29 (refactor step 1): ES module entry - pure text helpers live in ./js/md.js
 import { miniMd, linkifyPaths, ART_IMG } from './js/md.js';
+import { state, IS_TOUCH, CLOSED_KEY } from './js/state.js';
+import { auth, api, tryToken, setUnauthorized } from './js/api.js';
+import { initWs, connectWs, sendWs } from './js/ws.js';
 
 'use strict';
 
 const $ = (id) => document.getElementById(id);
-const CLOSED_KEY = 'cr_closed_groups';
-// touch devices: Enter inserts a newline (send only via the button);
-// desktop keeps the Enter-to-send convention
-const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
-
-const state = {
-  token: localStorage.getItem('cr_token') || '',
-  ws: null, wsTimer: null, wsRetry: 1000,
-  sessions: [],
-  currentId: null,
-  atBottom: true,
-  runs: {},            // sessionId -> {runId, state}
-  driver: null,
-  pendingNew: null,
-  turns: [],           // transcript turn objects for the open session
-  liveTurnOpen: false,
-  closedGroups: new Set(JSON.parse(localStorage.getItem(CLOSED_KEY) || '[]')),
-  perm: localStorage.getItem('cr_perm') || 'auto', // 'auto' | 'ask'
-  approvals: [],   // pending permission requests (queue)
-  userCollapsedLive: false, // user folded the live turn manually - respect it
-  modelCatalog: null, // /api/models cache: [{id,label,ctx}]
-  ctxProbe: null,    // last /context probe result {key,window,fixed,buffer}
-  queue: {},         // sessionId -> [{id,text}] pending queue (WS 'queue' frames)
-  attach: [],        // pending attachments for the open session (uploaded)
-  waits: {},         // sessionId -> {kind,tool,msg,at} PC stuck on a prompt (v21)
-};
-
 /* ---------------- token gate ---------------- */
-async function tryToken(token) {
-  try {
-    const r = await fetch('/api/ping', { headers: { Authorization: 'Bearer ' + token } });
-    if (r.status === 401) return false;
-    return r.ok;
-  } catch { return false; }
-}
 async function saveToken() {
   const t = $('token-input').value.trim();
   $('gate-err').textContent = '';
@@ -74,12 +43,6 @@ function showGate(reason) {
   $('detail').classList.add('hidden');
   $('gate').classList.remove('hidden');
   $('token-input').focus();
-}
-// fetch wrapper: any 401 means the stored token is dead
-async function api(path, opts) {
-  const r = await fetch(path, { ...opts, headers: { ...auth(), ...(opts && opts.headers) } });
-  if (r.status === 401) { showGate('令牌已失效（可能刚轮换过），请用新二维码重新配对'); throw new Error('unauthorized'); }
-  return r;
 }
 function fetchSessions() {
   api('/api/sessions')
@@ -1546,78 +1509,7 @@ function submitNewSession() {
     .catch(() => { $('new-err').textContent = '网络错误'; });
 }
 
-/* ---------------- websocket ---------------- */
-function auth() { return { Authorization: 'Bearer ' + state.token }; }
-function wsUrl() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return proto + '://' + location.host + '/ws?token=' + encodeURIComponent(state.token);
-}
-function connectWs() {
-  if (state.ws) { try { state.ws.close(); } catch (e) { /* noop */ } }
-  const ws = new WebSocket(wsUrl());
-  state.ws = ws;
-  ws.onopen = () => {
-    state.wsRetry = 1000;
-    $('conn-dot').className = 'brand-lamp on';
-    if (state.currentId) sendWs({ type: 'subscribe', id: state.currentId });
-    fetchPendingApprovals(); // catch cards missed while disconnected
-  };
-  ws.onmessage = (m) => {
-    let d; try { d = JSON.parse(m.data); } catch { return; }
-    if (d.type === 'sessions') {
-      state.sessions = d.sessions || [];
-      state.waits = {};
-      for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
-      renderList();
-      renderMeta();
-      renderWaitBanner();
-      updateTokenRing();
-      updateRunStatus();
-      updateComposer(); // opening mid-run: no run frame will come, the list is the signal
-      // liveness flip via session status (e.g. bridge saw the idle broadcast):
-      // close the live turn without waiting for the next append
-      if (state.currentId && state.liveTurnOpen && !sessionLive(state.currentId)) {
-        closeLiveTurn();
-        renderTail(state.turns.length);
-      }
-    } else if (d.type === 'append') {
-      handleAppend(d);
-    } else if (d.type === 'queue-dispatched') {
-      if (d.sessionId === state.currentId) toast('排队消息已自动发出');
-    } else if (d.type === 'queue') {
-      // authoritative queue snapshot after any mutation (enqueue/remove/
-      // reorder/clear/drain): refresh cache + the open session's panel
-      if (d.queue && d.queue.length) state.queue[d.sessionId] = d.queue;
-      else delete state.queue[d.sessionId];
-      if (d.sessionId === state.currentId) renderQueuePanel();
-    } else if (d.type === 'wait') {
-      // PC session stuck on a permission prompt / idle input (v21)
-      if (d.waiting) state.waits[d.sessionId] = d.waiting;
-      else delete state.waits[d.sessionId];
-      renderList();
-      if (d.sessionId === state.currentId) renderWaitBanner();
-    } else if (d.type === 'run') {
-      handleRunFrame(d);
-    } else if (d.type === 'approval') {
-      queueApproval(d);
-    } else if (d.type === 'approval-result') {
-      // a decision landed (this client or another); drop it if still queued
-      state.approvals = state.approvals.filter((a) => a.id !== d.id);
-      showApproval();
-    } else if (d.type === 'notify') {
-      toast('[' + (d.title || '').slice(0, 20) + '] ' + (d.event === 'stop' ? '已完成' : d.event));
-    }
-  };
-  ws.onclose = () => {
-    $('conn-dot').className = 'brand-lamp off';
-    clearTimeout(state.wsTimer);
-    state.wsTimer = setTimeout(connectWs, state.wsRetry);
-    state.wsRetry = Math.min(state.wsRetry * 2, 8000);
-  };
-  ws.onerror = () => { try { ws.close(); } catch (e) { /* noop */ } };
-}
-function sendWs(obj) { if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify(obj)); }
-
+/* ---------------- websocket frame semantics (transport in js/ws.js) ---------------- */
 function handleAppend(d) {
   if (d.id !== state.currentId) return;
   const prevLen = state.turns.length;
@@ -1773,6 +1665,53 @@ if (window.ResizeObserver && composerEl) {
     requestAnimationFrame(applyPad);
   }).observe(composerEl);
 }
+
+/* ---------------- wiring: transport <-> semantics ---------------- */
+initWs({
+  onOpen: () => fetchPendingApprovals(), // catch cards missed while disconnected
+  sessions: (d) => {
+    state.sessions = d.sessions || [];
+    state.waits = {};
+    for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
+    renderList();
+    renderMeta();
+    renderWaitBanner();
+    updateTokenRing();
+    updateRunStatus();
+    updateComposer(); // opening mid-run: no run frame will come, the list is the signal
+    // liveness flip via session status (e.g. bridge saw the idle broadcast):
+    // close the live turn without waiting for the next append
+    if (state.currentId && state.liveTurnOpen && !sessionLive(state.currentId)) {
+      closeLiveTurn();
+      renderTail(state.turns.length);
+    }
+  },
+  append: handleAppend,
+  'queue-dispatched': (d) => { if (d.sessionId === state.currentId) toast('排队消息已自动发出'); },
+  queue: (d) => {
+    // authoritative queue snapshot after any mutation (enqueue/remove/
+    // reorder/clear/drain): refresh cache + the open session's panel
+    if (d.queue && d.queue.length) state.queue[d.sessionId] = d.queue;
+    else delete state.queue[d.sessionId];
+    if (d.sessionId === state.currentId) renderQueuePanel();
+  },
+  wait: (d) => {
+    // PC session stuck on a permission prompt (v21)
+    if (d.waiting) state.waits[d.sessionId] = d.waiting;
+    else delete state.waits[d.sessionId];
+    renderList();
+    if (d.sessionId === state.currentId) renderWaitBanner();
+  },
+  run: handleRunFrame,
+  approval: queueApproval,
+  'approval-result': (d) => {
+    // a decision landed (this client or another); drop it if still queued
+    state.approvals = state.approvals.filter((a) => a.id !== d.id);
+    showApproval();
+  },
+  notify: (d) => toast('[' + (d.title || '').slice(0, 20) + '] ' + (d.event === 'stop' ? '已完成' : d.event)),
+});
+setUnauthorized(() => showGate('令牌已失效（可能刚轮换过），请用新二维码重新配对'));
 
 (async function boot() {
   // auto-pairing: ?token=... (QR); saved then stripped from the URL
