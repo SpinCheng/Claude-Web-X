@@ -322,6 +322,11 @@ export class CcAdapter extends EventEmitter {
         }
         const stats = { usd: (usd || obj.totalCostUSD || null), inTok, outTok, cacheRead, cacheCreate };
         patch.cost = stats;
+        // 2.1.308 occasionally flushes two cost-state lines back-to-back at
+        // process exit (distinct snapshots; once in 39 here) - collapse
+        // adjacent stats into the final one instead of rendering both
+        const prevEv = events[events.length - 1];
+        if (prevEv && prevEv.k === 'stats') events.pop();
         return { k: 'stats', ts: '', stats };
       }
       case 'system': {

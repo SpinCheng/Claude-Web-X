@@ -43,7 +43,7 @@ npm start          # node bridge/index.js，端口 3742
 
 **转录格式**
 
-`%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.jsonl`（追加式）。adapter 消费：`user`（**人机判定按内容：2.1.308 本地工具的 tool_result 行 origin 为 null，只看 `origin.kind==='human'` 会漏配对——含 tool_result 块即机器回合**；content 字符串或数组）、`assistant`（`message.content[]`：thinking/text/tool_use——**tool_use 的 `id` 是结果配对键**；`message.model` 是显示模型名的**唯一来源**；`message.usage` 是圆环**唯一数据源**：in/cacheRead/cacheCreate/out）、`custom-title`、`cost-state`（**聚合全部模型**，且**不覆盖** model 标签——曾致模型名闪烁）、`system`（stop 类 subtype → idle + `{k:'stop'}` 标记事件）。slug：`D:\foo\Bar` → `D--foo-Bar`。
+`%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.jsonl`（追加式）。adapter 消费：`user`（**人机判定按内容：2.1.308 本地工具的 tool_result 行 origin 为 null，只看 `origin.kind==='human'` 会漏配对——含 tool_result 块即机器回合**；content 字符串或数组）、`assistant`（`message.content[]`：thinking/text/tool_use——**tool_use 的 `id` 是结果配对键**；`message.model` 是显示模型名的**唯一来源**；`message.usage` 是圆环**唯一数据源**：in/cacheRead/cacheCreate/out）、`custom-title`、`cost-state`（**聚合全部模型**，且**不覆盖** model 标签——曾致模型名闪烁；进程退出时偶发连写两行快照，39 次中见 1 次——**adapter 相邻折叠保末值**，中间隔其他事件则都保留）、`system`（stop 类 subtype → idle + `{k:'stop'}` 标记事件）。slug：`D:\foo\Bar` → `D--foo-Bar`。
 
 ## PWA 硬约束（勿回退，详见 docs/history.md 的根因）
 
