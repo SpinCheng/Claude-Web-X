@@ -48,6 +48,15 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 - **align-self:stretch 竖向拉伸**：row-flex 下 stretch 是竖向，把所有弹层拉到同高（症状：四个弹层高度完全相同 419px）→ 主轴填充用 `flex:1 1 auto`。
 - v16：应用户要求移除弹层内滚（max-height/overflow 全删），弹层纯内容自适应。
 
+## 2026-10-26 · 排队交互 v17（Z.ai 模式落地）
+
+参考图识读（GLM MCP 对任何图都报 1210——服务端问题，换模型自带识图解决）→ 三版设计稿被否 → R1 定稿：队列面板贴输入框上方（平铺行+发丝线，去卡片嵌套）、头部计数/清空/「N 条待上屏」、上限 3 行、行操作 ▶✏🗑+grip 拖动、三态发送钮（运行+有字=仅琥珀发送，停止隐藏）。
+
+- 实现坑：`arr.map(row)` 把索引当第二参传入 `row(t, icon)` → 图标全 undefined（设计稿阶段踩的，map 语义警钟）。
+- 测试坑：CDP 从 `/#open=` 二次导航是**同页 hash 跳转，boot 不重跑**——deep link 测试必须带 query（`?_b=N#open=`）强制整页加载；countdown 任务 ~9 秒就跑完，UI 竞态用「页面先打开、从输入框 UI 发起慢任务」的确定性时序解决。
+- 顺手抓出真 bug：**WS `sessions` 帧处理器不调 `updateComposer`**——中途打开一个已在跑的会话（无 run 帧推送），发送/停止按钮态永远停在初始的空闲渲染。已修（sessions 分支补 updateComposer）。
+- 端到端：API 8 步（排队/快照/删单条/重排/坏重排 400/插队中断+派发）+ UI 7 断言（面板/占位切换/三态/删行/拖动/▶确认框）全过，真实 run 驱动。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

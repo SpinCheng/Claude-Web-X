@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>排队交互 R1 定稿 v2 · claude-remote</title>
+<style>
+:root {
+  --bg: #1D1C1A; --panel: #26241F; --panel2: #2E2B26; --raise: #36332D;
+  --ink-hi: rgba(255,255,255,.045);
+  --fg: #F2EEE7; --dim: #A79F92; --faint: #6E675D; --line: #36332D;
+  --acc: #D97757; --acc-strong: #E8926F; --acc-tint: rgba(217,119,87,.14);
+  --ok: #8FB98D; --warn: #D9A262; --err: #DB6B5E;
+  --sh-3: 0 -6px 28px rgba(12,10,8,.45);
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: #141311; color: var(--fg); font-family: var(--sans); padding: 28px 16px 60px; }
+.intro { max-width: 1240px; margin: 0 auto 26px; }
+.intro h1 { font-size: 19px; font-weight: 600; }
+.intro p { color: var(--dim); font-size: 13px; margin-top: 6px; line-height: 1.6; }
+.intro .hint { color: var(--acc-strong); font-size: 12.5px; margin-top: 4px; }
+.frames { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; }
+.frame-wrap { display: flex; flex-direction: column; gap: 10px; }
+.frame-label { text-align: center; }
+.frame-label b { font-size: 14px; }
+.frame-label span { display: block; color: var(--faint); font-size: 11.5px; margin-top: 2px; line-height: 1.5; max-width: 380px; }
+.frame { position: relative; width: 360px; height: 700px; background: var(--bg); border-radius: 26px; overflow: hidden; box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 1px 0 var(--ink-hi); display: flex; flex-direction: column; }
+
+/* 聊天尾 + 运行状态 */
+.chat-tail { flex: 1; padding: 18px 14px; overflow: hidden; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; }
+.msg-user { align-self: flex-end; max-width: 78%; background: var(--raise); border-radius: 14px 14px 4px 14px; padding: 9px 12px; font-size: 13.5px; line-height: 1.5; }
+.working { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; color: var(--faint); font: 11px var(--mono); padding: 2px 2px; }
+.working::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px rgba(217,162,98,.5); animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .4; } }
+
+/* dock */
+.dock { position: relative; padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 78%, transparent); }
+.dock-card { background: var(--panel); border-radius: 18px; box-shadow: var(--sh-3), inset 0 1px 0 var(--ink-hi); }
+.dock textarea { width: 100%; border: 0; background: none; color: var(--fg); resize: none; height: 44px; padding: 12px 14px 6px; font: 15px/1.4 var(--sans); outline: none; }
+.dock textarea::placeholder { color: var(--faint); }
+
+/* ============ 队列区（v2：去卡片，分割线区分） ============ */
+.qarea { margin: 2px 12px 0; border-bottom: 1px solid var(--line); transition: opacity .3s; }
+.qarea.cleared { opacity: 0; pointer-events: none; }
+.qhead { display: flex; align-items: center; justify-content: space-between; padding: 9px 2px 5px; font: 10.5px var(--mono); color: var(--faint); }
+.qhead .cnt { color: var(--warn); }
+.qhead .clr { border: 0; background: none; color: var(--err); font-size: 11px; cursor: pointer; padding: 2px 2px; opacity: .85; }
+.qrow { display: flex; align-items: center; gap: 4px; min-height: 42px; padding: 0 0; transition: opacity .25s; }
+.qrow + .qrow { border-top: 1px solid rgba(54,51,45,.55); }
+.qrow.gone { opacity: .3; }
+.grip { flex: none; width: 20px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--faint); opacity: .55; cursor: grab; }
+.qtxt { flex: 1; min-width: 0; font-size: 13px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qacts { flex: none; display: flex; align-items: center; gap: 1px; }
+.qico { flex: none; width: 30px; height: 40px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: var(--faint); cursor: pointer; }
+.qico:active { color: var(--fg); }
+.qico.del:active { color: var(--err); }
+.qico.zap { color: var(--warn); }
+.qico.zap:active { color: var(--acc-strong); }
+
+/* 图标候选对比 */
+.cands { max-width: 1240px; margin: 0 auto 30px; display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.cand { width: 224px; background: var(--panel); border-radius: 14px; padding: 14px 14px 10px; box-shadow: inset 0 1px 0 var(--ink-hi); }
+.cand-big { display: flex; align-items: center; justify-content: center; height: 46px; color: var(--warn); }
+.cand-name { text-align: center; font-size: 13px; font-weight: 600; margin-top: 6px; }
+.cand-sem { text-align: center; font: 10.5px var(--mono); color: var(--faint); margin-top: 3px; line-height: 1.5; }
+.cand-row { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 2px; }
+.cand .qtxt { font-size: 12px; }
+
+/* 工具栏（无框胶囊） */
+.toolbar { display: flex; align-items: center; gap: 0; padding: 2px 8px 6px; }
+.tdot { width: 2px; height: 2px; border-radius: 50%; background: var(--line); margin: 0 4px; flex: none; }
+.flat { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 8px; border: 0; background: none; color: var(--faint); font: 600 11.5px var(--sans); border-radius: 9px; }
+.flat .pv { font: 11px var(--mono); font-weight: 400; }
+.ring-svg { width: 15px; height: 15px; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--raise); stroke-width: 3; }
+.ring-fg { fill: none; stroke: var(--acc); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 19.7 56.55; }
+.send, .stopbtn { width: 34px; height: 34px; border-radius: 50%; border: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+.send { background: var(--acc); color: #fff; box-shadow: 0 2px 10px rgba(217,119,87,.35); }
+.send.queue { background: var(--warn); box-shadow: 0 2px 10px rgba(217,162,98,.35); }
+.stopbtn { background: none; border: 1.5px solid var(--err); color: var(--err); width: 30px; height: 30px; }
+.tools-right { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>排队交互 · R1 定稿 v2（三项微调）</h1>
+  <p>① 队列区去圆角卡片背景——行平铺进 dock 卡内，行间细分隔线，队列区与输入区之间一条分割线；② 超出 3 条不再单开提示行，头部计数后追加「本轮结束后依序发出 · N 条待上屏」；③ 操作图标收紧（间距 1px），「立即」定稿为纯图标 <b>▶ 运行（琥珀色）</b>。下方为候选对比存档。</p>
+  <p class="hint">▸ 可交互：点 🗑 删除行；点「清空」看队列区退场</p>
+</div>
+<div class="intro">
+  <h1 style="font-size:16px">「立即」图标候选</h1>
+</div>
+<div class="cands" id="cands"></div>
+<div class="frames" id="frames"></div>
+
+<script>
+const ICON = {
+  send: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>',
+  pencil: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
+  grip: '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13.5" r="1.3"/><circle cx="7.5" cy="13.5" r="1.3"/></svg>',
+  zap: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  ff: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="4 5 12 12 4 19"/><polygon points="12 5 20 12 12 19"/></svg>',
+  next: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 5 14 12 5 19"/><rect x="15.4" y="5" width="2.6" height="14" rx="1"/></svg>',
+  top: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V8M6.5 13.5 12 8l5.5 5.5"/><path d="M5 4h14"/></svg>',
+  play: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>',
+  shield: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>',
+  chip: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>',
+  gauge: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M4 19a9 9 0 0 1 16 0"/></svg>',
+  ring: '<svg viewBox="0 0 24 24" class="ring-svg"><circle class="ring-bg" cx="12" cy="12" r="9"/><circle class="ring-fg" cx="12" cy="12" r="9"/></svg>',
+};
+
+const MAX_ROWS = 3;
+function qArea(texts) {
+  if (!texts.length) return '';
+  const shown = texts.slice(0, MAX_ROWS), hidden = texts.length - shown.length;
+  const note = hidden ? `本轮结束后依序发出 · ${hidden} 条待上屏` : '本轮结束后依序发出';
+  return `<div class="qarea">
+    <div class="qhead"><span>队列 · <span class="cnt">${texts.length}</span> · ${note}</span><button class="clr">清空</button></div>
+    ${shown.map(t => row(t)).join('')}
+  </div>`;
+}
+const row = (t, zap = 'play') => `
+  <div class="qrow">
+    <span class="grip" title="拖动排序">${ICON.grip}</span>
+    <span class="qtxt">${t}</span>
+    <span class="qacts">
+      <button class="qico zap" title="立即：中断当前并发送此条">${ICON[zap]}</button>
+      <button class="qico" title="编辑">${ICON.pencil}</button>
+      <button class="qico del" title="删除">${ICON.trash}</button>
+    </span>
+  </div>`;
+
+/* 三态按钮：运行中+有字 → 只有琥珀发送 */
+function toolsRight(st) {
+  if (st === 'idle') return `<button class="send" title="发送">${ICON.send}</button>`;
+  if (st === 'running') return `<button class="stopbtn" title="停止">${ICON.stop}</button>`;
+  return `<button class="send queue" title="加入排队">${ICON.send}</button>`;
+}
+function toolbar(st) {
+  return `<div class="toolbar">
+    <button class="flat">${ICON.shield}<span class="pv">自动</span></button><span class="tdot"></span>
+    <button class="flat">${ICON.ring}<span class="pv">48%</span></button><span class="tdot"></span>
+    <button class="flat">${ICON.chip}<span class="pv">glm-5.3</span></button><span class="tdot"></span>
+    <button class="flat">${ICON.gauge}<span class="pv">高</span></button>
+    <span class="tools-right">${toolsRight(st)}</span>
+  </div>`;
+}
+function dock(st, q) {
+  const typed = st === 'typing' ? '修复 ctrl+c 后光标位置不对' : '';
+  return `<div class="dock"><div class="dock-card">${qArea(q)}
+    <textarea placeholder="${st === 'idle' ? '提出后续修改要求' : '继续输入以排队后续修改'}">${typed}</textarea>
+    ${toolbar(st)}</div></div>`;
+}
+const chatRun = `
+  <div class="msg-user">修复登录页在手机上的样式问题</div>
+  <div class="working">工作中 · 42秒 · 正在调用 Edit</div>`;
+const chatIdle = `<div class="msg-user">修复登录页在手机上的样式问题</div>`;
+
+const q2 = ['跑完后把测试也补上，用 npm test 验证', '顺便更新一下 README 的安装说明'];
+const q5 = [...q2, '最后把改动 commit 掉', '顺手跑一遍 lint 修掉告警', '更新一下 CHANGELOG'];
+
+const frames = [
+  { name: '① 空闲 · 无队列', tag: '只有发送钮；队列区不渲染', html: `<div class="chat-tail">${chatIdle}</div>${dock('idle', [])}` },
+  { name: '② 运行中 · 队列 2 条', tag: '输入空 → 红描边停止钮；队列区平铺无卡片，底部分割线区分输入区', html: `<div class="chat-tail">${chatRun}</div>${dock('running', q2)}` },
+  { name: '③ 运行中 · 队列 5 条（显示 3）', tag: '行数封顶 3，头部追加「2 条待上屏」。当前任务完成→第 1 条派发→队列整体上移', html: `<div class="chat-tail">${chatRun}</div>${dock('running', q5)}` },
+  { name: '④ 运行中 + 有字', tag: '不显示停止钮，只有琥珀发送钮（点=入队）；停止在清空文字后仍可达', html: `<div class="chat-tail">${chatRun}</div>${dock('typing', q2)}` },
+];
+
+const host = document.getElementById('frames');
+for (const f of frames) {
+  const wrap = document.createElement('div');
+  wrap.className = 'frame-wrap';
+  wrap.innerHTML = `<div class="frame"></div>
+    <div class="frame-label"><b>${f.name}</b><span>${f.tag}</span></div>`;
+  host.appendChild(wrap);
+  const frame = wrap.querySelector('.frame');
+  frame.innerHTML = f.html;
+  frame.addEventListener('click', (e) => {
+    const del = e.target.closest('.qico.del');
+    if (del) del.closest('.qrow').classList.add('gone');
+    if (e.target.closest('.clr')) frame.querySelector('.qarea')?.classList.add('cleared');
+  });
+}
+
+/* 图标候选对比卡 */
+const CANDS = [
+  { key: 'play', big: 24, name: '▶ 运行（已选）', sem: '马上运行此条' },
+  { key: 'zap', big: 26, name: '⚡ 闪电', sem: '瞬时 / 立刻执行' },
+  { key: 'ff', big: 24, name: '⏩ 快进', sem: '跳过队列，先跑这条' },
+  { key: 'next', big: 24, name: '⏭ 下一条', sem: '立即执行下一条（媒体语义）' },
+  { key: 'top', big: 24, name: '⤒ 置顶', sem: '提到队列最前发送' },
+];
+const cHost = document.getElementById('cands');
+for (const c of CANDS) {
+  const el = document.createElement('div');
+  el.className = 'cand';
+  el.innerHTML = `
+    <div class="cand-big">${ICON[c.key].replace('width="13" height="13"', `width="${c.big}" height="${c.big}"`)}</div>
+    <div class="cand-name">${c.name}</div>
+    <div class="cand-sem">${c.sem}</div>
+    <div class="cand-row">${row('把测试也补上，用 npm test 验证', c.key)}</div>`;
+  cHost.appendChild(el);
+}
+
+</script>
+</body>
+</html>

@@ -32,8 +32,9 @@ export class Runner extends EventEmitter {
     this.port = opts.port || 3742; // for the approve-mcp callback URL
     this.runs = new Map(); // runId -> run record
     this.outcomes = new Map(); // sessionId -> { state, exitCode, cancelled, at } (last finished run)
-    this.queues = new Map(); // sessionId -> [{text, perm, at}] (pending while busy)
+    this.queues = new Map(); // sessionId -> [{id, text, perm, model, effort, at}] (pending while busy)
     this._seq = 0;
+    this._qseq = 0;
     this._claudeExe = null;
     this._settingsEnv = null;
   }
@@ -103,8 +104,9 @@ export class Runner extends EventEmitter {
       // is still running; they dispatch automatically when it finishes
       const q = this.queues.get(sessionId) || [];
       if (q.length >= 5) return { error: 'queue-full' };
-      q.push({ text, perm: opts.perm || 'auto', model: opts.model || '', effort: opts.effort || '', at: Date.now() });
+      q.push({ id: 'q' + (++this._qseq).toString(36), text, perm: opts.perm || 'auto', model: opts.model || '', effort: opts.effort || '', at: Date.now() });
       this.queues.set(sessionId, q);
+      this._queueChanged(sessionId);
       return { queued: true, position: q.length, runId: null };
     }
     return r;
@@ -112,9 +114,57 @@ export class Runner extends EventEmitter {
 
   queuedFor(sessionId) { return this.queues.get(sessionId) || []; }
 
+  // wire-safe snapshot (ids + texts only) for WS frames / GET
+  queueSnapshot(sessionId) {
+    return this.queuedFor(sessionId).map((e) => ({ id: e.id, text: e.text }));
+  }
+  _queueChanged(sessionId) {
+    this.emit('queue-changed', { sessionId, queue: this.queueSnapshot(sessionId) });
+  }
+
+  removeQueued(sessionId, qid) {
+    const q = this.queues.get(sessionId);
+    if (!q) return false;
+    const i = q.findIndex((e) => e.id === qid);
+    if (i < 0) return false;
+    q.splice(i, 1);
+    if (q.length === 0) this.queues.delete(sessionId);
+    this._queueChanged(sessionId);
+    return true;
+  }
+
+  reorderQueue(sessionId, ids) {
+    const q = this.queues.get(sessionId);
+    if (!q || !Array.isArray(ids) || ids.length !== q.length) return false;
+    const byId = new Map(q.map((e) => [e.id, e]));
+    if (!ids.every((id) => byId.has(id))) return false;
+    this.queues.set(sessionId, ids.map((id) => byId.get(id)));
+    this._queueChanged(sessionId);
+    return true;
+  }
+
+  // "run now": jump this queued item to the front, interrupt the active run
+  // (or dispatch directly when idle) — the drain then sends it first
+  runNow(sessionId, qid) {
+    const q = this.queues.get(sessionId);
+    if (!q) return false;
+    const i = q.findIndex((e) => e.id === qid);
+    if (i < 0) return false;
+    const [entry] = q.splice(i, 1);
+    q.unshift(entry);
+    this._queueChanged(sessionId);
+    const run = this.activeRunFor(sessionId);
+    if (run) this.cancel(run.runId);
+    else this._drainQueue(sessionId);
+    return true;
+  }
+
   clearQueue(sessionId) {
     const n = (this.queues.get(sessionId) || []).length;
-    this.queues.delete(sessionId);
+    if (n) {
+      this.queues.delete(sessionId);
+      this._queueChanged(sessionId);
+    }
     return n;
   }
 
@@ -125,6 +175,7 @@ export class Runner extends EventEmitter {
     if (!q || q.length === 0) return;
     const next = q.shift();
     if (q.length === 0) this.queues.delete(sessionId);
+    this._queueChanged(sessionId);
     this.emit('queued-dispatch', { sessionId, text: next.text, remaining: q.length });
     const cwd = (this.store.get(sessionId) || {}).cwd || os.homedir();
     this._spawnRun(['--resume', sessionId], next.text, cwd, sessionId, next.perm, next.model || '', next.effort || '');

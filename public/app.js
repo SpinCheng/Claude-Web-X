@@ -26,6 +26,7 @@ const state = {
   userCollapsedLive: false, // user folded the live turn manually - respect it
   modelCatalog: null, // /api/models cache: [{id,label,ctx}]
   ctxProbe: null,    // last /context probe result {key,window,fixed,buffer}
+  queue: {},         // sessionId -> [{id,text}] pending queue (WS 'queue' frames)
 };
 
 /* ---------------- token gate ---------------- */
@@ -106,7 +107,7 @@ function openDetail(id) {
     })
     .catch(() => {});
   updateComposer();
-  updateQueueBadge();
+  fetchQueue(id);
   updateRunStatus();
   history.pushState({ cr: 'detail' }, '', '#s');
 }
@@ -717,11 +718,120 @@ function updateRunStatus() {
   $('run-status-text').textContent = s + (tool ? ' · 正在调用 ' + tool : '');
   el.classList.remove('hidden');
 }
-function updateQueueBadge() {
-  const rec = state.sessions.find((x) => x.id === state.currentId);
-  const n = rec ? (rec.queued || 0) : 0;
-  $('queue-n').textContent = n;
-  $('queue-badge').classList.toggle('hidden', n === 0);
+/* ---------------- queue panel (v17): flat rows above the input ---------------- */
+const QI = {
+  grip: '<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13.5" r="1.3"/><circle cx="7.5" cy="13.5" r="1.3"/></svg>',
+  play: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>',
+  pencil: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
+};
+const Q_MAX_ROWS = 3;
+function queueEntries() { return state.queue[state.currentId] || []; }
+function qApi(path, opts) { return api('/api/sessions/' + encodeURIComponent(state.currentId) + '/queue' + path, opts); }
+function fetchQueue(id) {
+  api('/api/sessions/' + encodeURIComponent(id) + '/queue')
+    .then((r) => r.json())
+    .then((d) => {
+      if (d.queue && d.queue.length) state.queue[id] = d.queue;
+      else delete state.queue[id];
+      if (state.currentId === id) renderQueuePanel();
+    })
+    .catch(() => {});
+}
+function renderQueuePanel() {
+  const host = $('queue-area');
+  if (!host) return;
+  host.innerHTML = '';
+  const q = queueEntries();
+  if (!q.length) return;
+  const shown = q.slice(0, Q_MAX_ROWS), hidden = q.length - shown.length;
+  const area = document.createElement('div');
+  area.className = 'queue-area';
+  const head = document.createElement('div');
+  head.className = 'q-head';
+  const info = document.createElement('span');
+  const cnt = document.createElement('b'); cnt.className = 'cnt'; cnt.textContent = q.length;
+  info.append('队列 · ', cnt, ' · ' + (hidden ? '本轮结束后依序发出 · ' + hidden + ' 条待上屏' : '本轮结束后依序发出'));
+  const clr = document.createElement('button');
+  clr.className = 'clr'; clr.textContent = '清空';
+  clr.onclick = () => {
+    if (window.confirm('清空所有排队的消息？')) qApi('', { method: 'DELETE' }).catch(() => {});
+  };
+  head.append(info, clr);
+  area.appendChild(head);
+  for (const e of shown) area.appendChild(qRowEl(e, area));
+  host.appendChild(area);
+}
+function qRowEl(e, area) {
+  const row = document.createElement('div');
+  row.className = 'q-row';
+  row.dataset.qid = e.id;
+  const grip = document.createElement('span');
+  grip.className = 'q-grip'; grip.title = '拖动排序'; grip.innerHTML = QI.grip;
+  const txt = document.createElement('span');
+  txt.className = 'q-txt'; txt.textContent = e.text;
+  const acts = document.createElement('span');
+  acts.className = 'q-acts';
+  // ▶ 立即：插到队首 + 中断当前 run，排空时优先发这条
+  const run = document.createElement('button');
+  run.className = 'q-ico run'; run.title = '立即运行：中断当前任务并发送此条'; run.innerHTML = QI.play;
+  run.onclick = () => {
+    if (window.confirm('中断当前任务，立即发送这条？')) qApi('/' + encodeURIComponent(e.id) + '/runnow', { method: 'POST' }).catch(() => {});
+  };
+  // ✏ 编辑：取回输入框（出队），改完重新发送会重新排队
+  const edit = document.createElement('button');
+  edit.className = 'q-ico'; edit.title = '编辑：取回输入框'; edit.innerHTML = QI.pencil;
+  edit.onclick = () => {
+    const input = $('msg-input');
+    input.value = e.text;
+    autoGrow();
+    qApi('/' + encodeURIComponent(e.id), { method: 'DELETE' }).catch(() => {});
+    input.focus();
+  };
+  const del = document.createElement('button');
+  del.className = 'q-ico del'; del.title = '删除'; del.innerHTML = QI.trash;
+  del.onclick = () => qApi('/' + encodeURIComponent(e.id), { method: 'DELETE' }).catch(() => {});
+  acts.append(run, edit, del);
+  row.append(grip, txt, acts);
+  wireQDrag(grip, row, area);
+  return row;
+}
+// drag-to-reorder on the grip only (touch-action:none there, scroll unaffected)
+function wireQDrag(grip, row, area) {
+  grip.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    const startY = ev.clientY;
+    let started = false;
+    const rows = () => [...area.querySelectorAll('.q-row')];
+    const onMove = (e2) => {
+      if (!started) {
+        if (Math.abs(e2.clientY - startY) < 6) return;
+        started = true;
+        row.classList.add('dragging');
+      }
+      const all = rows();
+      const idx = all.indexOf(row);
+      if (idx < 0) return;
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] === row) continue;
+        const b = all[i].getBoundingClientRect();
+        const mid = b.top + b.height / 2;
+        if (i < idx && e2.clientY < mid) { area.insertBefore(row, all[i]); break; }
+        if (i > idx && e2.clientY > mid) { area.insertBefore(row, all[i].nextElementSibling); break; }
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      row.classList.remove('dragging');
+      if (!started || !state.currentId) return;
+      const hiddenIds = queueEntries().slice(Q_MAX_ROWS).map((x) => x.id);
+      const order = rows().map((r) => r.dataset.qid).concat(hiddenIds);
+      qApi('/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }) }).catch(() => {});
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
 }
 function fmtTokens(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -1016,9 +1126,14 @@ function updateComposer() {
   const rec = state.sessions.find((x) => x.id === state.currentId);
   // live run may be known locally (run frames) or come from the server list
   const running = !!(run && run.state === 'running') || !!(rec && rec.running);
-  $('send').classList.toggle('hidden', running);
-  $('stop').classList.toggle('hidden', !running);
-  // input stays usable while running: sends are queued server-side
+  const typed = $('msg-input').value.trim().length > 0;
+  // three-state (v17): idle=send · running+empty=stop · running+typed=amber
+  // queue-send ONLY (stop hides while typing; clear text to reach it again)
+  const showSend = !running || typed;
+  $('send').classList.toggle('hidden', !showSend);
+  $('send').classList.toggle('queue', running && typed);
+  $('stop').classList.toggle('hidden', !running || typed);
+  $('msg-input').placeholder = running ? '继续输入以排队后续修改' : '提出后续修改要求';
   renderDriverChip();
 }
 function sendMessage(force) {
@@ -1168,9 +1283,9 @@ function connectWs() {
       state.sessions = d.sessions || [];
       renderList();
       renderMeta();
-      updateQueueBadge();
       updateTokenRing();
       updateRunStatus();
+      updateComposer(); // opening mid-run: no run frame will come, the list is the signal
       // liveness flip via session status (e.g. bridge saw the idle broadcast):
       // close the live turn without waiting for the next append
       if (state.currentId && state.liveTurnOpen && !sessionLive(state.currentId)) {
@@ -1181,6 +1296,12 @@ function connectWs() {
       handleAppend(d);
     } else if (d.type === 'queue-dispatched') {
       if (d.sessionId === state.currentId) toast('排队消息已自动发出');
+    } else if (d.type === 'queue') {
+      // authoritative queue snapshot after any mutation (enqueue/remove/
+      // reorder/clear/drain): refresh cache + the open session's panel
+      if (d.queue && d.queue.length) state.queue[d.sessionId] = d.queue;
+      else delete state.queue[d.sessionId];
+      if (d.sessionId === state.currentId) renderQueuePanel();
     } else if (d.type === 'run') {
       handleRunFrame(d);
     } else if (d.type === 'approval') {
@@ -1305,15 +1426,7 @@ $('msg-input').addEventListener('keydown', (e) => {
 });
 $('token-ring').onclick = openContextSheet;
 $('c-model').onclick = openModelSheet;
-$('queue-badge').onclick = () => {
-  if (!state.currentId) return;
-  if (window.confirm('取消所有排队的消息？')) {
-    api('/api/sessions/' + encodeURIComponent(state.currentId) + '/queue', { method: 'DELETE' })
-      .then(() => toast('已取消排队'))
-      .catch(() => {});
-  }
-};
-$('msg-input').addEventListener('input', autoGrow);
+$('msg-input').addEventListener('input', () => { autoGrow(); updateComposer(); });
 $('new-text').addEventListener('input', function () {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, window.innerHeight * 0.3) + 'px';

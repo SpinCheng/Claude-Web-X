@@ -52,6 +52,8 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.ico': 'image/x-icon',
 };
 
@@ -238,6 +240,13 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
         res.end(JSON.stringify({ events }));
         return;
       }
+      // pending queue snapshot (ids + texts) for the composer queue panel
+      m = p.match(/^\/api\/sessions\/([^/]+)\/queue$/);
+      if (m) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, queue: runner.queueSnapshot(decodeURIComponent(m[1])) }));
+        return;
+      }
       // ground-truth context breakdown for a session's (cwd, model): runs the
       // CLI's /context in a throwaway session, returns the same fixed-part
       // accounting the Desktop popover shows. Cached bridge-side after 1st hit.
@@ -331,6 +340,37 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
         const n = runner.clearQueue(decodeURIComponent(m[1]));
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, cleared: n }));
+        return;
+      }
+
+      // drag reorder: full id order (visible rows + hidden tail)
+      m = p.match(/^\/api\/sessions\/([^/]+)\/queue\/reorder$/);
+      if (m && req.method === 'POST') {
+        const ok = runner.reorderQueue(decodeURIComponent(m[1]), json.order);
+        res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok }));
+        return;
+      }
+
+      // remove one queued message
+      m = p.match(/^\/api\/sessions\/([^/]+)\/queue\/([^/]+)$/);
+      if (m && req.method === 'DELETE') {
+        const ok = runner.removeQueued(decodeURIComponent(m[1]), decodeURIComponent(m[2]));
+        res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok }));
+        return;
+      }
+
+      // "run now": jump this queued item to the front + interrupt the active run
+      m = p.match(/^\/api\/sessions\/([^/]+)\/queue\/([^/]+)\/runnow$/);
+      if (m && req.method === 'POST') {
+        const id = decodeURIComponent(m[1]);
+        const qid = decodeURIComponent(m[2]);
+        const run = runner.activeRunFor(id);
+        if (run) denyAllForRun(run.runId, 'run interrupted by queued item');
+        const ok = runner.runNow(id, qid);
+        res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok }));
         return;
       }
 
@@ -431,6 +471,10 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   runner.on('queued-dispatch', (q) => {
     broadcast({ type: 'queue-dispatched', sessionId: q.sessionId, remaining: q.remaining });
     broadcastSessionsSoon();
+  });
+  // any queue mutation (enqueue/remove/reorder/clear/drain) pushes a snapshot
+  runner.on('queue-changed', (q) => {
+    broadcast({ type: 'queue', sessionId: q.sessionId, queue: q.queue });
   });
 
   return { server, broadcast };

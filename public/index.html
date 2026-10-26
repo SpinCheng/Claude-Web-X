@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=16">
+  <link rel="stylesheet" href="/style.css?v=17">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
-        <span id="build" class="build-badge">v16</span>
+        <span id="build" class="build-badge">v17</span>
       </div>
       <button id="new-session" class="icon-btn" title="新建任务">
         <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
@@ -68,9 +68,9 @@
       <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 4h2v12l5.5-5.5 1.42 1.42L12 19.84l-7.92-7.92L5.5 10.5 11 16z"/></svg>
     </button>
     <div id="composer" class="composer">
-      <div id="queue-badge" class="queue-badge hidden">已排队 <b id="queue-n">0</b> 条 · 点击取消</div>
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div class="composer-dock">
+        <div id="queue-area"></div>
         <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
         <div class="composer-toolbar" id="toolbar">
           <button id="perm" class="cbtn mode" title="权限模式：点击选择">
@@ -181,6 +181,6 @@
 
   </div>
 
-  <script src="/app.js?v=15"></script>
+  <script src="/app.js?v=17"></script>
 </body>
 </html>
