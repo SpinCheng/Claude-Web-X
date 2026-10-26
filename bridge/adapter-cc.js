@@ -173,11 +173,16 @@ export class CcAdapter extends EventEmitter {
   _applyLine(id, obj, patch, events) {
     switch (obj.type) {
       case 'user': {
-        if (obj.origin && obj.origin.kind !== 'human') {
-          // tool_result payload: invisible in the timeline but the biggest
-          // context consumer - feed the composition estimate
+        const cRaw = obj.message && obj.message.content;
+        // 2.1.308: local-tool results carry origin=null (only MCP results set
+        // origin.kind) - classify by CONTENT, not origin: a tool_result block
+        // means machine turn regardless
+        const hasToolRes = Array.isArray(cRaw) && cRaw.some((p) => p && p.type === 'tool_result');
+        if (hasToolRes || (obj.origin && obj.origin.kind !== 'human')) {
+          // tool_result payload: paired back to tool steps below for display,
+          // and the biggest context consumer - feed the composition estimate
+          const c = cRaw;
           if (patch.est) {
-            const c = obj.message && obj.message.content;
             let n = 0;
             if (typeof c === 'string') n = c.length;
             else if (Array.isArray(c)) {
@@ -190,7 +195,35 @@ export class CcAdapter extends EventEmitter {
             }
             if (n) patch.est.tools += n + 16;
           }
-          return null; // tool_result noise
+          // tool results: pair back to their tool_use by id so the PWA can
+          // show the run's actual output (text capped, images inline)
+          const items = [];
+          if (Array.isArray(c)) {
+            for (const p of c) {
+              if (!p || p.type !== 'tool_result' || !p.tool_use_id) continue;
+              let text = '';
+              const images = [];
+              const rc = p.content;
+              if (typeof rc === 'string') text = rc;
+              else if (Array.isArray(rc)) {
+                for (const b of rc) {
+                  if (!b) continue;
+                  if (b.type === 'text' && b.text) text += (text ? '\n' : '') + b.text;
+                  else if (b.type === 'image' && b.source && b.source.data && images.length < 4) {
+                    images.push({ mt: b.source.media_type || 'image/png', data: b.source.data });
+                  }
+                }
+              }
+              items.push({
+                id: p.tool_use_id,
+                text: text.length > 4000 ? text.slice(0, 4000) + '\n…(截断，共 ' + text.length + ' 字符)' : text,
+                err: !!p.is_error,
+                images,
+              });
+            }
+          }
+          if (!items.length) return null; // pure noise (queued/guideline lines etc.)
+          return { k: 'toolres', ts: obj.timestamp || '', items };
         }
         const c = obj.message && obj.message.content;
         let text = '';
@@ -264,7 +297,7 @@ export class CcAdapter extends EventEmitter {
             if (patch.est) patch.est.prose += p.text.length;
           }
           else if (p.type === 'tool_use') {
-            parts.push({ t: 'tool', name: p.name, v: briefJson(p.input) });
+            parts.push({ t: 'tool', name: p.name, id: p.id || '', v: briefJson(p.input) });
             if (patch.est) { try { patch.est.tools += JSON.stringify(p.input || {}).length + 32; } catch { /* skip */ } }
           }
         }

@@ -310,16 +310,39 @@ function applyEventToTurns(ev) {
       return i; // edited an earlier turn: caller must re-render from here
     }
     T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
-    T.push({ role: 'bot', think: [], tools: [], texts: [], ts: '' });
+    T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '' });
   } else if (ev.k === 'assistant') {
-    if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push({ role: 'bot', think: [], tools: [], texts: [], ts: ev.ts });
+    if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: ev.ts });
     const turn = T[T.length - 1];
     turn.ts = turn.ts || ev.ts;
     for (const p of ev.parts || []) {
-      if (p.t === 'think') turn.think.push(p.v);
-      else if (p.t === 'tool') turn.tools.push({ name: p.name, v: p.v });
-      else if (p.t === 'text' && p.v && p.v.trim()) turn.texts.push(p.v);
+      if (p.t === 'think') { turn.think.push(p.v); turn.steps.push({ t: 'think', v: p.v }); }
+      else if (p.t === 'tool') {
+        const tool = { name: p.name, id: p.id || '', v: p.v, out: null };
+        turn.tools.push(tool);
+        turn.steps.push({ t: 'tool', tool });
+      }
+      else if (p.t === 'text' && p.v && p.v.trim()) { turn.texts.push(p.v); turn.steps.push({ t: 'text', v: p.v }); }
     }
+  } else if (ev.k === 'toolres') {
+    // tool results arrive as later user lines; pair each back to its tool_use
+    // step by id (search recent bot turns from the tail)
+    let touched = null;
+    for (let ti = T.length - 1; ti >= Math.max(0, T.length - 3) && touched === null; ti--) {
+      const turn = T[ti];
+      if (turn.role !== 'bot' || !turn.steps) continue;
+      let allFound = true;
+      for (const it of ev.items || []) {
+        const step = turn.steps.find((s) => s.t === 'tool' && s.tool.id === it.id);
+        if (!step || step.tool.out) { allFound = false; continue; }
+        step.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
+        const bkt = turn.tools.find((x) => x === step.tool);
+        if (bkt) bkt.out = step.tool.out;
+        touched = ti;
+      }
+      if (touched === null) allFound = false; // nothing here; keep searching older turns
+    }
+    return touched; // re-render from this turn so the output shows up
   } else if (ev.k === 'stats') {
     T.push({ role: 'sys', text: '成本 $' + (ev.stats.usd != null ? Number(ev.stats.usd).toFixed(2) : '?') +
       ' · in ' + (ev.stats.inTok ?? '?') + ' / out ' + (ev.stats.outTok ?? '?') + ' tok' });
@@ -344,7 +367,7 @@ function closeLiveTurn() { state.liveTurnOpen = false; state.userCollapsedLive =
 function markCapped(root) {
   requestAnimationFrame(() => {
     const cap = Math.floor(window.innerHeight * 0.34) + 8;
-    (root || $('chat')).querySelectorAll('.tool-chip:not(.capped), .think:not(.capped)').forEach((el) => {
+    (root || $('chat')).querySelectorAll('.tool-chip:not(.capped), .think:not(.capped), .tool-out:not(.capped)').forEach((el) => {
       if (el.scrollHeight > cap) el.classList.add('capped');
     });
   });
@@ -475,21 +498,27 @@ function renderTurn(t) {
   // bot turn: trigger pill + timeline(思考/工具/修改/输出/结论) + final card.
   // final conclusion is NEVER folded away: expanded turns end with a 结论
   // node, collapsed turns keep the final-card below the pill.
+  // v22: nodes render in true chronology from t.steps (think/tool/text
+  // interleaved as they happened); tool steps carry their result (out).
   const wrap = document.createElement('div');
   const live = state.liveTurnOpen && t === state.turns[state.turns.length - 1];
-  const concl = t.texts.length ? t.texts[t.texts.length - 1] : '';
-  const mids = t.texts.slice(0, -1);
-  const steps = t.think.length + t.tools.length + mids.length;
+  const steps = (t.steps && t.steps.length ? t.steps : [
+    ...t.think.map((v) => ({ t: 'think', v })),
+    ...t.tools.map((tool) => ({ t: 'tool', tool })),
+    ...t.texts.slice(0, -1).map((v) => ({ t: 'text', v })),
+  ]);
+  const textSteps = steps.filter((s) => s.t === 'text');
+  const concl = textSteps.length ? textSteps[textSteps.length - 1].v : '';
   // a live turn opens by default UNLESS the user folded it by hand (streaming
   // re-renders must not force it back open every append)
   const liveOpen = live && !state.userCollapsedLive;
   wrap.className = 'turn bot ' + (live ? (liveOpen ? 'live open' : 'live') : 'done');
 
-  if (steps > 0) {
+  if (steps.length > 0) {
     const trig = document.createElement('button');
     trig.className = 'trigger';
     trig.innerHTML = '<span class="ic">' + (live ? ICO_CLOCK : ICO_CHECK) + '</span>' +
-      '<span class="t">过程</span><span class="n">· ' + steps + ' 步</span>' +
+      '<span class="t">过程</span><span class="n">· ' + steps.length + ' 步</span>' +
       '<span class="chev">' + CHEV_B + '</span>';
     trig.onclick = () => {
       wrap.classList.toggle('open');
@@ -500,52 +529,78 @@ function renderTurn(t) {
 
     const tl = document.createElement('div');
     tl.className = 'timeline';
-    for (const th of t.think) {
-      tl.appendChild(nodeEl('think', { badge: '思考' }, (b) => {
-        const d = document.createElement('div');
-        d.className = 'think';
-        d.textContent = th;
-        b.appendChild(d);
-      }, live));
-    }
-    for (const tool of t.tools) {
-      const isEdit = tool.name === 'Edit' || tool.name === 'Write' || tool.name === 'MultiEdit';
-      const diff = isEdit ? toolDiff(tool) : null;
-      tl.appendChild(nodeEl('tool', {
-        badge: isEdit ? '修改' : '工具',
-        meta: tool.name,
-        link: toolLink(tool),
-        diff,
-      }, (b) => {
-        const c = document.createElement('div');
-        c.className = 'tool-chip';
-        const p = document.createElement('span');
-        p.className = 'p';
-        p.textContent = '⚙ ';
-        c.appendChild(p);
-        c.appendChild(document.createTextNode(tool.name + ' ' + (tool.v || '')));
-        b.appendChild(c);
-      }, live));
-    }
-    for (const m of mids) {
-      tl.appendChild(nodeEl('mid', { badge: '输出' }, (b) => {
-        const d = document.createElement('div');
-        d.className = 'mid';
-        d.textContent = m;
-        b.appendChild(d);
-      }));
-    }
-    if (concl && !live) {
-      tl.appendChild(nodeEl('final', { badge: '结论' }, (b) => {
-        const d = document.createElement('div');
-        d.className = 'final';
-        d.innerHTML = miniMd(concl);
-        b.appendChild(d);
-      }));
+    for (const s of steps) {
+      if (s.t === 'think') {
+        tl.appendChild(nodeEl('think', { badge: '思考' }, (b) => {
+          const d = document.createElement('div');
+          d.className = 'think';
+          d.textContent = s.v;
+          b.appendChild(d);
+        }, live));
+      } else if (s.t === 'tool') {
+        const tool = s.tool;
+        const isEdit = tool.name === 'Edit' || tool.name === 'Write' || tool.name === 'MultiEdit';
+        const diff = isEdit ? toolDiff(tool) : null;
+        tl.appendChild(nodeEl('tool', {
+          badge: isEdit ? '修改' : '工具',
+          meta: tool.name,
+          link: toolLink(tool),
+          diff,
+        }, (b) => {
+          const c = document.createElement('div');
+          c.className = 'tool-chip';
+          const p = document.createElement('span');
+          p.className = 'p';
+          p.textContent = '⚙ ';
+          c.appendChild(p);
+          c.appendChild(document.createTextNode(tool.name + ' ' + (tool.v || '')));
+          b.appendChild(c);
+          // the run's actual output, paired back from the tool_result line
+          const out = tool.out;
+          if (out && (out.text || (out.images && out.images.length))) {
+            if (out.text) {
+              const o = document.createElement('pre');
+              o.className = 'tool-out' + (out.err ? ' err' : '');
+              o.textContent = out.text;
+              b.appendChild(o);
+            }
+            if (out.images && out.images.length) {
+              const box = document.createElement('div');
+              box.className = 'tool-out-imgs';
+              for (const im of out.images) {
+                const img = document.createElement('img');
+                img.className = 'bubble-img';
+                img.alt = '工具输出图片';
+                img.src = 'data:' + im.mt + ';base64,' + im.data;
+                img.onclick = () => openLightbox(img.src);
+                box.appendChild(img);
+              }
+              b.appendChild(box);
+            }
+          }
+        }, live));
+      } else { // text step: mid-run output, or the conclusion (last one)
+        const isConcl = s === textSteps[textSteps.length - 1];
+        if (isConcl && concl && !live) {
+          tl.appendChild(nodeEl('final', { badge: '结论' }, (b) => {
+            const d = document.createElement('div');
+            d.className = 'final';
+            d.innerHTML = miniMd(concl);
+            b.appendChild(d);
+          }));
+        } else {
+          tl.appendChild(nodeEl('mid', { badge: '输出' }, (b) => {
+            const d = document.createElement('div');
+            d.className = 'mid';
+            d.textContent = s.v;
+            b.appendChild(d);
+          }));
+        }
+      }
     }
     wrap.appendChild(tl);
   }
-  if (concl || (live && steps === 0)) {
+  if (concl || (live && steps.length === 0)) {
     const b = document.createElement('div');
     b.className = 'final-card';
     if (concl) b.innerHTML = miniMd(concl);

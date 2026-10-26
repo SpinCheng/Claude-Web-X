@@ -43,7 +43,7 @@ npm start          # node bridge/index.js，端口 3742
 
 **转录格式**
 
-`%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.jsonl`（追加式）。adapter 消费：`user`（**`origin.kind==='human'` 才是真人**；content 字符串或数组）、`assistant`（`message.content[]`：thinking/text/tool_use；`message.model` 是显示模型名的**唯一来源**；`message.usage` 是圆环**唯一数据源**：in/cacheRead/cacheCreate/out）、`custom-title`、`cost-state`（**聚合全部模型**，且**不覆盖** model 标签——曾致模型名闪烁）、`system`（stop 类 subtype → idle + `{k:'stop'}` 标记事件）。slug：`D:\foo\Bar` → `D--foo-Bar`。
+`%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.jsonl`（追加式）。adapter 消费：`user`（**人机判定按内容：2.1.308 本地工具的 tool_result 行 origin 为 null，只看 `origin.kind==='human'` 会漏配对——含 tool_result 块即机器回合**；content 字符串或数组）、`assistant`（`message.content[]`：thinking/text/tool_use——**tool_use 的 `id` 是结果配对键**；`message.model` 是显示模型名的**唯一来源**；`message.usage` 是圆环**唯一数据源**：in/cacheRead/cacheCreate/out）、`custom-title`、`cost-state`（**聚合全部模型**，且**不覆盖** model 标签——曾致模型名闪烁）、`system`（stop 类 subtype → idle + `{k:'stop'}` 标记事件）。slug：`D:\foo\Bar` → `D--foo-Bar`。
 
 ## PWA 硬约束（勿回退，详见 docs/history.md 的根因）
 
@@ -53,7 +53,7 @@ npm start          # node bridge/index.js，端口 3742
 - 限高只作用于 `.think/.tool-chip`（结论/输出不限高），且必须由 `markCapped()` 动态加 `.capped`——固定挂 overflow 会造手势死区。display:none 元素 scrollHeight=0：**胶囊与节点头点击里必须局部重跑 markCapped**。
 - 滚动三律：`.page` 必须 `height:100dvh`；`#chat` 必须 `overflow-anchor:none`；**renderTail 只从 `prevLen-1` 重渲染**（chat 子节点与 state.turns 一一对应，多删即错位→全量重建→滚动跳顶）。
 - 乐观上屏（v20）：发送 202 即 push `optimistic` user turn（pending 半透明）；转录 user 事件按文本匹配**原地折叠**（匹配必须是幂等的——已确认的同文要 no-op，否则 fs.watch+轮询双触发会推出重复气泡）；fold 改的是尾部**之前**的 turn，handleAppend 用 `editStart`（本批最早被改索引）调 renderTail，默认仍是尾帧。
-- 轮次形状 `{think[], tools[], texts[]}`（texts 末位=结论）。done 与 live 轮都要有折叠规则；`state.userCollapsedLive` 尊重手动收起；完成信号双路：run 帧 + stop 标记事件（后者覆盖桌面/CLI 驱动），sessions 帧做活跃度翻转兜底。
+- 轮次形状：**渲染源是 `steps[]`（v22 起按真实发生顺序交错：think/tool/text 任意排列）**，`think[]/tools[]/texts[]` 桶仍在但只作兼容（markLiveTurn/lastLiveToolName 用），两者必须同步 push。结论=最后一个 text step，其余 text step=输出节点。**tool_result 事件（`{k:'toolres',items:[{id,text,err,images}]}`）按 tool_use_id 配对回填 `tool.out`**（文本 ≤4KB 截断、图片 ≤4 张内联+灯箱，`.tool-out` 纳入 markCapped 限高体系）；配对改动的是尾部之前的内容，handleAppend 的 editStart 机制复用。done 与 live 轮都要有折叠规则；`state.userCollapsedLive` 尊重手动收起；完成信号双路：run 帧 + stop 标记事件（后者覆盖桌面/CLI 驱动），sessions 帧做活跃度翻转兜底。
 - 触屏 Enter=换行（`IS_TOUCH`=pointer:coarse）。
 
 **视觉纪律**

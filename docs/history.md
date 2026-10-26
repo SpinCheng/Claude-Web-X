@@ -79,6 +79,14 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 
 
+## 2026-10-26 · 时间轴交错 + 工具产出 v22
+
+用户报两个问题：① 输出节点全堆在轮次末尾——渲染按类型分桶（think 全部→tools 全部→texts 全部）而非真实顺序；② 工具产出（图片/文本）完全不可见——tool_result 只被拿去算上下文估算后丢弃。修复：轮次加 `steps[]` 交错序列作渲染源（桶保留兼容）；tool_use 带 id，`toolres` 事件按 id 配对回填 `tool.out`（文本 ≤4KB、图片 ≤4 张内联+灯箱、`.tool-out` 入 markCapped）。
+
+关键发现：**2.1.308 本地工具的 tool_result 行 origin 为 null**（MCP 结果才有 origin.kind），原来只认 `origin.kind!=='human'` 的人机门把这些结果全漏了——判定改为按内容含 tool_result 块。测试侧：中转环境下 Bash 被关在 ToolSearch 后面（提示词逼不出），改用合成转录（手写 tool_use/tool_result JSONL 放进监听目录）做确定性断言，[工具→结论] 顺序 + echo 输出全链路 PASS。
+
+
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。
