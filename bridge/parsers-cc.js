@@ -153,9 +153,9 @@ export function applyLine(id, obj, patch, events, rec) {
           // fixed overhead (system prompt + tool schemas + memory): the FIRST
           // request's full prompt minus the first user message. Desktop's
           // "Messages" category = used - fixed, so mirror that split here.
-                    if (rec0 && rec0.usageFirst == null && patch.usageFirst == null) {
+          if (rec && rec.usageFirst == null && patch.usageFirst == null) {
             const total = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
-            const fu = patch.firstUserChars != null ? patch.firstUserChars : (rec0.firstUserChars != null ? rec0.firstUserChars : 0);
+            const fu = patch.firstUserChars != null ? patch.firstUserChars : (rec.firstUserChars != null ? rec.firstUserChars : 0);
             patch.usageFirst = total;
             patch.fixedTok = Math.min(200_000, Math.max(0, Math.round(total - fu / 2.5)));
           }

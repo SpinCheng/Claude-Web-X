@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyLine } from '../../bridge/parsers-cc.js';
 
-const run = (lines, rec = undefined) => {
+const run = (lines, rec = {}) => { // rec defaults to a seeded (empty) record like _ensureSession creates
   const events = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
   for (const o of lines) { const e = applyLine('s', o, patch, events, rec); if (e) events.push(e); }
   return { events, patch };
@@ -97,4 +97,22 @@ test('first human message seeds the fallback title', () => {
   const { patch } = run([user({ message: { role: 'user', content: 'this is a long first question about bridges' } })]);
   assert.equal(patch.titleFallback, true);
   assert.ok(patch.title.startsWith('this is a long'));
+});
+
+// regression: the step-4 extraction left an undefined rec0 in the usage
+// derivation below - fixtures without message.usage never executed it and
+// the crash only surfaced on real transcripts (production bridge down)
+test('assistant usage derives usageFirst/fixedTok without crashing', () => {
+  const asstUsage = (parts) => ({ type: 'assistant', timestamp: 't', message: { role: 'assistant', model: 'glm-5.3', content: parts, usage: { input_tokens: 1000, cache_read_input_tokens: 2000, cache_creation_input_tokens: 500, output_tokens: 50 } } });
+  const { patch } = run([user({ message: { role: 'user', content: 'hello world question' } }), asstUsage([{ type: 'text', text: 'a' }])]);
+  assert.equal(patch.usage.in, 1000);
+  assert.equal(patch.usage.cacheRead, 2000);
+  assert.equal(patch.usageFirst, 3500);
+  assert.ok(patch.fixedTok > 0);
+});
+
+test('usage derivation also works with a pre-seeded record (second run)', () => {
+  const asstUsage = { type: 'assistant', timestamp: 't', message: { role: 'assistant', model: 'm', content: [{ type: 'text', text: 'a' }], usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 1 } } };
+  const { patch } = run([asstUsage], { usageFirst: 999, firstUserChars: 10 }); // rec snapshot
+  assert.equal(patch.usageFirst, undefined); // already known: not re-derived
 });

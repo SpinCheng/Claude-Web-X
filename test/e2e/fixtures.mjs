@@ -10,7 +10,7 @@ export const user = (i, text, cwd = 'D:\\e2e') =>
   ({ type: 'user', timestamp: ts(i), cwd, origin: { kind: 'human' }, message: { role: 'user', content: text } });
 
 export const assistant = (i, parts, model = 'glm-5.3') =>
-  ({ type: 'assistant', timestamp: ts(i), message: { role: 'assistant', model, content: parts } });
+  ({ type: 'assistant', timestamp: ts(i), message: { role: 'assistant', model, content: parts, usage: { input_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 10 } } });
 
 export const toolResult = (i, id, text) =>
   ({ type: 'user', timestamp: ts(i), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text }] }] } });
