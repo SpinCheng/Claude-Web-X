@@ -553,7 +553,8 @@ function renderTurn(t) {
           p.className = 'p';
           p.textContent = '⚙ ';
           c.appendChild(p);
-          c.appendChild(document.createTextNode(tool.name + ' ' + (tool.v || '')));
+          c.appendChild(document.createTextNode(tool.name + ' '));
+          linkifyPaths(c, tool.v || '');
           b.appendChild(c);
           // the run's actual output, paired back from the tool_result line
           const out = tool.out;
@@ -561,7 +562,7 @@ function renderTurn(t) {
             if (out.text) {
               const o = document.createElement('pre');
               o.className = 'tool-out' + (out.err ? ' err' : '');
-              o.textContent = out.text;
+              linkifyPaths(o, out.text);
               b.appendChild(o);
             }
             if (out.images && out.images.length) {
@@ -592,7 +593,7 @@ function renderTurn(t) {
           tl.appendChild(nodeEl('mid', { badge: '输出' }, (b) => {
             const d = document.createElement('div');
             d.className = 'mid';
-            d.textContent = s.v;
+            linkifyPaths(d, s.v);
             b.appendChild(d);
           }));
         }
@@ -1015,6 +1016,52 @@ function openFilePreview(a) {
     .then((r) => r.text())
     .then((t) => { $('fp-body').textContent = t.slice(0, 32 * 1024); })
     .catch(() => { $('fp-body').textContent = '（读取失败）'; });
+}
+
+/* v23: mid-run artifact preview - files a run wrote to disk show up as plain
+   paths in tool text; linkify them and fetch the bridge's preview endpoint,
+   which only serves previewable files inside the session's project dir.
+   Separators tolerate the JSON-doubled backslashes shown in tool chips. */
+const ART_IMG = /\.(png|jpe?g|webp|gif|bmp)$/i;
+const ART_PATH_RE = /[A-Za-z]:[\\/]{1,2}(?:[^\s"'<>|:*?\\/]+[\\/]{1,2})*[^\s"'<>|:*?\\/]*\.(?:png|jpe?g|webp|gif|bmp|txt|md|log|json|csv|ya?ml|xml|html?|css|mjs|cjs|js|ts|py|ps1|sh|ini|toml)\b/gi;
+function linkifyPaths(el, text) {
+  if (!text) return;
+  let last = 0, mm;
+  ART_PATH_RE.lastIndex = 0;
+  while ((mm = ART_PATH_RE.exec(text))) {
+    const raw = mm[0];
+    el.appendChild(document.createTextNode(text.slice(last, mm.index)));
+    const a = document.createElement('a');
+    a.className = 'flink';
+    a.textContent = raw;
+    a.href = '#';
+    a.onclick = (e) => { e.preventDefault(); previewArtifact(raw.replace(/\\\\/g, '\\')); };
+    el.appendChild(a);
+    last = mm.index + raw.length;
+  }
+  el.appendChild(document.createTextNode(text.slice(last)));
+}
+let artPreviewUrl = '';
+async function previewArtifact(winPath) {
+  const url = '/api/sessions/' + encodeURIComponent(state.currentId) + '/preview?p=' + encodeURIComponent(winPath);
+  try {
+    const r = await fetch(url, { headers: auth() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (ART_IMG.test(winPath)) {
+      const blob = await r.blob();
+      if (artPreviewUrl) URL.revokeObjectURL(artPreviewUrl);
+      artPreviewUrl = URL.createObjectURL(blob);
+      openLightbox(artPreviewUrl);
+    } else {
+      $('fp-name').textContent = winPath.split(/[\\/]/).pop();
+      $('fp-body').textContent = '加载中…';
+      $('file-prev').classList.remove('hidden');
+      $('fp-body').textContent = (await r.text()).slice(0, 64 * 1024);
+    }
+  } catch (e) {
+    $('file-prev').classList.add('hidden');
+    toast('预览失败：' + ((e && e.message) || '文件不可用'));
+  }
 }
 function fmtTokens(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';

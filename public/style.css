@@ -175,6 +175,8 @@ button { font-family: inherit; }
 .tool-out.err { color: var(--err); opacity: .85; }
 .tool-out.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .tool-out-imgs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.flink { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); word-break: break-all; }
+.flink:active { opacity: .7; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
 .final { font-size: 15px; line-height: 1.55; font-weight: 600; }
 .final pre { font-weight: 400; }

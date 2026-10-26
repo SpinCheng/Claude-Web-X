@@ -95,6 +95,12 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 
 
+## 2026-10-26 · 产物预览 v23
+
+用户追问 v22 是否真完成「中途输出的图片、文本等文件无法查看」——只完成了一半：工具结果里的**内联**文本/图片（v22 toolres 配对）能看，但运行中**写到磁盘**的文件（Write/Edit 产物、脚本截图）在转录里只是路径字符串，`/files` 又只服务手机上传的附件目录。v23 补齐：PWA 侧路径正则链接化（仅白名单扩展才链、分隔符容忍 tool chip 里 JSON.stringify 的双反斜杠）；bridge 侧 `preview` 端点锁会话 cwd（resolve+前缀校验，`..`/绝对路径在外/UNC 全 403）。
+
+安全取舍：html/svg 即使白名单也**按 text/plain 出**（模型写的文件当 markup 渲染=自造 XSS）；图片直出；≤2MB；cwd 外不可预览（~/.claude 等故意排除）。测试：隔离实例（:3799，不碰生产 bridge，规避红线 6）curl 9 断言（401/200/415/403×3/404）+ CDP headless E2E（badge v23、4 条链接、txt 弹层含正文、png 灯箱 blob URL）全过。教训：**「显示层缺功能」先分清数据在不在转录里**——内联结果在（v22 够），磁盘文件不在（需要服务端取，v23）。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

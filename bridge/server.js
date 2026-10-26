@@ -64,6 +64,24 @@ const MIME = {
   '.csv': 'text/plain; charset=utf-8',
 };
 
+// previewable mid-run artifacts (v23): images inline; everything textual as
+// text/plain - html/svg are deliberately NOT served as markup (kills any
+// XSS vector from a model-written file), unknown extensions are refused
+const PREVIEW_MIME = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp',
+  '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
+  '.log': 'text/plain; charset=utf-8', '.json': 'text/plain; charset=utf-8',
+  '.csv': 'text/plain; charset=utf-8', '.yml': 'text/plain; charset=utf-8',
+  '.yaml': 'text/plain; charset=utf-8', '.xml': 'text/plain; charset=utf-8',
+  '.html': 'text/plain; charset=utf-8', '.htm': 'text/plain; charset=utf-8',
+  '.css': 'text/plain; charset=utf-8', '.js': 'text/plain; charset=utf-8',
+  '.mjs': 'text/plain; charset=utf-8', '.cjs': 'text/plain; charset=utf-8',
+  '.ts': 'text/plain; charset=utf-8', '.py': 'text/plain; charset=utf-8',
+  '.ps1': 'text/plain; charset=utf-8', '.sh': 'text/plain; charset=utf-8',
+  '.ini': 'text/plain; charset=utf-8', '.toml': 'text/plain; charset=utf-8',
+};
+
 export function createServer(cfg, store, adapter, runner, handoff, paths = {}, ctxprobe = null) {
   const UPLOADS_DIR = paths.uploadsDir || path.join(__dirname, 'data', 'uploads');
   // per-session "PC is stuck on a prompt" state (Notification hook driven);
@@ -269,6 +287,30 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
         if (!events) { res.writeHead(404); res.end('{"error":"not found"}'); return; }
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ events }));
+        return;
+      }
+      // mid-run artifact preview (v23): files a run touched on disk, locked
+      // inside the session's project dir, previewable extensions, <= 2 MB
+      m = p.match(/^\/api\/sessions\/([^/]+)\/preview$/);
+      if (m) {
+        const rec = store.get(decodeURIComponent(m[1]));
+        const rel = url.searchParams.get('p') || '';
+        if (!rec || !rec.cwd || !rel || /^\\\\/.test(rel)) { res.writeHead(403); res.end('{"error":"forbidden"}'); return; }
+        const root = path.resolve(rec.cwd);
+        const abs = path.resolve(root, rel);
+        if (!abs.toLowerCase().startsWith(root.toLowerCase() + path.sep)) {
+          res.writeHead(403); res.end('{"error":"outside project dir"}'); return;
+        }
+        const mt = PREVIEW_MIME[path.extname(abs).toLowerCase()];
+        if (!mt) { res.writeHead(415); res.end('{"error":"not previewable"}'); return; }
+        let st; try { st = fs.statSync(abs); } catch { res.writeHead(404); res.end('{"error":"not found"}'); return; }
+        if (!st.isFile()) { res.writeHead(404); res.end('{"error":"not found"}'); return; }
+        if (st.size > 2 * 1024 * 1024) { res.writeHead(413); res.end('{"error":"too large"}'); return; }
+        res.writeHead(200, { 'Content-Type': mt, 'Cache-Control': 'no-cache' });
+        fs.readFile(abs, (err, data) => {
+          if (err) { res.writeHead(404); res.end('not found'); return; }
+          res.end(data);
+        });
         return;
       }
       // pending queue snapshot (ids + texts) for the composer queue panel
