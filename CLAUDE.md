@@ -2,10 +2,10 @@
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话的插件工程（LAN bridge + 免构建 PWA）。
 
-- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-4 已落地，step 5 views 拆分待做）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=ES module 入口 → `js/`（state 单例/api 带 401 回调/ws 传输注入 handlers/md 纯函数）。
+- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / ctxring 圆环·明细·模型目录 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 是唯一函数级循环 import，求值期零交叉）。
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
 - 版本演进与调试史（症状→根因）：`docs/history.md`
-- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（12 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，6 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换）
+- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（14 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，7 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换）
 - 功能缺口 Backlog：README「路线图/Backlog」节
 
 ## 快速开始

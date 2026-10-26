@@ -31,3 +31,8 @@ export const state = {
 };
 
 export { CLOSED_KEY };
+
+// picked send overrides (persisted): '' = follow CLI/session default.
+// Views write localStorage inline; reads funnel through here.
+export function currentModel() { return localStorage.getItem('cr_model') || ''; }
+export function currentEffort() { return localStorage.getItem('cr_effort') || ''; }

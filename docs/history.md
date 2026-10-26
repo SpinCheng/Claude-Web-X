@@ -8,7 +8,7 @@
 
 症状：重构 step 0-4 提交、脱离重启器换血后 bridge 起不来，手机全部失联；且本轮 turn 仍活着（**runner 死后 `-p` 模式不再读 stdin，管道断裂杀不掉已派发的 turn**——"杀 bridge=杀 turn"只对进行中读写窗口成立，对纯输出阶段不成立）。根因：抽取脚本把 assistant 分支的 `const rec0 = this.store.get(id)` 删了但引用还在——`ReferenceError: rec0 is not defined`，**每条真实 assistant 行都带 message.usage**，启动 drain 必炸。测试盲区：单测与 E2E 的 assistant fixture 都没带 usage 字段，崩溃行从未执行——14 测全绿带雷上线。修复 + 两个回归单测（usage 推导有/无预置记录）+ E2E fixture 的 assistant 一律带 usage（此后该路径永远被踩）。教训两条：①机械搬运脚本的变量改名 replace 必须 grep 残留引用再收工；②**fixture 字段保真度=测试有效性**——缺 usage 这种"真实必有、合成常无"的字段就是盲区清单。另：启动横幅含 token，诊断重定向日志只可进 %TEMP%（勿进仓库），常态重启一律不重定向。
 
-## 2026-10-27 · 分层重构 step 0-4（用户裁定：可维护性整改）
+## 2026-10-27 · 分层重构 step 0-5（用户裁定：可维护性整改）
 
 动机：app.js 1880 行 26 分区、server.js 604 行 6 类职责混居；路线图功能（审批 diff/分页/搜索/导出/Phase 3 cowork）全要动这两块公共区。方案先行讨论后按步执行，每步独立提交、套件护航：
 
@@ -18,7 +18,7 @@
 - **step 3**：server.js 604→106 行组装根；`lib/`（router 33 行含 `*` 通配、wshub、auth、mime、models）+ `routes/` 六域。新增路由级 try/catch（原来 route 抛错=进程级 unhandled）。踩坑：guard 闭包里取 `r.res` 而 r 无 res——签名 (req,res,r)。
 - **step 4**：`parsers-cc.js` 纯函数化（applyLine 整个 switch，rec 作参数注入），adapter 只剩生命周期 204 行；12 个单测把 v22/24/26/28 判定坑全部钉死。踩坑：heredoc 嵌模板字符串生成正则必丢反斜杠（`\\s`→`s`）——**生成含正则的代码一律 Edit 直写**（同 bash 内联 fixture 教训一族）。
 
-待办 step 5：app.js 剩余 1735 行拆 views（list/detail/composer/overlays/ctxring/toast，detail 最后——滚动三律/renderTail 不变量是全工程最脆处）。
+- **step 5**：app.js 1735→244 行组装根（boot/gate/popstate 路由/WS 帧语义/delete），视图拆入 `js/views/`：toast / overlays（气泡+灯箱+预览+审批卡）/ list（分组列表）/ ctxring（圆环+明细+模型目录）/ composer（输入区+附件+队列面板+新会话弹窗）/ detail（视图壳）+ transcript（轮次模型+renderTail 脆核）——detail 拆两半是超计划项（单文件会 ~800 行，脆核单独成层可测可审）。currentModel/currentEffort 读取器并入 state.js（"持久化键在此读"宪章）；util.js 收 $ + 格式化。**composer↔detail 唯一函数级循环 import**（renderDriverChip↔updateComposer/renderAttachChips/fetchQueue）——ESM 函数声明在实例化期即初始化、事件期才调用，两文件头注已声明"求值期零交叉"红线。死代码 togglePerm 丢弃（全工程零引用）。对账制度化（step-4 rec0 教训）：import↔export 双向脚本对账 + 新旧函数清单 diff，审计脚本 .tmp-* 用完即删。改动仅搬运+导出声明，v32，14 单测 + 7 场景全绿。
 
 CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档。根因分析对新会话仍有诊断价值，规则本身已提炼进 CLAUDE.md。
 

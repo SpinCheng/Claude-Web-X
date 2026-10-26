@@ -1,0 +1,498 @@
+// js/views/transcript.js - the fragile core of the detail view: transcript
+// turn model (events -> turns), timeline DOM rendering, renderTail's 1:1
+// chat-children/turns invariant, dynamic height caps, scrolling and the
+// optimistic user bubble. Scroll laws and markCapped rules live HERE -
+// read docs/history.md (折叠/滚动系列坑) before touching anything.
+
+import { $, fmtTs } from '../util.js';
+import { state } from '../state.js';
+import { miniMd, linkifyPaths } from '../md.js';
+import { openLightbox, previewArtifact } from './overlays.js';
+
+/* ---------------- turn model ---------------- */
+function sessionLive(id) {
+  if (state.runs[id]?.state === 'running') return true;
+  const s = state.sessions.find((x) => x.id === id);
+  return !!(s && s.status === 'active' && Date.now() - s.lastActive < 180_000);
+}
+
+// events -> turns. A user event closes the pending bot turn and starts a new
+// user turn; assistant parts accumulate into the following bot turn.
+function buildTurns(events) {
+  state.turns = [];
+  state.liveTurnOpen = false;
+  let stopped = false;
+  for (const ev of events) {
+    // track whether the replay ends past a stop marker: a trailing stop means
+    // the last run FINISHED (any driver) - the last turn must render done,
+    // not live, even while the session is still freshness-"active"
+    if (ev.k === 'user') stopped = false;
+    else if (ev.k === 'stop') stopped = true;
+    applyEventToTurns(ev);
+  }
+  if (!stopped) markLiveTurn();
+}
+function applyEventToTurns(ev) {
+  const T = state.turns;
+  if (ev.k === 'user') {
+    state.userCollapsedLive = false; // a new question re-opens the next live turn
+    // fold into a matching recent user turn: an unconfirmed optimistic one
+    // (sent this session, transcript not written yet) gets confirmed in place;
+    // an already-confirmed match is a replayed/duplicate event -> no-op.
+    // Pushing instead would duplicate the bubble on double-fired appends.
+    for (let i = T.length - 1; i >= Math.max(0, T.length - 12); i--) {
+      const t = T[i];
+      if (t.role !== 'user') continue;
+      if (t.text !== ev.text) continue;
+      if (!t.optimistic) return i; // replay: already on screen, nothing to do
+      t.optimistic = false;
+      t.ts = ev.ts || t.ts;
+      if (ev.images && ev.images.length) t.images = ev.images;
+      return i; // edited an earlier turn: caller must re-render from here
+    }
+    T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
+    T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '' });
+  } else if (ev.k === 'assistant') {
+    if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: ev.ts });
+    const turn = T[T.length - 1];
+    turn.ts = turn.ts || ev.ts;
+    for (const p of ev.parts || []) {
+      if (p.t === 'think') { turn.think.push(p.v); turn.steps.push({ t: 'think', v: p.v }); }
+      else if (p.t === 'tool') {
+        const tool = { name: p.name, id: p.id || '', v: p.v, out: null };
+        turn.tools.push(tool);
+        turn.steps.push({ t: 'tool', tool });
+      }
+      else if (p.t === 'text' && p.v && p.v.trim()) { turn.texts.push(p.v); turn.steps.push({ t: 'text', v: p.v }); }
+    }
+  } else if (ev.k === 'toolres') {
+    // tool results arrive as later user lines; pair each back to its tool_use
+    // step by id (search recent bot turns from the tail)
+    let touched = null;
+    for (let ti = T.length - 1; ti >= Math.max(0, T.length - 3) && touched === null; ti--) {
+      const turn = T[ti];
+      if (turn.role !== 'bot' || !turn.steps) continue;
+      let allFound = true;
+      for (const it of ev.items || []) {
+        const step = turn.steps.find((s) => s.t === 'tool' && s.tool.id === it.id);
+        if (!step || step.tool.out) { allFound = false; continue; }
+        step.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
+        const bkt = turn.tools.find((x) => x === step.tool);
+        if (bkt) bkt.out = step.tool.out;
+        touched = ti;
+      }
+      if (touched === null) allFound = false; // nothing here; keep searching older turns
+    }
+    return touched; // re-render from this turn so the output shows up
+  } else if (ev.k === 'stats') {
+    T.push({ role: 'sys', text: '成本 $' + (ev.stats.usd != null ? Number(ev.stats.usd).toFixed(2) : '?') +
+      ' · in ' + (ev.stats.inTok ?? '?') + ' / out ' + (ev.stats.outTok ?? '?') + ' tok' });
+  } else if (ev.k === 'compact') {
+    // compaction continuation summary folded by the adapter (isCompactSummary
+    // flag) - one marker line instead of a giant machine-generated bubble
+    const n = ev.n || 0;
+    T.push({ role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
+  } else if (ev.k === 'skill') {
+    // skill body injected by the CLI on invocation - folded to a marker too
+    const n = ev.n || 0;
+    T.push({ role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
+  } else if (ev.k === 'title') { /* meta only */ }
+}
+function markLiveTurn() {
+  // the trailing bot turn is "live" when its session is streaming
+  state.liveTurnOpen = false;
+  if (state.currentId && sessionLive(state.currentId) && state.turns.length) {
+    const last = state.turns[state.turns.length - 1];
+    if (last.role === 'bot' && (last.think.length || last.tools.length || last.texts.length)) {
+      state.liveTurnOpen = true;
+    }
+  }
+}
+function closeLiveTurn() { state.liveTurnOpen = false; state.userCollapsedLive = false; }
+
+/* ---------------- DOM rendering ---------------- */
+// apply height caps only where content actually overflows: a permanently-on
+// max-height+overflow+overscroll-contain turns short expanded panels into
+// gesture dead zones on touch devices (nothing to scroll inside, chaining cut)
+function markCapped(root) {
+  requestAnimationFrame(() => {
+    const cap = Math.floor(window.innerHeight * 0.34) + 8;
+    (root || $('chat')).querySelectorAll('.tool-chip:not(.capped), .think:not(.capped), .tool-out:not(.capped)').forEach((el) => {
+      if (el.scrollHeight > cap) el.classList.add('capped');
+    });
+  });
+}
+
+function renderAllTurns() {
+  const chat = $('chat');
+  chat.innerHTML = '';
+  if (state.turns.length === 0) {
+    const d = document.createElement('div');
+    d.className = 'empty';
+    d.textContent = '还没有对话内容';
+    chat.appendChild(d);
+    return;
+  }
+  for (const t of state.turns) chat.appendChild(renderTurn(t));
+  markCapped();
+  armCodeCopy();
+}
+/* ---------------- timeline turns ---------------- */
+const CHEV_S = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+const CHEV_B = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+const ICO_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg>';
+const ICO_CLOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+const DOTS = {
+  think: '<span class="dot-hollow"></span>',
+  tool: '<span class="dot-tool"></span>',
+  mid: '<span class="dot-mid"></span>',
+  final: '<span class="dot-final">' + ICO_CHECK + '</span>',
+};
+
+function appendCaret(el) {
+  const c = document.createElement('span');
+  c.className = 'caret';
+  el.appendChild(c);
+}
+function addTs(el, iso) {
+  const t = fmtTs(iso);
+  if (!t) return;
+  const s = document.createElement('span');
+  s.className = 'ts';
+  s.textContent = t;
+  el.appendChild(s);
+}
+
+// timeline node: kind = think|tool|mid|final (mid/final not foldable)
+function nodeEl(kind, head, bodyBuilder, open) {
+  const plain = kind === 'mid' || kind === 'final';
+  const node = document.createElement('div');
+  node.className = 'node' + (plain ? ' plain' : '') + (!plain && open ? ' open' : '');
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.innerHTML = DOTS[kind];
+  const h = document.createElement(plain ? 'div' : 'button');
+  h.className = 'node-head';
+  h.innerHTML = '<span class="badge"></span>' +
+    (head.meta ? '<span class="dur"></span>' : '') +
+    (head.link ? '<span class="lnk"></span>' : '') +
+    (head.diff ? '<span class="diffbadge"><span class="add"></span><span class="del"></span></span>' : '') +
+    (plain ? '' : '<span class="chev">' + CHEV_S + '</span>');
+  h.querySelector('.badge').textContent = head.badge;
+  if (head.meta) h.querySelector('.dur').textContent = '· ' + head.meta;
+  if (head.link) h.querySelector('.lnk').textContent = head.link;
+  if (head.diff) {
+    h.querySelector('.diffbadge .add').textContent = head.diff.add;
+    h.querySelector('.diffbadge .del').textContent = head.diff.del;
+  }
+  node.append(dot, h);
+  if (bodyBuilder) {
+    const body = document.createElement('div');
+    body.className = 'node-body';
+    bodyBuilder(body);
+    node.appendChild(body);
+  }
+  if (!plain) h.onclick = () => {
+    node.classList.toggle('open');
+    markCapped(node); // hidden bodies never got measured at render time
+  };
+  return node;
+}
+
+// extract a short path/command label for a tool's head line
+function toolLink(t) {
+  let input = null;
+  try { input = JSON.parse(t.v); } catch { return ''; }
+  if (!input || typeof input !== 'object') return '';
+  const p = input.file_path || input.path || input.pattern || input.notebook_path;
+  if (typeof p === 'string' && p) return p;
+  const cmd = input.command || input.cmd;
+  if (typeof cmd === 'string' && cmd) return cmd.split('\n')[0].slice(0, 42);
+  return '';
+}
+// Edit/Write: line delta badge from old_string/new_string lengths
+function toolDiff(t) {
+  let input = null;
+  try { input = JSON.parse(t.v); } catch { return null; }
+  if (!input || typeof input !== 'object') return null;
+  if (typeof input.new_string === 'string' || typeof input.content === 'string') {
+    const add = (input.new_string || input.content || '').split('\n').length;
+    const del = typeof input.old_string === 'string' ? input.old_string.split('\n').length : 0;
+    return { add: '+' + add, del: '−' + del };
+  }
+  return null;
+}
+
+function renderTurn(t) {
+  if (t.role === 'sys') {
+    const d = document.createElement('div');
+    d.className = 'sysline';
+    d.textContent = t.text;
+    return d;
+  }
+  if (t.role === 'user') {
+    const d = document.createElement('div');
+    d.className = 'bubble user' + (t.optimistic ? ' pending' : '');
+    d.textContent = t.text;
+    for (const im of t.images || []) {
+      const img = document.createElement('img');
+      img.className = 'bubble-img';
+      img.alt = '附件图片';
+      img.src = 'data:' + im.mt + ';base64,' + im.data;
+      img.onclick = () => openLightbox(img.src);
+      d.appendChild(img);
+    }
+    if (t.ts) addTs(d, t.ts);
+    return d;
+  }
+  // bot turn: trigger pill + timeline(思考/工具/修改/输出/结论) + final card.
+  // final conclusion is NEVER folded away: expanded turns end with a 结论
+  // node, collapsed turns keep the final-card below the pill.
+  // v22: nodes render in true chronology from t.steps (think/tool/text
+  // interleaved as they happened); tool steps carry their result (out).
+  const wrap = document.createElement('div');
+  const live = state.liveTurnOpen && t === state.turns[state.turns.length - 1];
+  const steps = (t.steps && t.steps.length ? t.steps : [
+    ...t.think.map((v) => ({ t: 'think', v })),
+    ...t.tools.map((tool) => ({ t: 'tool', tool })),
+    ...t.texts.slice(0, -1).map((v) => ({ t: 'text', v })),
+  ]);
+  const textSteps = steps.filter((s) => s.t === 'text');
+  const concl = textSteps.length ? textSteps[textSteps.length - 1].v : '';
+  // a live turn opens by default UNLESS the user folded it by hand (streaming
+  // re-renders must not force it back open every append)
+  const liveOpen = live && !state.userCollapsedLive;
+  wrap.className = 'turn bot ' + (live ? (liveOpen ? 'live open' : 'live') : 'done');
+
+  if (steps.length > 0) {
+    const trig = document.createElement('button');
+    trig.className = 'trigger';
+    trig.innerHTML = '<span class="ic">' + (live ? ICO_CLOCK : ICO_CHECK) + '</span>' +
+      '<span class="t">过程</span><span class="n">· ' + steps.length + ' 步</span>' +
+      '<span class="chev">' + CHEV_B + '</span>';
+    trig.onclick = () => {
+      wrap.classList.toggle('open');
+      if (live) state.userCollapsedLive = !wrap.classList.contains('open');
+      markCapped(wrap); // bodies were display:none while collapsed (scrollHeight 0) - remeasure now
+    };
+    wrap.appendChild(trig);
+
+    const tl = document.createElement('div');
+    tl.className = 'timeline';
+    for (const s of steps) {
+      if (s.t === 'think') {
+        tl.appendChild(nodeEl('think', { badge: '思考' }, (b) => {
+          const d = document.createElement('div');
+          d.className = 'think';
+          d.textContent = s.v;
+          b.appendChild(d);
+        }, live));
+      } else if (s.t === 'tool') {
+        const tool = s.tool;
+        const isEdit = tool.name === 'Edit' || tool.name === 'Write' || tool.name === 'MultiEdit';
+        const diff = isEdit ? toolDiff(tool) : null;
+        tl.appendChild(nodeEl('tool', {
+          badge: isEdit ? '修改' : '工具',
+          meta: tool.name,
+          link: toolLink(tool),
+          diff,
+        }, (b) => {
+          const c = document.createElement('div');
+          c.className = 'tool-chip';
+          const p = document.createElement('span');
+          p.className = 'p';
+          p.textContent = '⚙ ';
+          c.appendChild(p);
+          c.appendChild(document.createTextNode(tool.name + ' '));
+          linkifyPaths(c, tool.v || '', previewArtifact);
+          b.appendChild(c);
+          // the run's actual output, paired back from the tool_result line
+          const out = tool.out;
+          if (out && (out.text || (out.images && out.images.length))) {
+            if (out.text) {
+              const o = document.createElement('pre');
+              o.className = 'tool-out' + (out.err ? ' err' : '');
+              linkifyPaths(o, out.text, previewArtifact);
+              b.appendChild(o);
+            }
+            if (out.images && out.images.length) {
+              const box = document.createElement('div');
+              box.className = 'tool-out-imgs';
+              for (const im of out.images) {
+                const img = document.createElement('img');
+                img.className = 'bubble-img';
+                img.alt = '工具输出图片';
+                img.src = 'data:' + im.mt + ';base64,' + im.data;
+                img.onclick = () => openLightbox(img.src);
+                box.appendChild(img);
+              }
+              b.appendChild(box);
+            }
+          }
+        }, live));
+      } else { // text step: mid-run output, or the conclusion (last one)
+        const isConcl = s === textSteps[textSteps.length - 1];
+        if (isConcl && concl && !live) {
+          tl.appendChild(nodeEl('final', { badge: '结论' }, (b) => {
+            const d = document.createElement('div');
+            d.className = 'final';
+            d.innerHTML = miniMd(concl);
+            b.appendChild(d);
+          }));
+        } else {
+          tl.appendChild(nodeEl('mid', { badge: '输出' }, (b) => {
+            const d = document.createElement('div');
+            d.className = 'mid';
+            linkifyPaths(d, s.v, previewArtifact);
+            b.appendChild(d);
+          }));
+        }
+      }
+    }
+    wrap.appendChild(tl);
+  }
+  if (concl || (live && steps.length === 0)) {
+    const b = document.createElement('div');
+    b.className = 'final-card';
+    if (concl) b.innerHTML = miniMd(concl);
+    if (live) appendCaret(b);
+    if (t.ts) addTs(b, t.ts);
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+
+// re-render the tail of the transcript. Invariant: chat children map 1:1 to
+// state.turns. New events either mutate the trailing turn (g=0) or append
+// turns after it (user event: g=2); in both cases re-rendering from the
+// previously-trailing turn (index prevLen-1) keeps the mapping aligned.
+// Removing more than that desyncs children vs turns and forces a full
+// rebuild on the next append (which collapses scrollHeight mid-frame and
+// yanks the scroll position).
+function renderTail(prevLen) {
+  const chat = $('chat');
+  const rendered = chat.childNodes.length;
+  if (state.turns.length < rendered) { renderAllTurns(); return; }
+  const start = Math.max(0, prevLen - 1);
+  while (chat.childNodes.length > start) chat.removeChild(chat.lastChild);
+  for (let i = start; i < state.turns.length; i++) chat.appendChild(renderTurn(state.turns[i]));
+  markCapped();
+  armCodeCopy();
+}
+
+/* delegate copy clicks for <pre><code> blocks (works for re-rendered nodes) */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  const code = btn.parentElement && btn.parentElement.querySelector('code');  if (!code) return;
+  copyText(code.textContent, btn);
+});
+function copyText(text, btn) {
+  const done = () => {
+    if (!btn) return;
+    btn.classList.add('ok');
+    const c = btn.querySelector('.i-copy'), o = btn.querySelector('.i-ok');
+    if (c && o) { c.style.display = 'none'; o.style.display = 'block'; }
+    setTimeout(() => {
+      btn.classList.remove('ok');
+      if (c && o) { c.style.display = 'block'; o.style.display = 'none'; }
+    }, 1600);
+  };
+  const fallback = () => {
+    // execCommand path (embedded contexts / denied clipboard)
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      done();
+    } catch (e2) { /* last resort: nothing to do */ }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    Promise.race([
+      navigator.clipboard.writeText(text).then(() => true, () => false),
+      new Promise((r) => setTimeout(() => r(false), 1200)),
+    ]).then((ok) => (ok ? done() : fallback()));
+  } else fallback();
+}
+// add copy buttons to every code fence inside a container (call after renders).
+// the pre gets wrapped in .codeblock so the button stays pinned to the frame
+// while the code scrolls beneath it.
+function armCodeCopy(root) {
+  (root || $('chat')).querySelectorAll('pre').forEach((pre) => {
+    if (pre.querySelector('.copy-btn') || !pre.querySelector('code')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'codeblock';
+    pre.replaceWith(wrap);
+    wrap.appendChild(pre);
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.title = '复制代码';
+    btn.innerHTML = '<svg class="i-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+      '<svg class="i-ok" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="m5 12.5 4.5 4.5L19 7"/></svg>';
+    wrap.appendChild(btn);
+  });
+}
+
+/* ---------------- scrolling ---------------- */
+function updateJumpFab() {
+  const chat = $('chat');
+  const overflow = chat.scrollHeight > chat.clientHeight + 40;
+  $('jump').classList.toggle('hidden', !(overflow && !state.atBottom));
+}
+// scroll events arrive asynchronously after content growth; re-check on the
+// next frame so atBottom reflects the post-growth geometry
+function scrollBottom(force) {
+  const chat = $('chat');
+  if (force || state.atBottom) {
+    chat.scrollTop = chat.scrollHeight;
+    requestAnimationFrame(() => { if (state.atBottom) chat.scrollTop = chat.scrollHeight; });
+  }
+}
+
+/* ---------------- optimistic user bubble (v21) ---------------- */
+// the tap shows the message at once; the transcript line only lands after
+// the CLI spawns and writes it (seconds on slow links). The real transcript
+// event folds into it (applyEventToTurns) and drops the pending styling.
+// Returns the turn so refusal paths can retract it.
+function pushOptimisticUser(text) {
+  const T = state.turns;
+  const t = { role: 'user', text, ts: '', optimistic: true };
+  T.push(t);
+  state.userCollapsedLive = false;
+  renderTail(T.length); // start = len-1: render just the new tail
+  scrollBottom();
+  updateJumpFab();
+  return t;
+}
+// a refused send (409 declined, network error) pulls its bubble back out —
+// unless the transcript already folded into it (optimistic=false), in which
+// case the message is real and stays. Removing the matching chat child keeps
+// the DOM 1:1 with turns, so renderTail's alignment invariant survives
+// without a full rebuild.
+function retractOptimisticUser(t) {
+  if (!t || t.optimistic !== true) return;
+  const i = state.turns.indexOf(t);
+  if (i < 0) return;
+  state.turns.splice(i, 1);
+  const chat = $('chat');
+  if (chat.childNodes[i]) chat.removeChild(chat.childNodes[i]);
+  updateJumpFab();
+}
+
+/* ---------------- wiring ---------------- */
+$('jump').onclick = () => { state.atBottom = true; scrollBottom(true); updateJumpFab(); };
+$('chat').addEventListener('scroll', () => {
+  const el = $('chat');
+  state.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  updateJumpFab();
+});
+window.addEventListener('resize', updateJumpFab);
+
+export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn,
+  markCapped, renderAllTurns, renderTurn, renderTail, updateJumpFab, scrollBottom,
+  pushOptimisticUser, retractOptimisticUser };
