@@ -288,8 +288,16 @@ function sessionLive(id) {
 function buildTurns(events) {
   state.turns = [];
   state.liveTurnOpen = false;
-  for (const ev of events) applyEventToTurns(ev);
-  markLiveTurn();
+  let stopped = false;
+  for (const ev of events) {
+    // track whether the replay ends past a stop marker: a trailing stop means
+    // the last run FINISHED (any driver) - the last turn must render done,
+    // not live, even while the session is still freshness-"active"
+    if (ev.k === 'user') stopped = false;
+    else if (ev.k === 'stop') stopped = true;
+    applyEventToTurns(ev);
+  }
+  if (!stopped) markLiveTurn();
 }
 function applyEventToTurns(ev) {
   const T = state.turns;

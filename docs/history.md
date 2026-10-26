@@ -109,6 +109,12 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/引用/无序有序列表/表格 + 行内（码/**粗**/*斜体*/链接），段落保留聊天式换行。安全边界：**转义先行**（含 `"`→`&quot;`，防 href 属性逃逸）、**链接只认 https?**（`javascript:` 死在正则之外）、模型注入的 `<script>` 原样变文本。排版循视觉纪律：链接珊瑚橘虚线下划线（同 .flink）、表格发丝线+tabular-nums、引用左侧刻线用中性色（珊瑚只留给链接/活态）、列表/表格字重 400 与结论 600 形成层级。隔离实例 CDP 15 断言全过（badge/h2/双 h3/5 li/表头表体/引用/hr/链接 rel/jsLink=false/scriptTag=0/** 不残留/斜体/行内码）。
 
+## 2026-10-26 · 代码块样式作用域 + 重放 live 误判 v26
+
+用户报「代码块没有正常渲染」。取证两处根因，都不在 miniMd 本身：① **CSS 只写了 `.final-card`**——展开过程后的时间线「结论」节点（`.final`）里 pre/code 是裸默认样式（无深底/内边距，v25 之前就这样）；而 v25 新加的 md 块样式又只写了 `.final`，主视图 final-card 的列表/表格/标题反而走浏览器默认（ul 40px 缩进、p 1em 边距）。修复：整套 md 样式统一 `.final, .final-card` 双选择器。② 顺手抓出 **buildTurns 重放 bug**：初始加载重放事件后无条件 `markLiveTurn()`，stop 标记只在 append 路径生效——刚跑完 3 分钟内重开会话，末轮仍按 live 渲染（结论变「输出」节点+闪烁光标）。修复：重放时跟踪 trailing stop（其后有新 user 事件则重置），有 trailing stop 不再 markLiveTurn。
+
+测试坑：合成转录的时间戳写成"未来"导致 sessionLive 恒真（Date.now()−lastActive 为负仍 <180s），反而把这个重放 bug 钉死了——确定性时序有时靠意外。隔离实例断言：时间线结论节点 pre×2 带深底、行内 code 存在、final-card ul 缩进 20px、mdh2 15.5px、无 ``` 残留。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

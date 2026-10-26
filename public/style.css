@@ -179,25 +179,29 @@ button { font-family: inherit; }
 .flink:active { opacity: .7; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
 .final { font-size: 15px; line-height: 1.55; font-weight: 600; }
-.final pre { font-weight: 400; }
-/* markdown blocks in conclusion cards (v25) */
+/* markdown blocks in conclusion cards (v25) - one style set for BOTH
+   containers: the collapsed .final-card AND the expanded timeline's
+   .final conclusion node (they render the same miniMd output) */
 .final > *:first-child, .final-card > *:first-child { margin-top: 0; }
 .final > *:last-child, .final-card > *:last-child { margin-bottom: 0; }
-.final p { margin: 7px 0; }
-.final .mdh1 { font-size: 17px; font-weight: 700; margin: 13px 0 6px; }
-.final .mdh2 { font-size: 15.5px; font-weight: 650; margin: 11px 0 5px; }
-.final .mdh3 { font-size: 14px; font-weight: 650; margin: 9px 0 4px; }
-.final .mdh4 { font-size: 13px; font-weight: 600; color: var(--dim); margin: 9px 0 4px; }
-.final ul, .final ol, .final blockquote, .final table { font-weight: 400; }
-.final ul, .final ol { margin: 7px 0; padding-left: 20px; }
-.final li { margin: 3px 0; }
-.final blockquote { margin: 8px 0; padding: 2px 0 2px 11px; border-left: 2px solid rgba(255, 255, 255, .16); color: var(--dim); }
-.final hr { border: 0; height: 1px; background: rgba(255, 255, 255, .1); margin: 11px 0; }
-.final table { border-collapse: collapse; margin: 8px 0; font-size: 12.5px; display: block; overflow-x: auto; max-width: 100%; }
-.final th, .final td { padding: 5px 12px 5px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; font-variant-numeric: tabular-nums; }
-.final th { color: var(--dim); font-weight: 600; white-space: nowrap; }
-.final a { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); word-break: break-all; }
-.final b { font-weight: 700; }
+.final p, .final-card p { margin: 7px 0; }
+.final pre, .final-card pre { font-weight: 400; background: #171613; border-radius: 9px; padding: 9px; overflow-x: auto; font-size: 12px; }
+.final code, .final-card code { font-family: var(--mono); font-size: 12.5px; }
+.final .mdh1, .final-card .mdh1 { font-size: 17px; font-weight: 700; margin: 13px 0 6px; }
+.final .mdh2, .final-card .mdh2 { font-size: 15.5px; font-weight: 650; margin: 11px 0 5px; }
+.final .mdh3, .final-card .mdh3 { font-size: 14px; font-weight: 650; margin: 9px 0 4px; }
+.final .mdh4, .final-card .mdh4 { font-size: 13px; font-weight: 600; color: var(--dim); margin: 9px 0 4px; }
+.final ul, .final ol, .final blockquote, .final table,
+.final-card ul, .final-card ol, .final-card blockquote, .final-card table { font-weight: 400; }
+.final ul, .final ol, .final-card ul, .final-card ol { margin: 7px 0; padding-left: 20px; }
+.final li, .final-card li { margin: 3px 0; }
+.final blockquote, .final-card blockquote { margin: 8px 0; padding: 2px 0 2px 11px; border-left: 2px solid rgba(255, 255, 255, .16); color: var(--dim); }
+.final hr, .final-card hr { border: 0; height: 1px; background: rgba(255, 255, 255, .1); margin: 11px 0; }
+.final table, .final-card table { border-collapse: collapse; margin: 8px 0; font-size: 12.5px; display: block; overflow-x: auto; max-width: 100%; }
+.final th, .final td, .final-card th, .final-card td { padding: 5px 12px 5px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; font-variant-numeric: tabular-nums; }
+.final th, .final-card th { color: var(--dim); font-weight: 600; white-space: nowrap; }
+.final a, .final-card a { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); word-break: break-all; }
+.final b, .final-card b { font-weight: 700; }
 
 /* 结论卡：签名元素——品牌色左侧刻线 + 浮起 */
 .final-card { position: relative; background: var(--panel); border-radius: 14px; padding: 13px 15px 13px 17px; font-size: 15px; line-height: 1.55; margin: 0 0 8px; word-break: break-word; box-shadow: var(--sh-1); overflow: hidden; }
