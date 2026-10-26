@@ -1,5 +1,17 @@
 # 版本演进与调试史（症状 → 根因）
 
+## 2026-10-27 · 分层重构 step 0-4（用户裁定：可维护性整改）
+
+动机：app.js 1880 行 26 分区、server.js 604 行 6 类职责混居；路线图功能（审批 diff/分页/搜索/导出/Phase 3 cowork）全要动这两块公共区。方案先行讨论后按步执行，每步独立提交、套件护航：
+
+- **step 0 安全网**：E2E 冒烟套件落地（`test/e2e/`：harness 隔离实例+CDP 驱动+合成转录 fixture，6 场景）。踩坑三枚：api() 助手 `...opts` 展开会**替换**掉 auth 头（401 假失败）；`#open=` 深链在 fixture 被发现前打过去=永久空白（waitSession 门）；projects 目录须在 adapter.start 前存在（fs.watch 对缺失目录静默降级轮询）。
+- **step 1**：app.js 转 ES module 入口，md/linkify 纯函数入 `js/md.js`（零构建不破——原生 module，无打包器）。
+- **step 2**：`js/state.js`（可变单例）/`js/api.js`（401 回调注入，无视图逻辑）/`js/ws.js`（传输与帧语义分离，handlers 注入）。
+- **step 3**：server.js 604→106 行组装根；`lib/`（router 33 行含 `*` 通配、wshub、auth、mime、models）+ `routes/` 六域。新增路由级 try/catch（原来 route 抛错=进程级 unhandled）。踩坑：guard 闭包里取 `r.res` 而 r 无 res——签名 (req,res,r)。
+- **step 4**：`parsers-cc.js` 纯函数化（applyLine 整个 switch，rec 作参数注入），adapter 只剩生命周期 204 行；12 个单测把 v22/24/26/28 判定坑全部钉死。踩坑：heredoc 嵌模板字符串生成正则必丢反斜杠（`\\s`→`s`）——**生成含正则的代码一律 Edit 直写**（同 bash 内联 fixture 教训一族）。
+
+待办 step 5：app.js 剩余 1735 行拆 views（list/detail/composer/overlays/ctxring/toast，detail 最后——滚动三律/renderTail 不变量是全工程最脆处）。
+
 CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档。根因分析对新会话仍有诊断价值，规则本身已提炼进 CLAUDE.md。
 
 ## 2026-10-25 · Phase 0/1/2（架构定形）
