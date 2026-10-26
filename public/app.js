@@ -642,24 +642,68 @@ function renderTail(prevLen) {
   armCodeCopy();
 }
 
-/* tiny safe markdown: escape first, then fences / inline code / bold */
-function miniMd(s) {
-  const esc = String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/* safe markdown for conclusion cards (v25): escape first, then block-level
+   (fences / headings / hr / blockquote / lists / tables) + inline (code /
+   bold / italic / links). Links are https? only - javascript: and any
+   model-injected markup die in the escape step. */
+function mdInline(s) {
+  return s
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<i>$2</i>')
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+function miniMd(src) {
+  const esc = String(src).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const parts = esc.split('```');
-  let out = '';
+  let html = '';
   for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 1) {
+    if (i % 2 === 1) { // fenced code: line after ``` is the lang tag
       const nl = parts[i].indexOf('\n');
       const body = nl >= 0 ? parts[i].slice(nl + 1) : parts[i];
-      out += '<pre><code>' + body + '</code></pre>';
-    } else {
-      out += parts[i]
-        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
-        .replace(/\n/g, '<br>');
+      html += '<pre><code>' + body.replace(/\n+$/, '') + '</code></pre>';
+      continue;
+    }
+    const lines = parts[i].split('\n');
+    let j = 0;
+    const isBlockStart = (l) => /^(#{1,4}\s|&gt;|\|)/.test(l) || /^\s*([-*+]\s|\d+[.)]\s)/.test(l) || /^(\s*[-*_]){3,}\s*$/.test(l);
+    while (j < lines.length) {
+      const ln = lines[j];
+      let m;
+      if (!ln.trim()) { j++; continue; }
+      if ((m = ln.match(/^(#{1,4})\s+(.*)$/))) {
+        html += '<div class="mdh' + Math.min(m[1].length, 4) + '">' + mdInline(m[2]) + '</div>'; j++;
+      } else if (/^(\s*[-*_]){3,}\s*$/.test(ln)) {
+        html += '<hr>'; j++;
+      } else if ((m = ln.match(/^&gt;\s?(.*)$/))) {
+        const buf = [];
+        while (j < lines.length && (m = lines[j].match(/^&gt;\s?(.*)$/))) { buf.push(m[1]); j++; }
+        html += '<blockquote>' + mdInline(buf.join('<br>')) + '</blockquote>';
+      } else if ((m = ln.match(/^\s*[-*+]\s+(.*)$/))) {
+        const buf = [];
+        while (j < lines.length && (m = lines[j].match(/^\s*[-*+]\s+(.*)$/))) { buf.push('<li>' + mdInline(m[1]) + '</li>'); j++; }
+        html += '<ul>' + buf.join('') + '</ul>';
+      } else if ((m = ln.match(/^\s*\d+[.)]\s+(.*)$/))) {
+        const buf = [];
+        while (j < lines.length && (m = lines[j].match(/^\s*\d+[.)]\s+(.*)$/))) { buf.push('<li>' + mdInline(m[1]) + '</li>'); j++; }
+        html += '<ol>' + buf.join('') + '</ol>';
+      } else if (ln.trim().startsWith('|') && j + 1 < lines.length && /^[\s|:-]+$/.test(lines[j + 1]) && lines[j + 1].includes('-') && lines[j + 1].includes('|')) {
+        const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+        const head = cells(ln);
+        j += 2;
+        const rows = [];
+        while (j < lines.length && lines[j].trim().startsWith('|')) { rows.push(cells(lines[j])); j++; }
+        html += '<table><thead><tr>' + head.map((h) => '<th>' + mdInline(h) + '</th>').join('') + '</tr></thead><tbody>' +
+          rows.map((r) => '<tr>' + r.map((c) => '<td>' + mdInline(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+      } else {
+        const buf = [];
+        while (j < lines.length && lines[j].trim() && !isBlockStart(lines[j])) { buf.push(mdInline(lines[j])); j++; }
+        if (!buf.length) { buf.push(mdInline(ln)); j++; } // lone '|'-ish line
+        html += '<p>' + buf.join('<br>') + '</p>';
+      }
     }
   }
-  return out;
+  return html;
 }
 
 /* delegate copy clicks for <pre><code> blocks (works for re-rendered nodes) */

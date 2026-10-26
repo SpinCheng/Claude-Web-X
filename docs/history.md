@@ -105,6 +105,10 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 用户报：某种状态下一大串生成文本以右侧气泡上屏——即上下文耗尽压缩后的**续传摘要**。取证（本会话文件 3 处）：该行 `type=user`、**origin 字段缺失**、`isCompactSummary:true`、`isVisibleInTranscriptOnly:true`、纯字符串 content；现有门只查 `origin.kind`，缺失即漏进真人分支渲染成大气泡。关键坑：**origin 缺失 ≠ 可折叠**——手机经 runner 发的消息（promptSource/turnOrigin=sdk）同样没有 origin 字段，按缺失折叠会把真消息吞掉，只能认显式 `isCompactSummary`。另发现 66 条 sdk 探针类 user 行（如 passphrase 探测）与手机消息同签名，无法字段区分，维持气泡。PWA 渲染为 sysline 标记「⟲ 上下文已压缩（续传摘要 N 字，已折叠）」。隔离实例验证：API 层 compact=1/user=2/零泄漏 + CDP DOM 六断言全过。
 
+## 2026-10-26 · 结论卡 Markdown 渲染 v25
+
+miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/引用/无序有序列表/表格 + 行内（码/**粗**/*斜体*/链接），段落保留聊天式换行。安全边界：**转义先行**（含 `"`→`&quot;`，防 href 属性逃逸）、**链接只认 https?**（`javascript:` 死在正则之外）、模型注入的 `<script>` 原样变文本。排版循视觉纪律：链接珊瑚橘虚线下划线（同 .flink）、表格发丝线+tabular-nums、引用左侧刻线用中性色（珊瑚只留给链接/活态）、列表/表格字重 400 与结论 600 形成层级。隔离实例 CDP 15 断言全过（badge/h2/双 h3/5 li/表头表体/引用/hr/链接 rel/jsLink=false/scriptTag=0/** 不残留/斜体/行内码）。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。
