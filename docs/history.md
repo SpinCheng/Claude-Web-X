@@ -1,5 +1,9 @@
 # 版本演进与调试史（症状 → 根因）
 
+## 2026-10-27 · 会话列表不可滚（v31）
+
+症状：列表页无法滚动。根因两层：① `.groups` 从 v16 起就没有 overflow/min-height——flex 列里 main 默认 `min-height:auto`，内容超出即被 `.page` 的 `overflow:hidden` 剪掉，**从来没有真正的滚动容器**（此前分组多折叠态没暴露）；② 补 `overflow-y:auto` 后又踩 flex 第二坑——`.pgroup` 作为滚动容器的 flex 子项且自带 `overflow:hidden`（min-height 退化为 0），被**压缩**到视口高（14 行只显 5.7 行）而不是撑开滚动。完整修复=滚动容器+子项不缩：`.groups { overflow-y:auto; min-height:0 }` + `.pgroup { flex:none }`。E2E 新增 list 场景（14 会话断言 sh>ch+300 且 scrollTop 生效）。教训：**flex 布局里"可滚"=容器约束(overflow+min-height:0)+子项不缩(flex:none)成对出现**，缺一半就是"剪掉"或"压扁"。
+
 ## 2026-10-27 · step-4 回归炸停产线（症状：换血后手机连不上）
 
 症状：重构 step 0-4 提交、脱离重启器换血后 bridge 起不来，手机全部失联；且本轮 turn 仍活着（**runner 死后 `-p` 模式不再读 stdin，管道断裂杀不掉已派发的 turn**——"杀 bridge=杀 turn"只对进行中读写窗口成立，对纯输出阶段不成立）。根因：抽取脚本把 assistant 分支的 `const rec0 = this.store.get(id)` 删了但引用还在——`ReferenceError: rec0 is not defined`，**每条真实 assistant 行都带 message.usage**，启动 drain 必炸。测试盲区：单测与 E2E 的 assistant fixture 都没带 usage 字段，崩溃行从未执行——14 测全绿带雷上线。修复 + 两个回归单测（usage 推导有/无预置记录）+ E2E fixture 的 assistant 一律带 usage（此后该路径永远被踩）。教训两条：①机械搬运脚本的变量改名 replace 必须 grep 残留引用再收工；②**fixture 字段保真度=测试有效性**——缺 usage 这种"真实必有、合成常无"的字段就是盲区清单。另：启动横幅含 token，诊断重定向日志只可进 %TEMP%（勿进仓库），常态重启一律不重定向。
