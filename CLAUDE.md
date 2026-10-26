@@ -51,6 +51,7 @@ npm start          # node bridge/index.js，端口 3742
 - 折叠 CSS 必须是 `.node:not(.open):not(.plain) .node-body{display:none}`——输出/结论文本是 plain 节点（不可折叠），漏 `:not(.plain)` 会藏掉全部输出。
 - 限高只作用于 `.think/.tool-chip`（结论/输出不限高），且必须由 `markCapped()` 动态加 `.capped`——固定挂 overflow 会造手势死区。display:none 元素 scrollHeight=0：**胶囊与节点头点击里必须局部重跑 markCapped**。
 - 滚动三律：`.page` 必须 `height:100dvh`；`#chat` 必须 `overflow-anchor:none`；**renderTail 只从 `prevLen-1` 重渲染**（chat 子节点与 state.turns 一一对应，多删即错位→全量重建→滚动跳顶）。
+- 乐观上屏（v20）：发送 202 即 push `optimistic` user turn（pending 半透明）；转录 user 事件按文本匹配**原地折叠**（匹配必须是幂等的——已确认的同文要 no-op，否则 fs.watch+轮询双触发会推出重复气泡）；fold 改的是尾部**之前**的 turn，handleAppend 用 `editStart`（本批最早被改索引）调 renderTail，默认仍是尾帧。
 - 轮次形状 `{think[], tools[], texts[]}`（texts 末位=结论）。done 与 live 轮都要有折叠规则；`state.userCollapsedLive` 尊重手动收起；完成信号双路：run 帧 + stop 标记事件（后者覆盖桌面/CLI 驱动），sessions 帧做活跃度翻转兜底。
 - 触屏 Enter=换行（`IS_TOUCH`=pointer:coarse）。
 

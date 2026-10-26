@@ -286,6 +286,7 @@ button { font-family: inherit; }
 .attach-chip .ac-x:active { color: var(--err); }
 .cbtn.attach { padding: 0 6px; }
 .bubble.user .bubble-img { display: block; width: min(240px, 100%); border-radius: 10px; margin-top: 6px; cursor: zoom-in; }
+.bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
 .lightbox-img { max-width: 94vw; max-height: 88dvh; border-radius: 12px; }
 .file-prev { width: auto; flex: 1 1 auto; margin: 0 12px calc(30px + env(safe-area-inset-bottom)); max-width: 640px; }
 .fp-body { max-height: 62dvh; overflow: auto; overscroll-behavior: contain; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; margin: 0; }

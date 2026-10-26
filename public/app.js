@@ -287,6 +287,20 @@ function applyEventToTurns(ev) {
   const T = state.turns;
   if (ev.k === 'user') {
     state.userCollapsedLive = false; // a new question re-opens the next live turn
+    // fold into a matching recent user turn: an unconfirmed optimistic one
+    // (sent this session, transcript not written yet) gets confirmed in place;
+    // an already-confirmed match is a replayed/duplicate event -> no-op.
+    // Pushing instead would duplicate the bubble on double-fired appends.
+    for (let i = T.length - 1; i >= Math.max(0, T.length - 12); i--) {
+      const t = T[i];
+      if (t.role !== 'user') continue;
+      if (t.text !== ev.text) continue;
+      if (!t.optimistic) return i; // replay: already on screen, nothing to do
+      t.optimistic = false;
+      t.ts = ev.ts || t.ts;
+      if (ev.images && ev.images.length) t.images = ev.images;
+      return i; // edited an earlier turn: caller must re-render from here
+    }
     T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
     T.push({ role: 'bot', think: [], tools: [], texts: [], ts: '' });
   } else if (ev.k === 'assistant') {
@@ -437,7 +451,7 @@ function renderTurn(t) {
   }
   if (t.role === 'user') {
     const d = document.createElement('div');
-    d.className = 'bubble user';
+    d.className = 'bubble user' + (t.optimistic ? ' pending' : '');
     d.textContent = t.text;
     for (const im of t.images || []) {
       const img = document.createElement('img');
@@ -1248,15 +1262,21 @@ function sendMessage(force) {
   if (!text || !state.currentId) return;
   _send(text, input.value, force);
 }
-// optimistic path (v18): the box empties, its height collapses and the
-// three-state button flips THE MOMENT the send is tapped — not after the
-// network round-trip (slow links made taps feel dead). Every failure path
-// restores the original text so nothing is lost.
-function _send(text, rawInput, force, attsOverride) {
+// optimistic path (v18→v21): the box empties, its height collapses, the
+// three-state button flips and the message bubble appears THE MOMENT the send
+// is tapped — not after the network round-trip (slow links made taps feel
+// dead). Every failure path restores the original text so nothing is lost.
+function _send(text, rawInput, force, attsOverride, shownTurn) {
   // retry passes its attachments back in; first attempt takes them from state
   const atts = attsOverride || state.attach.splice(0);
   if (!attsOverride) renderAttachChips();
   clearComposer();
+  // optimistic bubble (v21): at TAP time, not after the round-trip — on slow
+  // links the POST latency is the same dead-tap window v18 closed for the
+  // composer. Retracted by every refusal path unless the transcript already
+  // folded into it (then it is a real message and stays).
+  if (!shownTurn && state.currentId) shownTurn = pushOptimisticUser(text);
+  const fail = () => { restoreComposer(rawInput, atts); retractOptimisticUser(shownTurn); };
   api('/api/sessions/' + encodeURIComponent(state.currentId) + '/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1270,23 +1290,23 @@ function _send(text, rawInput, force, attsOverride) {
         const j = await r.json().catch(() => ({}));
         if (j.error === 'recent-local-write') {
           const ago = j.sinceMs != null ? Math.round(j.sinceMs / 1000) + ' 秒' : '刚刚';
-          if (window.confirm('电脑端 ' + ago + '前刚在写这个会话，可能正在使用（电脑窗口需重开才能看到手机的新消息）。仍然发送？')) _send(text, rawInput, force, atts);
-          else restoreComposer(rawInput, atts);
+          if (window.confirm('电脑端 ' + ago + '前刚在写这个会话，可能正在使用（电脑窗口需重开才能看到手机的新消息）。仍然发送？')) _send(text, rawInput, force, atts, shownTurn);
+          else fail();
           return;
         }
         if (j.error === 'pc-claim') {
-          if (window.confirm('电脑端已接管此会话（cr attach）。切换为手机驱动并发送？')) _send(text, rawInput, force, atts);
-          else restoreComposer(rawInput, atts);
+          if (window.confirm('电脑端已接管此会话（cr attach）。切换为手机驱动并发送？')) _send(text, rawInput, force, atts, shownTurn);
+          else fail();
           return;
         }
-        if (j.error === 'busy') { toast('本会话已有消息在运行，等它结束或点停止'); restoreComposer(rawInput, atts); return; }
+        if (j.error === 'busy') { toast('本会话已有消息在运行，等它结束或点停止'); fail(); return; }
       }
-      if (!r.ok) { toast('发送失败（' + r.status + '）'); restoreComposer(rawInput, atts); return; }
+      if (!r.ok) { toast('发送失败（' + r.status + '）'); fail(); return; }
       const j = await r.json().catch(() => ({}));
       if (j.queued) toast('已排队（第 ' + j.position + ' 条）· 本轮结束后自动发出');
       state.atBottom = true;
     })
-    .catch(() => { toast('网络错误'); restoreComposer(rawInput, atts); });
+    .catch(() => { toast('网络错误'); fail(); });
 }
 function clearComposer() {
   const input = $('msg-input');
@@ -1312,6 +1332,34 @@ function stopRun() {
   fetch('/api/runs/' + encodeURIComponent(run.runId) + '/cancel', { method: 'POST', headers: auth() })
     .then(() => toast('已发送停止信号'))
     .catch(() => {});
+}
+// optimistic bubble (v21): the tap shows the message at once; the transcript
+// line only lands after the CLI spawns and writes it (seconds on slow links).
+// The real transcript event folds into it (applyEventToTurns) and drops the
+// pending styling. Returns the turn so refusal paths can retract it.
+function pushOptimisticUser(text) {
+  const T = state.turns;
+  const t = { role: 'user', text, ts: '', optimistic: true };
+  T.push(t);
+  state.userCollapsedLive = false;
+  renderTail(T.length); // start = len-1: render just the new tail
+  scrollBottom();
+  updateJumpFab();
+  return t;
+}
+// a refused send (409 declined, network error) pulls its bubble back out —
+// unless the transcript already folded into it (optimistic=false), in which
+// case the message is real and stays. Removing the matching chat child keeps
+// the DOM 1:1 with turns, so renderTail's alignment invariant survives
+// without a full rebuild.
+function retractOptimisticUser(t) {
+  if (!t || t.optimistic !== true) return;
+  const i = state.turns.indexOf(t);
+  if (i < 0) return;
+  state.turns.splice(i, 1);
+  const chat = $('chat');
+  if (chat.childNodes[i]) chat.removeChild(chat.childNodes[i]);
+  updateJumpFab();
 }
 
 /* ---------------- toast ---------------- */
@@ -1466,7 +1514,13 @@ function sendWs(obj) { if (state.ws && state.ws.readyState === 1) state.ws.send(
 function handleAppend(d) {
   if (d.id !== state.currentId) return;
   const prevLen = state.turns.length;
-  for (const ev of d.events || []) applyEventToTurns(ev);
+  // optimistic-fold can edit a turn EARLIER than the tail; track the first
+  // index touched so renderTail re-renders from there (children stay aligned)
+  let editStart = prevLen - 1;
+  for (const ev of d.events || []) {
+    const ef = applyEventToTurns(ev);
+    if (ef != null && ef < editStart) editStart = ef;
+  }
   // a stop marker means the turn ENDED (any driver): close the live view so
   // the finished turn re-renders collapsed
   if ((d.events || []).some((e) => e.k === 'stop')) {
@@ -1475,7 +1529,7 @@ function handleAppend(d) {
   } else {
     markLiveTurn();
   }
-  renderTail(prevLen);
+  renderTail(editStart + 1);
   scrollBottom();
   updateJumpFab();
   updateRunStatus(); // tool name may have advanced

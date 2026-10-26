@@ -65,6 +65,12 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 测试事故两起：① 会话选择从列表猜——同 cwd 列表第一个是**当前 harness 会话**，测试差点把本会话发进回收站（409 recent-local-write 意外救场：headless confirm 自动取消）；改用 runId→run 帧确定性捕获。② 杀残留进程 `wmic name='claude.exe'` 把宿主 App 一起杀了（本机 Claude.exe 名字冲突）——清进程必须按命令行过滤。
 
+## 2026-10-26 · 乐观上屏 v20
+
+症状：v18 只在点击瞬间清空输入框，消息气泡仍要等 CLI 启动+写转录（2-5 秒）才出现，用户感觉「卡住」。修复：POST 202 即 push `optimistic` user turn（pending 半透明）；转录 user 事件按文本匹配原地折叠。两个坑：① 去重必须幂等——fs.watch+轮询会双触发同一事件，第一版对已确认气泡直接 break 推了重复气泡；② fold 改的是尾部之前的 turn，handleAppend 固定渲染尾帧会漏掉它——引入 editStart（本批最早被改索引）。测试教训：断言数 `.bubble.user` 时忘了会话创建的引导消息也是 user 气泡，total:2 被误判为重复（state.turns vs DOM 转储一步定位）。
+
+
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。
