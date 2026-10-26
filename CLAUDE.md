@@ -5,6 +5,7 @@
 - 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
 - 版本演进与调试史（症状→根因）：`docs/history.md`
+- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，6 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮；fixture 勿走 bash 内联——反斜杠会被吃）
 - 功能缺口 Backlog：README「路线图/Backlog」节
 
 ## 快速开始
