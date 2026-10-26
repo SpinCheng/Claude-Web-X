@@ -148,8 +148,8 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
       if (!authOk(req, url, cfg)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return; }
       const event = p.slice('/hooks/'.length).split('/')[0] || 'unknown';
       const rr = await handleHook(req, res, cfg, store, broadcast, event);
-      // permission / idle-input notifications become a persistent per-session
-      // waiting state (the prompt itself never reaches the transcript)
+      // permission notifications become a persistent per-session waiting
+      // state (the prompt itself never reaches the transcript)
       if (rr && rr.sessionId) {
         if (rr.waiting) {
           waitings.set(rr.sessionId, rr.waiting);

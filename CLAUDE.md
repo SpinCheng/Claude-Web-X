@@ -24,7 +24,7 @@ npm start          # node bridge/index.js，端口 3742
 - **handoff 仲裁**：转录 mtime 8s 内有新写入且非本 bridge 刚完成的 run → 409 `recent-local-write`（PWA 确认后 force）；PC 持有 claim（`cr attach`）→ 409 `pc-claim`；attach 退出 finally 自动 release（锁 `bridge/data/locks/<id>.json`，TTL 12h）。**自己的活 run 在跑时跳过 mtime 仲裁**（server 先查 `runner.activeRunFor`）。
 - **runner**：① yolo 默认开——固定加 `--dangerously-skip-permissions`（headless 无人审批，不加则工具调用永久卡死）；② perm=ask 走 `--permission-prompt-tool` + 内联 `--mcp-config`（approve-mcp.mjs 回调 `/internal/approval`，手机审批卡，3 分钟超时自动拒）；③ `--model`/`--effort` 直传（effort 白名单 low|medium|high|xhigh|max）；④ busy 时入队（上限 5，run 结束 800ms 后自动派发）。**队列单条管理（v17）**：条目带 id，任意变更推 WS `queue` 帧（快照 {id,text}）；API：`GET/DELETE /api/sessions/:id/queue`（快照/整队清）、`DELETE .../queue/:qid`（删单条）、`POST .../queue/reorder {order:[ids]}`（拖动重排）、`POST .../queue/:qid/runnow`（插队=移到队首+中断当前 run，排空时先发它）。PWA：dock 内队列面板（头部计数/清空/待上屏，最多 3 行）、行操作 ▶✏🗑、grip 拖动排序、三态发送钮（空闲=发送 / 运行+空=停止 / **运行+有字=仅琥珀发送**）。⑤ 全局并发 ≤4。PWA 侧选择持久化：`cr_model`+`cr_model_label`、`cr_effort`、`cr_perm`（localStorage）。
 - **会话状态** = `running`（runner 内存）+ `lastRun`（bridge 重启即失）+ `lastOutcome`（转录 system 行推导，随文件持久：interrupt→stopped / error·max_turns·permission_denied→failed / stop→ok）。
-- **等待横幅（v21）**：PC 交互会话卡在权限确认/等待输入时 CLI 不写转录、手机无从得知——Notification hook（message 含 "permission to use X"/"waiting for your input"）→ `waitings` Map → WS `wait` 帧 + `/api/sessions` 的 `waiting` 字段 + 详情页横幅 + 列表「待确认」灯。清除双路：该会话任何转录 append、Stop hook。**所有 sessions 帧（WS 初始/broadcast/HTTP）必须走 `mergedSessions()`**——曾因 broadcast 发未合并的 `store.list()` 导致 WS 侧永远看不到 running/queued/waiting。
+- **等待横幅（v21）**：PC 交互会话卡在权限确认时 CLI 不写转录、手机无从得知——Notification hook（message 含 "permission to use X"/"needs your approval"；**只认权限类**——空闲提示 "waiting for your input" 每轮跑完必发且清除时机都已过去，认了横幅就常驻，勿加回）→ `waitings` Map → WS `wait` 帧 + `/api/sessions` 的 `waiting` 字段 + 详情页横幅 + 列表「待确认」灯。清除双路：该会话任何转录 append、Stop hook。**所有 sessions 帧（WS 初始/broadcast/HTTP）必须走 `mergedSessions()`**——曾因 broadcast 发未合并的 `store.list()` 导致 WS 侧永远看不到 running/queued/waiting。
 - **上下文探针（ctxprobe.js）**：`GET /api/sessions/:id/context` → 按 (cwd, modelId) 缓存（内存 + `bridge/data/ctx-probe.json`）跑一次性 `-p /context`，解析后 `adapter.archiveSession` 回收丢弃会话（首次 ~6s，缓存后毫秒级）。固定开销只取决于 (cwd, model)。
 - **会话删除**：转录移入 `bridge/data/trash/`（可找回）+ 墓碑防 fs.watch 复活；运行中 409。
 
@@ -85,6 +85,7 @@ npm start          # node bridge/index.js，端口 3742
 3. 密钥/token 永不写日志；`bridge/data/` 永不入库。
 4. 静态服务只允许 `public/`（路径穿越防护）；响应 no-cache+ETag 304。
 5. Node ≥ 20 ESM；fs.watch(recursive) 不可用时自动降级轮询。
+6. **手机驱动的开发会话长在 bridge 进程树里**（runner 的 `--resume -p` 子进程）：会话内脚本杀 bridge = 杀掉本会话（stdin 管道断裂、turn 无结果中断，脱离的脚本仍会跑完拉起——bridge"自己恢复了"是假象）。重启 bridge 一律从 PC 侧做；确需会话内重启，接受当前 turn 被切断。
 
 ## 路线图（候选下一批 = PWA·P0，详见 README Backlog）
 

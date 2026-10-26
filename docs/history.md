@@ -77,6 +77,10 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 顺手抓出老根：**`broadcastSessionsSoon` 和 WS 初始帧发的都是未合并的 `store.list()`**——WS sessions 帧从来不含 running/queued/waiting，手机列表灯对 PC 驱动会话一直是错的，「中途打开会话按钮态不刷新」的 v17 修复也只补了一半。三处（broadcast/初始帧/HTTP）统一走 `mergedSessions()`。
 
+后续修正（同日）：v21 初版把空闲通知（"waiting for your input"）也算 waiting——它每轮跑完 ~60s 后必发，而两条清除路径（转录 append / Stop hook）的时机都在它**之前**已经过去，横幅从此常驻（症状：用户手机上本会话一直挂「会话已暂停」，实际只是 PC 端跑完在等输入=交互会话的常态）。修复：extractWaiting 只认权限类通知。教训：**置位型状态必须先问"谁来清、何时清"**——清除时机全部早于置位时机的信号等于永不清除。
+
+排查此 bug 时被同一陷阱反咬两次：手机驱动的开发会话本身就是 bridge 的 runner 子进程，脚本里 `Stop-Process` 杀 bridge = 杀掉正在跑的会话（stdin 管道断裂，两次中断都精确落在杀进程那一步）；脱离的 PowerShell 不被连坐、继续跑完 kill+拉起，所以 bridge 每次"自己恢复了"。规则已进 CLAUDE.md 工程红线第 6 条。
+
 
 
 ## 2026-10-26 · 时间轴交错 + 工具产出 v22

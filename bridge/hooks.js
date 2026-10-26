@@ -25,8 +25,11 @@ export async function handleHook(req, res, cfg, store, broadcast, event = 'unkno
 }
 
 // Claude Code's Notification hook fires for permission requests AND for
-// idle-input nudges - both leave the PC session silently stuck from the
-// phone's point of view. Surface them as a per-session waiting state.
+// idle-input nudges. Only permission prompts become a waiting state: the
+// idle nudge ("waiting for your input") fires ~60s after EVERY turn of an
+// interactive PC session, and nothing clears it until the next user message
+// (Stop hook already ran before it, transcript is quiet while idle) - the
+// banner would be the resting state of every PC session, crying wolf.
 function extractWaiting(event, payload) {
   if (event !== 'notification') return null;
   const msg = String(payload.message || '');
@@ -34,7 +37,6 @@ function extractWaiting(event, payload) {
   const pm = msg.match(/permission to use (\S+)/i);
   if (pm) { kind = 'permission'; tool = pm[1]; }
   else if (/needs your approval/i.test(msg)) { kind = 'permission'; }
-  else if (/waiting for your input/i.test(msg)) { kind = 'input'; }
   else if (/permission/i.test(msg)) { kind = 'permission'; }
   return kind ? { kind, tool, msg: msg.slice(0, 120), at: Date.now() } : null;
 }
