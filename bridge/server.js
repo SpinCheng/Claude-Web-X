@@ -66,6 +66,9 @@ const MIME = {
 
 export function createServer(cfg, store, adapter, runner, handoff, paths = {}, ctxprobe = null) {
   const UPLOADS_DIR = paths.uploadsDir || path.join(__dirname, 'data', 'uploads');
+  // per-session "PC is stuck on a prompt" state (Notification hook driven);
+  // cleared by transcript activity or the Stop hook - see wire-adapter below
+  const waitings = new Map();
   // message.attachments gate: only files this session uploaded, sane names
   function normAttachments(sessionId, list) {
     if (!Array.isArray(list)) return [];
@@ -100,7 +103,7 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     sessionsDirty = true;
     setTimeout(() => {
       sessionsDirty = false;
-      broadcast({ type: 'sessions', sessions: store.list() });
+      broadcast({ type: 'sessions', sessions: mergedSessions() });
     }, 250);
   }
 
@@ -144,7 +147,18 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     if (req.method === 'POST' && p.startsWith('/hooks/')) {
       if (!authOk(req, url, cfg)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return; }
       const event = p.slice('/hooks/'.length).split('/')[0] || 'unknown';
-      handleHook(req, res, cfg, store, broadcast, event);
+      const rr = await handleHook(req, res, cfg, store, broadcast, event);
+      // permission / idle-input notifications become a persistent per-session
+      // waiting state (the prompt itself never reaches the transcript)
+      if (rr && rr.sessionId) {
+        if (rr.waiting) {
+          waitings.set(rr.sessionId, rr.waiting);
+          broadcast({ type: 'wait', sessionId: rr.sessionId, waiting: rr.waiting });
+        } else if (event === 'stop' && waitings.has(rr.sessionId)) {
+          waitings.delete(rr.sessionId);
+          broadcast({ type: 'wait', sessionId: rr.sessionId, waiting: null });
+        }
+      }
       return;
     }
 
@@ -245,14 +259,8 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
         return;
       }
       if (p === '/api/sessions') {
-        // merge live run state + last phone-run outcome into every record
-        const sessions = store.list().map((s) => {
-          const live = runner.activeRunFor(s.id);
-          const out = runner.recallOutcome(s.id);
-          return { ...s, running: !!live, queued: runner.queuedFor(s.id).length, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
-        });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ sessions }));
+        res.end(JSON.stringify({ sessions: mergedSessions() }));
         return;
       }
       let m = p.match(/^\/api\/sessions\/([^/]+)\/messages$/);
@@ -496,7 +504,7 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     wss.handleUpgrade(req, socket, head, (ws) => {
       clients.add(ws);
       ws.subId = null;
-      ws.send(JSON.stringify({ type: 'sessions', sessions: store.list() }));
+      ws.send(JSON.stringify({ type: 'sessions', sessions: mergedSessions() }));
       ws.on('message', (raw) => {
         try {
           const msg = JSON.parse(raw.toString());
@@ -514,7 +522,22 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
 
   // ------- wire adapter events -------
   store.on('session', broadcastSessionsSoon);
-  adapter.on('append', (a) => broadcast({ type: 'append', ...a }));
+  adapter.on('append', (a) => {
+    broadcast({ type: 'append', ...a });
+    // transcript writing again = the PC answered the prompt; drop the banner
+    if (waitings.has(a.id)) {
+      waitings.delete(a.id);
+      broadcast({ type: 'wait', sessionId: a.id, waiting: null });
+    }
+  });
+
+  function mergedSessions() {
+    return store.list().map((s) => {
+      const live = runner.activeRunFor(s.id);
+      const out = runner.recallOutcome(s.id);
+      return { ...s, running: !!live, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
+    });
+  }
 
   // ------- wire runner events (Phase 2) -------
   runner.on('update', (u) => {

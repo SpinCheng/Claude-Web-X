@@ -21,6 +21,22 @@ export async function handleHook(req, res, cfg, store, broadcast, event = 'unkno
   await pushNtfy(cfg, note);
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ ok: true }));
+  return { sessionId, waiting: extractWaiting(event, payload) };
+}
+
+// Claude Code's Notification hook fires for permission requests AND for
+// idle-input nudges - both leave the PC session silently stuck from the
+// phone's point of view. Surface them as a per-session waiting state.
+function extractWaiting(event, payload) {
+  if (event !== 'notification') return null;
+  const msg = String(payload.message || '');
+  let kind = null, tool = '';
+  const pm = msg.match(/permission to use (\S+)/i);
+  if (pm) { kind = 'permission'; tool = pm[1]; }
+  else if (/needs your approval/i.test(msg)) { kind = 'permission'; }
+  else if (/waiting for your input/i.test(msg)) { kind = 'input'; }
+  else if (/permission/i.test(msg)) { kind = 'permission'; }
+  return kind ? { kind, tool, msg: msg.slice(0, 120), at: Date.now() } : null;
 }
 
 function summarize(event, p, title) {

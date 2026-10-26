@@ -28,6 +28,7 @@ const state = {
   ctxProbe: null,    // last /context probe result {key,window,fixed,buffer}
   queue: {},         // sessionId -> [{id,text}] pending queue (WS 'queue' frames)
   attach: [],        // pending attachments for the open session (uploaded)
+  waits: {},         // sessionId -> {kind,tool,msg,at} PC stuck on a prompt (v21)
 };
 
 /* ---------------- token gate ---------------- */
@@ -80,7 +81,12 @@ async function api(path, opts) {
 function fetchSessions() {
   api('/api/sessions')
     .then((r) => r.json())
-    .then((d) => { state.sessions = d.sessions || []; renderList(); renderMeta(); })
+    .then((d) => {
+      state.sessions = d.sessions || [];
+      state.waits = {};
+      for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
+      renderList(); renderMeta(); renderWaitBanner();
+    })
     .catch(() => {});
 }
 
@@ -111,6 +117,7 @@ function openDetail(id) {
     .catch(() => {});
   updateComposer();
   fetchQueue(id);
+  renderWaitBanner();
   updateRunStatus();
   history.pushState({ cr: 'detail' }, '', '#s');
 }
@@ -172,13 +179,14 @@ function refreshDriver() {
 /* ---------------- session list: project groups ---------------- */
 function sessState(s) {
   if (s.running || state.runs[s.id]?.state === 'running') return 'running';
+  if (state.waits[s.id]) return 'waiting';
   const o = s.lastRun?.state || s.lastOutcome || '';
   if (o === 'failed') return 'failed';
   if (o === 'stopped') return 'stopped';
   return 'idle';
 }
-const ST_WORD = { running: '运行中', failed: '失败', stopped: '已停止', idle: '' };
-const GROUP_RANK = { running: 3, failed: 2, stopped: 2, idle: 1 };
+const ST_WORD = { running: '运行中', waiting: '待确认', failed: '失败', stopped: '已停止', idle: '' };
+const GROUP_RANK = { running: 3, waiting: 3, failed: 2, stopped: 2, idle: 1 };
 
 function projectLabel(s) {
   if (s.cwd) return shortPath(s.cwd);
@@ -1347,6 +1355,17 @@ function pushOptimisticUser(text) {
   updateJumpFab();
   return t;
 }
+/* ---------------- wait banner (v21): PC stuck on a prompt ---------------- */
+function renderWaitBanner() {
+  const el = $('wait-banner');
+  if (!el) return;
+  const w = state.waits[state.currentId];
+  if (!w) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  $('wait-text').textContent = w.kind === 'input'
+    ? '正在等待你在电脑端输入——会话已暂停'
+    : '等待权限确认' + (w.tool ? ' · ' + w.tool : '') + '——在电脑端批准后自动继续';
+}
 // a refused send (409 declined, network error) pulls its bubble back out —
 // unless the transcript already folded into it (optimistic=false), in which
 // case the message is real and stays. Removing the matching chat child keeps
@@ -1468,8 +1487,11 @@ function connectWs() {
     let d; try { d = JSON.parse(m.data); } catch { return; }
     if (d.type === 'sessions') {
       state.sessions = d.sessions || [];
+      state.waits = {};
+      for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
       renderList();
       renderMeta();
+      renderWaitBanner();
       updateTokenRing();
       updateRunStatus();
       updateComposer(); // opening mid-run: no run frame will come, the list is the signal
@@ -1489,6 +1511,12 @@ function connectWs() {
       if (d.queue && d.queue.length) state.queue[d.sessionId] = d.queue;
       else delete state.queue[d.sessionId];
       if (d.sessionId === state.currentId) renderQueuePanel();
+    } else if (d.type === 'wait') {
+      // PC session stuck on a permission prompt / idle input (v21)
+      if (d.waiting) state.waits[d.sessionId] = d.waiting;
+      else delete state.waits[d.sessionId];
+      renderList();
+      if (d.sessionId === state.currentId) renderWaitBanner();
     } else if (d.type === 'run') {
       handleRunFrame(d);
     } else if (d.type === 'approval') {

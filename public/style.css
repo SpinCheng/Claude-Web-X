@@ -44,6 +44,8 @@ button { font-family: inherit; }
 .lamp[data-st="failed"]  { background: var(--err); box-shadow: 0 0 6px rgba(219, 107, 94, .35); }
 .lamp[data-st="stopped"] { background: var(--warn); opacity: .5; }
 .lamp[data-st="idle"]    { background: var(--faint); }
+.lamp[data-st="waiting"] { background: var(--acc); box-shadow: 0 0 8px rgba(217, 119, 87, .5); animation: breathe 1.6s ease-in-out infinite; }
+.st-word[data-st="waiting"] { color: var(--acc-strong); }
 @keyframes breathe { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .caret, .timeline, .node-body { animation: none !important; } }
 
@@ -287,6 +289,10 @@ button { font-family: inherit; }
 .cbtn.attach { padding: 0 6px; }
 .bubble.user .bubble-img { display: block; width: min(240px, 100%); border-radius: 10px; margin-top: 6px; cursor: zoom-in; }
 .bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
+
+/* ---------- 等待横幅（v21）：PC 端卡在权限确认/等待输入 ---------- */
+.wait-banner { display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; padding: 9px 12px; border-radius: 12px; background: rgba(217, 119, 87, .12); color: var(--acc-strong); font-size: 12.5px; line-height: 1.45; flex: none; }
+.wait-banner svg { flex: none; opacity: .8; }
 .lightbox-img { max-width: 94vw; max-height: 88dvh; border-radius: 12px; }
 .file-prev { width: auto; flex: 1 1 auto; margin: 0 12px calc(30px + env(safe-area-inset-bottom)); max-width: 640px; }
 .fp-body { max-height: 62dvh; overflow: auto; overscroll-behavior: contain; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; margin: 0; }

@@ -71,6 +71,14 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 
 
 
+## 2026-10-26 · 等待横幅 v21（PC 权限卡手机不可见）
+
+用户截图：PC 端弹「Claude needs your permission to use Bash」确认卡时手机只会看到会话干等——权限提示只存在于 PC 交互 UI、**不落转录**。修复：Notification hook 的 message（permission to use X / waiting for your input）解析成会话级 `waiting` 状态 → WS `wait` 帧 + `/api/sessions` 合并字段 + 详情页横幅 + 列表「待确认」琥珀灯；清除双路 = 该会话任何转录 append（PC 批准后 CLI 继续写）或 Stop hook。E2E 用伪造 hook payload 驱动（真实交互提示无法 headless 触发），置位/横幅/清除全过。
+
+顺手抓出老根：**`broadcastSessionsSoon` 和 WS 初始帧发的都是未合并的 `store.list()`**——WS sessions 帧从来不含 running/queued/waiting，手机列表灯对 PC 驱动会话一直是错的，「中途打开会话按钮态不刷新」的 v17 修复也只补了一半。三处（broadcast/初始帧/HTTP）统一走 `mergedSessions()`。
+
+
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。
