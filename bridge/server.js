@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { authOk, handleHook, readBody } from './hooks.js';
+import { authOk, handleHook, readBody, readRawBody } from './hooks.js';
 import { rotateToken, installAutostart, autostartInstalled, lanUrls } from './pairing.js';
 
 // model catalog from ~/.claude/settings.json env aliases (shared by
@@ -54,10 +54,33 @@ const MIME = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
   '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/plain; charset=utf-8',
+  '.log': 'text/plain; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.csv': 'text/plain; charset=utf-8',
 };
 
 export function createServer(cfg, store, adapter, runner, handoff, paths = {}, ctxprobe = null) {
+  const UPLOADS_DIR = paths.uploadsDir || path.join(__dirname, 'data', 'uploads');
+  // message.attachments gate: only files this session uploaded, sane names
+  function normAttachments(sessionId, list) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    for (const a of list.slice(0, 4)) {
+      if (!a || typeof a.file !== 'string' || typeof a.name !== 'string') continue;
+      if (!a.file.startsWith(sessionId + '/') || /[\\/]|\.\./.test(a.file.slice(sessionId.length + 1))) continue;
+      const full = path.join(UPLOADS_DIR, a.file);
+      if (!full.startsWith(UPLOADS_DIR)) continue;
+      let st; try { st = fs.statSync(full); } catch { continue; }
+      if (!st.isFile()) continue;
+      out.push({ file: a.file, name: String(a.name).slice(0, 120), type: String(a.type || '') });
+    }
+    return out;
+  }
   // ------- broadcast plumbing -------
   let sessionsDirty = false;
   const clients = new Set(); // ws sockets; ws.subId = subscribed session id
@@ -281,6 +304,25 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     // control-plane routes (Phase 2): JSON bodies, token-authed like /api
     if ((req.method === 'POST' || req.method === 'DELETE') && p.startsWith('/api/')) {
       if (!authOk(req, url, cfg)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return; }
+
+      // attachment upload (v19): RAW body, up to 10 MB; stored under
+      // data/uploads/<sessionId>/ and referenced by message.attachments
+      let am = p.match(/^\/api\/sessions\/([^/]+)\/attach$/);
+      if (am && req.method === 'POST') {
+        const sid = decodeURIComponent(am[1]);
+        if (!store.get(sid)) { res.writeHead(404); res.end('{"error":"no such session"}'); return; }
+        const raw = await readRawBody(req, 10 * 1024 * 1024);
+        if (!raw || !raw.length) { res.writeHead(400); res.end('{"error":"empty body"}'); return; }
+        const base = (url.searchParams.get('name') || 'file.bin').split(/[\\/]/).pop().replace(/[^\w.\- ()一-龥]/g, '_').slice(0, 80) || 'file.bin';
+        const dir = path.join(UPLOADS_DIR, sid);
+        try { fs.mkdirSync(dir, { recursive: true }); } catch { /* exists */ }
+        const saved = Date.now().toString(36) + '-' + base;
+        try { fs.writeFileSync(path.join(dir, saved), raw); } catch { res.writeHead(500); res.end('{"error":"write failed"}'); return; }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, file: sid + '/' + saved, name: base, size: raw.length }));
+        return;
+      }
+
       const body = await readBody(req, 256 * 1024);
       let json = {};
       try { json = body ? JSON.parse(body) : {}; } catch { json = {}; }
@@ -300,7 +342,7 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
           res.end(JSON.stringify({ error: arb.reason, lastWriteMs: arb.lastWriteMs, sinceMs: arb.sinceMs, claimedAt: arb.claimedAt }));
           return;
         }
-        const r = runner.send(id, text, { perm: json.perm === 'ask' ? 'ask' : 'auto', model: String(json.model || ''), effort: String(json.effort || '') });
+        const r = runner.send(id, text, { perm: json.perm === 'ask' ? 'ask' : 'auto', model: String(json.model || ''), effort: String(json.effort || ''), attachments: normAttachments(id, json.attachments) });
         if (r.queued) {
           res.writeHead(202, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ ok: true, queued: true, position: r.position }));
@@ -396,12 +438,28 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
         if (runner.activeRunFor(id)) { res.writeHead(409); res.end('{"error":"busy"}'); return; }
         const r = adapter.archiveSession(id);
         if (!r.ok) { res.writeHead(404); res.end(JSON.stringify({ error: r.error })); return; }
+        try { fs.rmSync(path.join(UPLOADS_DIR, id), { recursive: true, force: true }); } catch { /* nothing stored */ }
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(r));
         return;
       }
 
       res.writeHead(404); res.end('{"error":"no such api"}');
+      return;
+    }
+
+    // uploaded attachments: token-authed, locked inside the uploads dir
+    if (req.method === 'GET' && p.startsWith('/files/')) {
+      if (!authOk(req, url, cfg)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return; }
+      const file = path.normalize(path.join(UPLOADS_DIR, decodeURIComponent(p.slice('/files/'.length))));
+      if (!file.startsWith(UPLOADS_DIR)) { res.writeHead(403); res.end(); return; }
+      let st; try { st = fs.statSync(file); } catch { res.writeHead(404); res.end('not found'); return; }
+      if (!st.isFile()) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      fs.readFile(file, (err, data) => {
+        if (err) { res.writeHead(404); res.end('not found'); return; }
+        res.end(data);
+      });
       return;
     }
 

@@ -27,6 +27,7 @@ const state = {
   modelCatalog: null, // /api/models cache: [{id,label,ctx}]
   ctxProbe: null,    // last /context probe result {key,window,fixed,buffer}
   queue: {},         // sessionId -> [{id,text}] pending queue (WS 'queue' frames)
+  attach: [],        // pending attachments for the open session (uploaded)
 };
 
 /* ---------------- token gate ---------------- */
@@ -88,6 +89,8 @@ function openDetail(id) {
   state.currentId = id;
   state.atBottom = true;
   state.userCollapsedLive = false;
+  state.attach = [];
+  renderAttachChips();
   $('list').classList.add('hidden');
   $('detail').classList.remove('hidden');
   $('chat').innerHTML = '';
@@ -284,7 +287,7 @@ function applyEventToTurns(ev) {
   const T = state.turns;
   if (ev.k === 'user') {
     state.userCollapsedLive = false; // a new question re-opens the next live turn
-    T.push({ role: 'user', text: ev.text, ts: ev.ts });
+    T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
     T.push({ role: 'bot', think: [], tools: [], texts: [], ts: '' });
   } else if (ev.k === 'assistant') {
     if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push({ role: 'bot', think: [], tools: [], texts: [], ts: ev.ts });
@@ -436,6 +439,14 @@ function renderTurn(t) {
     const d = document.createElement('div');
     d.className = 'bubble user';
     d.textContent = t.text;
+    for (const im of t.images || []) {
+      const img = document.createElement('img');
+      img.className = 'bubble-img';
+      img.alt = '附件图片';
+      img.src = 'data:' + im.mt + ';base64,' + im.data;
+      img.onclick = () => openLightbox(img.src);
+      d.appendChild(img);
+    }
     if (t.ts) addTs(d, t.ts);
     return d;
   }
@@ -797,8 +808,7 @@ function qRowEl(e, area) {
   return row;
 }
 // drag-to-reorder on the grip only (touch-action:none there, scroll unaffected)
-function wireQDrag(grip, row, area) {
-  grip.addEventListener('pointerdown', (ev) => {
+function wireQDrag(grip, row, area) {  grip.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
     const startY = ev.clientY;
     let started = false;
@@ -832,6 +842,102 @@ function wireQDrag(grip, row, area) {
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
   });
+}
+
+/* ---------------- attachments (v19): pick -> downscale -> upload -> chip ---------------- */
+const DOC_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+function renderAttachChips() {
+  const host = $('attach-chips');
+  host.innerHTML = '';
+  for (const a of state.attach) host.appendChild(chipEl(a));
+  host.classList.toggle('hidden', !state.attach.length);
+}
+function chipEl(a) {
+  const s = document.createElement('span');
+  s.className = 'attach-chip';
+  if (/^image\//.test(a.type || '') && a.url) {
+    const im = document.createElement('img');
+    im.src = a.url;
+    im.onclick = () => openLightbox(a.url);
+    s.appendChild(im);
+  } else {
+    const ic = document.createElement('span');
+    ic.className = 'ac-ico';
+    ic.innerHTML = DOC_ICON;
+    ic.onclick = () => !a.uploading && openFilePreview(a);
+    s.appendChild(ic);
+  }
+  const nm = document.createElement('span');
+  nm.className = 'ac-name';
+  nm.textContent = a.name + (a.uploading ? ' …' : '');
+  nm.onclick = () => !a.uploading && (/^image\//.test(a.type || '') ? openLightbox(a.url) : openFilePreview(a));
+  const x = document.createElement('button');
+  x.className = 'ac-x';
+  x.textContent = '×';
+  x.onclick = () => {
+    const i = state.attach.indexOf(a);
+    if (i >= 0) state.attach.splice(i, 1);
+    renderAttachChips();
+  };
+  s.append(nm, x);
+  return s;
+}
+async function addAttachment(f) {
+  if (state.attach.length >= 4) { toast('最多带 4 个附件'); return; }
+  if (f.size > 20 * 1024 * 1024) { toast('文件超过 20MB：' + f.name); return; }
+  const att = { name: f.name, type: f.type || '', uploading: true, url: '' };
+  state.attach.push(att);
+  renderAttachChips();
+  try {
+    let bytes = new Uint8Array(await f.arrayBuffer());
+    if (/^image\//.test(att.type) && att.type !== 'image/gif') {
+      const r = await downscaleImage(bytes, att.type);
+      bytes = r.bytes; att.type = r.type;
+      att.url = URL.createObjectURL(new Blob([bytes], { type: att.type }));
+    }
+    const r = await fetch('/api/sessions/' + encodeURIComponent(state.currentId) + '/attach?name=' + encodeURIComponent(f.name), {
+      method: 'POST', headers: auth(), body: bytes,
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    att.file = j.file; att.uploading = false;
+  } catch {
+    toast('附件上传失败：' + f.name);
+    const i = state.attach.indexOf(att);
+    if (i >= 0) state.attach.splice(i, 1);
+  }
+  renderAttachChips();
+}
+// photos from the phone camera are multi-MB; canvas-downscale to the vision
+// sweet spot before upload (small images pass through untouched)
+async function downscaleImage(bytes, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const MAX = 1568;
+    if (bytes.length <= 400 * 1024 && img.width <= MAX && img.height <= MAX) return { bytes, type };
+    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.width * scale));
+    c.height = Math.max(1, Math.round(img.height * scale));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.85));
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), type: 'image/jpeg' };
+  } finally { URL.revokeObjectURL(url); }
+}
+function openLightbox(src) {
+  $('lightbox-img').src = src;
+  $('lightbox').classList.remove('hidden');
+}
+function openFilePreview(a) {
+  if (!a.file) return;
+  $('fp-name').textContent = a.name;
+  $('fp-body').textContent = '加载中…';
+  $('file-prev').classList.remove('hidden');
+  fetch('/files/' + a.file.split('/').map(encodeURIComponent).join('/'), { headers: auth() })
+    .then((r) => r.text())
+    .then((t) => { $('fp-body').textContent = t.slice(0, 32 * 1024); })
+    .catch(() => { $('fp-body').textContent = '（读取失败）'; });
 }
 function fmtTokens(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -1140,32 +1246,65 @@ function sendMessage(force) {
   const input = $('msg-input');
   const text = input.value.trim();
   if (!text || !state.currentId) return;
+  _send(text, input.value, force);
+}
+// optimistic path (v18): the box empties, its height collapses and the
+// three-state button flips THE MOMENT the send is tapped — not after the
+// network round-trip (slow links made taps feel dead). Every failure path
+// restores the original text so nothing is lost.
+function _send(text, rawInput, force, attsOverride) {
+  // retry passes its attachments back in; first attempt takes them from state
+  const atts = attsOverride || state.attach.splice(0);
+  if (!attsOverride) renderAttachChips();
+  clearComposer();
   api('/api/sessions/' + encodeURIComponent(state.currentId) + '/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, force: !!force, perm: state.perm, model: currentModel(), effort: currentEffort() }),
+    body: JSON.stringify({
+      text, force: !!force, perm: state.perm, model: currentModel(), effort: currentEffort(),
+      attachments: atts.map((a) => ({ file: a.file, name: a.name, type: a.type })),
+    }),
   })
     .then(async (r) => {
       if (r.status === 409) {
         const j = await r.json().catch(() => ({}));
         if (j.error === 'recent-local-write') {
           const ago = j.sinceMs != null ? Math.round(j.sinceMs / 1000) + ' 秒' : '刚刚';
-          if (window.confirm('电脑端 ' + ago + '前刚在写这个会话，可能正在使用（电脑窗口需重开才能看到手机的新消息）。仍然发送？')) sendMessage(true);
+          if (window.confirm('电脑端 ' + ago + '前刚在写这个会话，可能正在使用（电脑窗口需重开才能看到手机的新消息）。仍然发送？')) _send(text, rawInput, force, atts);
+          else restoreComposer(rawInput, atts);
           return;
         }
         if (j.error === 'pc-claim') {
-          if (window.confirm('电脑端已接管此会话（cr attach）。切换为手机驱动并发送？')) sendMessage(true);
+          if (window.confirm('电脑端已接管此会话（cr attach）。切换为手机驱动并发送？')) _send(text, rawInput, force, atts);
+          else restoreComposer(rawInput, atts);
           return;
         }
-        if (j.error === 'busy') { toast('本会话已有消息在运行，等它结束或点停止'); return; }
+        if (j.error === 'busy') { toast('本会话已有消息在运行，等它结束或点停止'); restoreComposer(rawInput, atts); return; }
       }
-      if (!r.ok) { toast('发送失败（' + r.status + '）'); return; }
+      if (!r.ok) { toast('发送失败（' + r.status + '）'); restoreComposer(rawInput, atts); return; }
       const j = await r.json().catch(() => ({}));
       if (j.queued) toast('已排队（第 ' + j.position + ' 条）· 本轮结束后自动发出');
-      input.value = '';
       state.atBottom = true;
     })
-    .catch(() => toast('网络错误'));
+    .catch(() => { toast('网络错误'); restoreComposer(rawInput, atts); });
+}
+function clearComposer() {
+  const input = $('msg-input');
+  input.value = '';
+  autoGrow();       // collapse the grown height back to one line
+  updateComposer(); // re-evaluate the button: running+empty => stop, not amber queue-send
+}
+function restoreComposer(text, atts) {
+  const input = $('msg-input');
+  if (!input.value) {
+    input.value = text;
+    autoGrow();
+    updateComposer();
+  }
+  if (atts && atts.length) {
+    state.attach = atts.concat(state.attach);
+    renderAttachChips();
+  }
 }
 function stopRun() {
   const run = state.currentId && state.runs[state.currentId];
@@ -1404,6 +1543,14 @@ $('back').onclick = () => {
 $('del').onclick = deleteSession;
 $('send').onclick = () => sendMessage(false);
 $('stop').onclick = stopRun;
+$('attach').onclick = () => $('attach-input').click();
+$('attach-input').addEventListener('change', async (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  for (const f of files) await addAttachment(f);
+});
+$('lightbox').onclick = () => { $('lightbox').classList.add('hidden'); $('lightbox-img').src = ''; };
+$('file-prev').onclick = (e) => { if (e.target.id === 'file-prev') $('file-prev').classList.add('hidden'); };
 $('perm').onclick = openPermSheet;
 $('c-effort').onclick = openEffortSheet;
 renderEffortChip();

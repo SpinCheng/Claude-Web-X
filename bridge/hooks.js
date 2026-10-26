@@ -54,7 +54,21 @@ function readBody(req, limit) {
   });
 }
 
-export { readBody };
+// binary variant for attachment uploads (raw bytes, capped)
+function readRawBody(req, limit) {
+  return new Promise((resolve) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { req.destroy(); resolve(null); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', () => resolve(null));
+  });
+}
+
+export { readBody, readRawBody };
 
 export function authOk(req, url, cfg) {
   const q = url.searchParams.get('token') || '';

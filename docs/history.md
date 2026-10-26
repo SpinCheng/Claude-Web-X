@@ -57,6 +57,14 @@ CLAUDE.md 只保留当前事实与硬约束；这里的叙事按时间线归档�
 - 顺手抓出真 bug：**WS `sessions` 帧处理器不调 `updateComposer`**——中途打开一个已在跑的会话（无 run 帧推送），发送/停止按钮态永远停在初始的空闲渲染。已修（sessions 分支补 updateComposer）。
 - 端到端：API 8 步（排队/快照/删单条/重排/坏重排 400/插队中断+派发）+ UI 7 断言（面板/占位切换/三态/删行/拖动/▶确认框）全过，真实 run 驱动。
 
+## 2026-10-26 · 附件/手机发图 v19
+
+勘测先行的 P0 项。结论三条：① `--input-format stream-json` 在 2.1.308 可用，**但 stdin 写完必须保持打开**——写完立即 close 会连 init 都不出地挂死（产线策略：不 end，child 退出自然回收）；② `--resume` 下图片块完整落转录 human turn，CLI 另注入一条 `[Image: source: <临时路径>]` user turn（adapter 按模式折叠）；③ **中转模型对图是盲的**——Read 工具拿回 image 块后模型仍去 PowerShell hexdump PNG 头（IHDR/IDAT），工程链路照建，视觉即插即用。
+
+实现：raw 上传（readRawBody ≤10MB → data/uploads/<sid>/）+ /files 鉴权静态服务 + 附件校验（须属本会话）；runner 图片走 stdin 块、文本附件 ≤24KB 内联 prompt（盲模型也能读）；PWA 📎 → 图片 canvas 压 1568px/JPEG（≤400KB 透传）→ chips → 发送携带 → 转录气泡 data:URL 渲染 + 灯箱 + 文本预览。E2E：CDP `DOM.setFileInputFiles` 喂真实文件，chips/清空/上传/气泡图/灯箱/占位折叠全过。
+
+测试事故两起：① 会话选择从列表猜——同 cwd 列表第一个是**当前 harness 会话**，测试差点把本会话发进回收站（409 recent-local-write 意外救场：headless confirm 自动取消）；改用 runId→run 帧确定性捕获。② 杀残留进程 `wmic name='claude.exe'` 把宿主 App 一起杀了（本机 Claude.exe 名字冲突）——清进程必须按命令行过滤。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

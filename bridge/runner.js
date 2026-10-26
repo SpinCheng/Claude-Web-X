@@ -30,6 +30,7 @@ export class Runner extends EventEmitter {
     // stalls the run forever. Default on; cfg.yolo=false opts out.
     this.yolo = opts.yolo !== false;
     this.port = opts.port || 3742; // for the approve-mcp callback URL
+    this.uploadsDir = opts.uploadsDir || ''; // attachment storage root
     this.runs = new Map(); // runId -> run record
     this.outcomes = new Map(); // sessionId -> { state, exitCode, cancelled, at } (last finished run)
     this.queues = new Map(); // sessionId -> [{id, text, perm, model, effort, at}] (pending while busy)
@@ -98,13 +99,13 @@ export class Runner extends EventEmitter {
   send(sessionId, text, opts = {}) {
     if (!sessionId || !text) return { error: 'bad-request' };
     const cwd = (this.store.get(sessionId) || {}).cwd || os.homedir();
-    const r = this._spawnRun(['--resume', sessionId], text, cwd, sessionId, opts.perm || 'auto', opts.model || '', opts.effort || '');
+    const r = this._spawnRun(['--resume', sessionId], text, cwd, sessionId, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || []);
     if (r.error === 'busy') {
       // queue instead of rejecting: phone users type follow-ups while a turn
       // is still running; they dispatch automatically when it finishes
       const q = this.queues.get(sessionId) || [];
       if (q.length >= 5) return { error: 'queue-full' };
-      q.push({ id: 'q' + (++this._qseq).toString(36), text, perm: opts.perm || 'auto', model: opts.model || '', effort: opts.effort || '', at: Date.now() });
+      q.push({ id: 'q' + (++this._qseq).toString(36), text, perm: opts.perm || 'auto', model: opts.model || '', effort: opts.effort || '', attachments: opts.attachments || [], at: Date.now() });
       this.queues.set(sessionId, q);
       this._queueChanged(sessionId);
       return { queued: true, position: q.length, runId: null };
@@ -178,7 +179,7 @@ export class Runner extends EventEmitter {
     this._queueChanged(sessionId);
     this.emit('queued-dispatch', { sessionId, text: next.text, remaining: q.length });
     const cwd = (this.store.get(sessionId) || {}).cwd || os.homedir();
-    this._spawnRun(['--resume', sessionId], next.text, cwd, sessionId, next.perm, next.model || '', next.effort || '');
+    this._spawnRun(['--resume', sessionId], next.text, cwd, sessionId, next.perm, next.model || '', next.effort || '', next.attachments || []);
   }
 
   // Start a fresh session from the phone; sessionId is captured from the
@@ -208,14 +209,51 @@ export class Runner extends EventEmitter {
     return this.outcomes.get(sessionId);
   }
 
-  _spawnRun(resumeArgs, text, cwd, sessionId, perm, model, effort) {
+  _spawnRun(resumeArgs, text, cwd, sessionId, perm, model, effort, attachments = []) {
     if (sessionId && this.activeRunFor(sessionId)) return { error: 'busy', sessionId };
     let live = 0;
     for (const r of this.runs.values()) if (r.state === 'running') live++;
     if (live >= MAX_CONCURRENT_RUNS) return { error: 'overloaded' };
 
+    // attachments (v19): images ride the message as native image blocks via
+    // --input-format stream-json stdin (probe-verified on 2.1.308; stdin must
+    // stay open - closing it immediately after write stalls the CLI). Text-ish
+    // attachments are inlined into the prompt instead (the relay may not have
+    // vision, but it can always read text).
+    let stdinMsg = null;
+    let prompt = text;
+    const imgs = [];
+    for (const a of attachments) {
+      const isImg = /^image\//.test(a.type || '') || /\.(png|jpe?g|webp|gif)$/i.test(a.file || '');
+      if (isImg) imgs.push(a);
+      else if (this.uploadsDir) {
+        try {
+          const full = path.join(this.uploadsDir, a.file);
+          const buf = fs.readFileSync(full);
+          if (buf.length <= 24 * 1024) {
+            prompt += '\n\n[附件 ' + a.name + ']\n```\n' + buf.toString('utf8').slice(0, 24 * 1024) + '\n```';
+          } else {
+            prompt += '\n\n[附件 ' + a.name + ' 已保存到 ' + full + '，可用 Read 查看]';
+          }
+        } catch { /* vanished upload: skip */ }
+      }
+    }
+    if (imgs.length) {
+      const content = [{ type: 'text', text: prompt }];
+      for (const a of imgs) {
+        try {
+          const data = fs.readFileSync(path.join(this.uploadsDir, a.file)).toString('base64');
+          const mt = /^image\//.test(a.type || '') ? a.type : 'image/png';
+          content.push({ type: 'image', source: { type: 'base64', media_type: mt, data } });
+        } catch { /* vanished upload: skip */ }
+      }
+      if (content.length > 1) stdinMsg = JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n';
+    }
+
     const runId = 'r' + Date.now().toString(36) + (++this._seq).toString(36);
-    const args = [...resumeArgs, '-p', text, '--output-format', 'stream-json', '--verbose'];
+    const args = stdinMsg
+      ? [...resumeArgs, '--input-format', 'stream-json', '-p', '--output-format', 'stream-json', '--verbose']
+      : [...resumeArgs, '-p', prompt, '--output-format', 'stream-json', '--verbose'];
     if (model) args.push('--model', model);
     // reasoning effort (CLI: --effort low|medium|high|xhigh|max)
     if (['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) args.push('--effort', effort);
@@ -236,8 +274,9 @@ export class Runner extends EventEmitter {
       cwd,
       env: { ...process.env, ...this.settingsEnv() },
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    if (stdinMsg) child.stdin.write(stdinMsg); // keep stdin open: closing right away stalls the CLI
     const run = {
       runId, sessionId, child, state: 'running', startedAt: Date.now(),
       exitCode: null, stderrTail: '', cancelled: false,

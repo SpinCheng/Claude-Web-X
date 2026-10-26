@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=17">
+  <link rel="stylesheet" href="/style.css?v=19">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
-        <span id="build" class="build-badge">v17</span>
+        <span id="build" class="build-badge">v19</span>
       </div>
       <button id="new-session" class="icon-btn" title="新建任务">
         <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
@@ -71,8 +71,13 @@
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div class="composer-dock">
         <div id="queue-area"></div>
+        <div id="attach-chips" class="attach-chips hidden"></div>
         <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
         <div class="composer-toolbar" id="toolbar">
+          <button id="attach" class="cbtn attach" title="附件（图片/文本）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <span class="tdot"></span>
           <button id="perm" class="cbtn mode" title="权限模式：点击选择">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>
             <span id="perm-label">自动</span>
@@ -101,6 +106,17 @@
         </div>
       </div>
     </div>
+
+    <!-- attachment lightbox + text preview (v19) -->
+    <div id="lightbox" class="overlay hidden"><img id="lightbox-img" class="lightbox-img" alt=""></div>
+    <div id="file-prev" class="overlay hidden">
+      <div class="sheet file-prev">
+        <div class="sheet-title" id="fp-name"></div>
+        <pre id="fp-body" class="fp-body"></pre>
+      </div>
+    </div>
+    <input id="attach-input" type="file" multiple class="hidden"
+      accept="image/*,.txt,.md,.log,.json,.csv,.js,.ts,.py,.ps1,.yml,.yaml,.xml,.html,.css">
 
     <!-- remote permission approval card -->
     <div id="approval" class="overlay hidden">
@@ -181,6 +197,6 @@
 
   </div>
 
-  <script src="/app.js?v=17"></script>
+  <script src="/app.js?v=19"></script>
 </body>
 </html>

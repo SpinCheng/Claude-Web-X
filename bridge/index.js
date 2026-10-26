@@ -60,7 +60,7 @@ const cfg = loadConfig();
 const store = new Store();
 // CR_ROOT env override (testing); default: <home>/.claude/projects
 const adapter = new CcAdapter(store, process.env.CR_ROOT || undefined, path.join(DATA_DIR, 'trash'));
-const runner = new Runner({ store, claudePath: cfg.claudePath, yolo: cfg.yolo !== false, port: cfg.port });
+const runner = new Runner({ store, claudePath: cfg.claudePath, yolo: cfg.yolo !== false, port: cfg.port, uploadsDir: path.join(DATA_DIR, 'uploads') });
 const handoff = new Handoff({ store, locksDir: path.join(DATA_DIR, 'locks') });
 const ctxprobe = new CtxProbe({ runner, adapter, cachePath: path.join(DATA_DIR, 'ctx-probe.json'), defaultCwd: cfg.defaultCwd });
 const paths = {
@@ -68,6 +68,7 @@ const paths = {
   settingsPath: path.join(os.homedir(), '.claude', 'settings.json'),
   hookCmd: path.join(__dirname, 'hook-post.cmd').split(path.sep).join('/'), // forward slashes: escape-safe everywhere
   vbsPath: path.join(__dirname, '..', 'scripts', 'start-bridge.vbs'),
+  uploadsDir: path.join(DATA_DIR, 'uploads'),
 };
 const { server } = createServer(cfg, store, adapter, runner, handoff, paths, ctxprobe);
 

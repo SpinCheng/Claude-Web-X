@@ -194,26 +194,39 @@ export class CcAdapter extends EventEmitter {
         }
         const c = obj.message && obj.message.content;
         let text = '';
+        const images = [];
         if (typeof c === 'string') text = c;
         else if (Array.isArray(c)) {
-          text = c.filter((p) => p && p.type === 'text').map((p) => p.text).join('\n');
+          for (const p of c) {
+            if (!p) continue;
+            if (p.type === 'text') text += (text ? '\n' : '') + p.text;
+            else if (p.type === 'image' && p.source && p.source.data) {
+              images.push({ mt: p.source.media_type || 'image/png', data: p.source.data });
+            }
+          }
         }
-        if (!text) return null;
+        if (!text && !images.length) return null;
         text = stripReminder(text);
-        if (!text) return null;
+        if (!text && !images.length) return null;
+        // CLI-injected chatter: when an image is attached the CLI adds its own
+        // user turn pointing the model at the extracted temp file - not human
+        // content, fold it out of the timeline
+        if (!images.length && /^\[Image: source: .+\]\s*$/.test(text)) return null;
         if (patch.est) patch.est.prose += text.length;
         // fallback title from first human message only; explicit custom-title wins.
         // Guard against same-batch overwrites (store not yet updated mid-batch).
         const rec = this.store.get(id);
         // first human message length: needed once to derive the fixed overhead
         // (system prompt + tools) from the first request's prompt size
-        if (rec && rec.firstUserChars == null && patch.firstUserChars == null) {
+        if (rec && rec.firstUserChars == null && patch.firstUserChars == null && text) {
           patch.firstUserChars = text.length;
         }
         const haveTitle = patch.title || (rec && rec.title && rec.title !== '(loading)');
-        if (!haveTitle) { patch.title = text.slice(0, 48); patch.titleFallback = true; }
+        if (!haveTitle && text) { patch.title = text.slice(0, 48); patch.titleFallback = true; }
         if (obj.cwd) patch.cwd = obj.cwd;
-        return { k: 'user', ts: obj.timestamp || '', text };
+        const ev = { k: 'user', ts: obj.timestamp || '', text };
+        if (images.length) ev.images = images;
+        return ev;
       }
       case 'assistant': {
         const content = (obj.message && obj.message.content) || [];

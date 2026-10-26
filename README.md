@@ -109,7 +109,7 @@ claude-remote/
 - [ ] **手动 /compact**：上下文自救按钮——`-p` 模式斜杠命令路线已由 `/context` 探针验证；勘测压缩后返回行为
 - [ ] **审批卡 diff 视图**：ask 模式审批 Edit/Write 时渲染 +/- diff（复用时间线 toolDiff 逻辑），替代 JSON 原文
 - [ ] **历史回看分页**：去掉 `readTranscript` 400 事件硬上限，加"加载更早"
-- [ ] **手机发图**（拍照/相册）：`--input-format stream-json` 从 stdin 发含 image block 的 user turn；先勘测中转模型多模态支持
+- [x] ~~手机发图~~（v19 已实现：📎 附件上传 + 图片/文本预览 + 转录渲染 + 灯箱；注意：模型能否"看懂"图取决于后端——实测当前中转对图是盲的，链路已就绪即插即用）
 
 **P1 · 明显缺失**
 
