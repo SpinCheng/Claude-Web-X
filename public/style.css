@@ -175,7 +175,7 @@ button { font-family: inherit; }
 .tool-out.err { color: var(--err); opacity: .85; }
 .tool-out.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .tool-out-imgs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.flink { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); word-break: break-all; }
+.flink { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); overflow-wrap: anywhere; }
 .flink:active { opacity: .7; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
 .final { font-size: 15px; line-height: 1.55; font-weight: 600; }
@@ -200,7 +200,9 @@ button { font-family: inherit; }
 .final table, .final-card table { border-collapse: collapse; margin: 8px 0; font-size: 12.5px; display: block; overflow-x: auto; max-width: 100%; }
 .final th, .final td, .final-card th, .final-card td { padding: 5px 12px 5px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; font-variant-numeric: tabular-nums; }
 .final th, .final-card th { color: var(--dim); font-weight: 600; white-space: nowrap; }
-.final a, .final-card a { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); word-break: break-all; }
+.final a, .final-card a { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); overflow-wrap: anywhere; }
+/* keyboard focus rings for in-text links (v27 a11y): touch users never see these */
+.flink:focus-visible, .final a:focus-visible, .final-card a:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 3px; }
 .final b, .final-card b { font-weight: 700; }
 
 /* 结论卡：签名元素——品牌色左侧刻线 + 浮起 */

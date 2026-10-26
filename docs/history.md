@@ -115,6 +115,10 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 测试坑：合成转录的时间戳写成"未来"导致 sessionLive 恒真（Date.now()−lastActive 为负仍 <180s），反而把这个重放 bug 钉死了——确定性时序有时靠意外。隔离实例断言：时间线结论节点 pre×2 带深底、行内 code 存在、final-card ul 缩进 20px、mdh2 15.5px、无 ``` 残留。
 
+## 2026-10-26 · UI/UX 审计与 a11y 修补 v27
+
+跑 ui-ux-pro-max 审计（重点：v22-v26 落地的详情页/结论卡）。**对比度实测全部达标**：正文 13-14、次级 dim 5.4-6.9（含表头/工具输出）、链接 4.5-5.0、warn 7.5；仅两个次级 token 低于 AA——`--faint` 3.05（10px 机注行/队列头/徽章）、`--err` 4.21（错误输出）——均为 v8 定稿设计语言（最弱层/错误红），记录在案未擅动。修了四处机械问题：① 链接 `word-break: break-all` → `overflow-wrap: anywhere`（break-all 会把英文链接文本从词中切断，违反 long-token-wrapping；机串场景的 tool-chip/ap-input 保留 break-all 是对的）；② 8 个图标钮补 aria-label（原来只有 title）；③ `.flink`/结论卡链接补 `:focus-visible` 焦点环（触屏永不见）；④ Esc 关闭灯箱/文本预览（键盘逃生口，输入框聚焦时不劫持）。CDP 断言 9 项全过。教训：断言裸 `return` 在 Runtime.evaluate 顶层非法；`word-break:break-word` 是 final-card 既有继承值（等价 overflow-wrap 旧行为），断言目标应是"不再是 break-all"而非"必须是 normal"。
+
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。

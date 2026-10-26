@@ -1792,6 +1792,17 @@ $('attach-input').addEventListener('change', async (e) => {
 });
 $('lightbox').onclick = () => { $('lightbox').classList.add('hidden'); $('lightbox-img').src = ''; };
 $('file-prev').onclick = (e) => { if (e.target.id === 'file-prev') $('file-prev').classList.add('hidden'); };
+// keyboard escape route for the click-to-close overlays (v27 a11y); never
+// hijacks Esc while composing (textarea keeps it for IME cancel etc.)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) return;
+  for (const id of ['lightbox', 'file-prev']) {
+    const el = $(id);
+    if (el && !el.classList.contains('hidden')) { el.classList.add('hidden'); if (id === 'lightbox') $('lightbox-img').src = ''; return; }
+  }
+});
 $('perm').onclick = openPermSheet;
 $('c-effort').onclick = openEffortSheet;
 renderEffortChip();
