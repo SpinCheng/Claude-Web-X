@@ -208,17 +208,22 @@ export function applyLine(id, obj, patch, events, rec) {
       }
       case 'cost-state': {
         // aggregate across ALL models (a session can switch models mid-way);
-        // do NOT touch patch.model here - assistant lines own the display label
+        // do NOT touch patch.model here - assistant lines own the display label.
+        // models: per-model breakdown kept for the v48 cost panel - model
+        // switching must let each model's tokens price at ITS rate
         const usage = obj.modelUsage || {};
         let inTok = 0, outTok = 0, cacheRead = 0, cacheCreate = 0, usd = 0;
-        for (const m of Object.values(usage)) {
+        const models = {};
+        for (const [name, m] of Object.entries(usage)) {
           inTok += m.inputTokens || 0;
           outTok += m.outputTokens || 0;
           cacheRead += m.cacheReadInputTokens || 0;
           cacheCreate += m.cacheCreationInputTokens || 0;
-          usd += m.costUSD || 0;
+          const mu = m.costUSD || 0;
+          usd += mu;
+          models[name] = { inTok: m.inputTokens || 0, outTok: m.outputTokens || 0, cacheRead: m.cacheReadInputTokens || 0, cacheCreate: m.cacheCreationInputTokens || 0, usd: mu };
         }
-        const stats = { usd: (usd || obj.totalCostUSD || null), inTok, outTok, cacheRead, cacheCreate };
+        const stats = { usd: (usd || obj.totalCostUSD || null), inTok, outTok, cacheRead, cacheCreate, models };
         patch.cost = stats;
         // 2.1.308 occasionally flushes two cost-state lines back-to-back at
         // process exit (distinct snapshots; once in 39 here) - collapse

@@ -12,7 +12,7 @@ import { state } from '../state.js';
 import { auth, api } from '../api.js';
 import { sendWs } from '../ws.js';
 import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns } from './transcript.js';
-import { ensureModels, renderModelChip, updateTokenRing } from './ctxring.js';
+import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
 
 /* ---------------- history (system back = leave detail) ---------------- */
@@ -120,14 +120,27 @@ $('hist-more').onclick = loadOlder;
 $('chat').addEventListener('scroll', updateHistoryPill, { passive: true });
 
 /* ---------------- meta / driver chip ---------------- */
+// header cost text is the v48 cost-panel entry (.cost-entry, coral + dotted
+// underline; pulses when the number moves - dynamic discoverability)
+// (already listed in the export statement at the bottom)
 function renderMeta() {
   const s = state.sessions.find((x) => x.id === state.currentId);
   if (!s) return;
   $('d-title').textContent = s.title || s.id.slice(0, 8);
-  const bits = [];
-  if (s.cwd) bits.push(shortPath(s.cwd));
-  if (s.cost && s.cost.usd != null) bits.push('$' + Number(s.cost.usd).toFixed(2));
-  $('d-meta').textContent = bits.join(' · ');
+  const meta = $('d-meta');
+  meta.textContent = '';
+  if (s.cwd) meta.append(shortPath(s.cwd));
+  const usd = costDisplay(s.cost);
+  if (usd != null) {
+    if (s.cwd) meta.append(' · ');
+    const c = document.createElement('span');
+    c.className = 'cost-entry';
+    c.textContent = '$' + usd.toFixed(2);
+    c.onclick = openCostPanel;
+    if (meta.dataset.cost != null && meta.dataset.cost !== c.textContent) c.classList.add('pulse');
+    meta.dataset.cost = c.textContent;
+    meta.append(c);
+  } else delete meta.dataset.cost;
   const m = $('c-model-name');
   if (m) renderModelChip();
   updateTokenRing();

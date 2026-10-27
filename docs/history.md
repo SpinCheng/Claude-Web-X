@@ -249,3 +249,12 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 用户嫌 v46 加载行「背景色与过渡突兀」。ui-ux-pro-max skill 数据定位两病根：①双向同曲线同时长（数据条目：进场 ease-out / 离场加速；「一个时长抄所有过渡」是反模式）；②height 做动画主角且整宽色块压下像弹窗。评审页 design-histbar.html 四稿可交互演示（A 纯文字 / B hairline 生长 / C 弹簧胶囊 / D raise 材质），拍板 A。
 - 实现：无底色纯 dim 文字 38px 槽位；进场槽位 height/opacity/margin 走 ease-out（.3s cubic-bezier(.22,1,.36,1)）+ 内层 .in span translateY(-9px)→0 滑落（opacity 延迟 .05s）；离场一律加速收走（height .18s ease-in / opacity .13s）——不对称时序。文字位移走 transform；transform 挂内层 span 而非按钮自身（transform 建 stacking context 会盖过 header 底边），detail.js 文案改写 firstElementChild 防 span 被 textContent 清掉。prefers-reduced-motion 降为瞬时。
 - 纯样式改版，机制（≤48px 显隐、切轮缝合、孤儿配对）未动；三处 bump v47，评审页随拍板删除（未入库）。
+
+## v48（2026-10-28）费用/统计面板（方案 C 拍板落地）
+
+- 入口裁定：header 现有费用文本本身即入口（不新增 chip），感知用 M2+M1 组合——珊瑚着色 + 虚线下划的静态可供性，数值变化瞬间 pulse（scale+提亮，动态教学）。面板从 header 下方落下（.overlay.top + topIn ease-out 0.3s）；cost-sheet 收编进 BUBBLES（scrim 点击/系统 back/气泡互斥全复用）。
+- 「直接获取单价」实测否决：官方无价格 API（/v1/models 不含价格字段，本机可连通但不给价）；社区 LiteLLM 价目表 raw.githubusercontent 直连超时；ntfy.sh 亦不通。→ 零价表设计：官方口径 = cost-state 原值；倍率（预填 0.07 = DeepSeek V3.2 价目对 Sonnet 官方价的用量加权比，缓存读为主的真实结构：48k in/12.6k out/892k 缓存读/31k 缓存写 → 官方 $0.72 vs DeepSeek $0.052）；自定义单价 = 分模型 4 价（输入/输出/缓存读/缓存写）。价格偏好存 localStorage（cr_cost_mode/cr_cost_mult/cr_cost_prices）——显示偏好不进 bridge、多设备独立。
+- 分模型账目：cost-state 的 modelUsage 本来就按模型分账，parsers 原先求和丢弃——v48 留存 models map 随 mergedSessions 下发（mergedSessions 展开 {...s} 自动携带）。面板「分模型」段仅多模型会话出现（单模型零噪音）；自定义单价编辑器按会话模型自动列块 + 默认行兜底（按模型 id 记忆跨会话共用）。模型切换各归各账，不靠估算。
+- 体积构成条与次数行纯前端现算（compOfTurns：工具=tool_use 输入 JSON+输出文本字符，思考=think 字符，对话=user+text 字符；口径=字符占比非 token，UI 有标注）。
+- detail↔ctxring 新增一条函数级循环 import（refreshCostUI→renderMeta vs renderMeta→openCostPanel/costDisplay），同 composer↔detail 安全模式（求值期零交叉）。cost.test.mjs 入库：stub 元素必须带 dataset——ctxring→detail→composer 链会让 composer 在模块评估期跑 setPerm 写 dataset。
+- README Backlog 大扫除：审批 diff/历史分页（v44）、always-allow（v44）、改动文件总览（v45）、导出 MD（v44）、费用面板（v48）勾掉；锁屏通知与手动 /compact 标记已裁定不做（2026-10-28）。

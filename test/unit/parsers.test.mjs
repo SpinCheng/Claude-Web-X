@@ -77,6 +77,19 @@ test('adjacent cost-state snapshots collapse to the LAST one; separated stay', (
   assert.equal(sep.events.filter((e) => e.k === 'stats').length, 2);
 });
 
+test('cost-state keeps the per-model breakdown (v48 cost panel); aggregates unchanged', () => {
+  const line = { type: 'cost-state', modelUsage: {
+    sonnet: { inputTokens: 100, outputTokens: 10, cacheReadInputTokens: 500, cacheCreationInputTokens: 20, costUSD: 0.4 },
+    opus: { inputTokens: 200, outputTokens: 30, cacheReadInputTokens: 700, cacheCreationInputTokens: 40, costUSD: 1.6 },
+  } };
+  const { patch } = run([line]);
+  assert.equal(patch.cost.inTok, 300);
+  assert.equal(patch.cost.usd, 2);
+  assert.equal(patch.cost.models.sonnet.usd, 0.4);
+  assert.equal(patch.cost.models.opus.inTok, 200);
+  assert.equal(patch.cost.models.opus.cacheRead, 700);
+});
+
 test('stop-ish system subtypes emit the stop marker + map outcomes', () => {
   for (const [subtype, outcome] of [['interrupt', 'stopped'], ['error', 'failed'], ['stop', 'ok']]) {
     const { events, patch } = run([{ type: 'system', subtype }]);

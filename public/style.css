@@ -475,6 +475,51 @@ button { font-family: inherit; }
 .hist-more.busy { color: var(--faint); pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .hist-more, .hist-more.show, .hist-more .in { transition-duration: 1ms !important; transition-delay: 0s !important; } }
 
+/* ---------- v48：费用面板（header 费用文本入口 → 从 header 下落下的面板） ---------- */
+.cost-entry { color: var(--acc-strong); font-weight: 600; display: inline-block; text-decoration: underline dotted rgba(232, 146, 111, .55); text-underline-offset: 3px; cursor: pointer; }
+.cost-entry.pulse { animation: costPulse .55s cubic-bezier(.34, 1.4, .5, 1); }
+@keyframes costPulse { 0% { transform: scale(1); } 35% { transform: scale(1.22); color: #fff; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .cost-entry.pulse { animation: none; } }
+.overlay.top { align-items: flex-start; padding-top: calc(58px + env(safe-area-inset-top)); }
+.overlay.top .sheet { width: 100%; border-radius: 0 0 20px 20px; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); margin-bottom: 0; animation: topIn .3s cubic-bezier(.22, 1, .36, 1); transform-origin: 50% 0; }
+@keyframes topIn { from { transform: translateY(-16px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .overlay.top .sheet { animation: none; } }
+.cost-hero { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 12px; }
+.cost-hero b { font: 700 26px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.cost-cap { color: var(--faint); font-size: 11.5px; }
+.tok-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.tok-grid .cell { background: var(--panel2); border-radius: 10px; padding: 8px 4px 7px; text-align: center; }
+.tok-grid .tv { font: 600 13px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.tok-grid .tk { color: var(--faint); font-size: 10px; margin-top: 2px; }
+.comp-cap { color: var(--faint); font-size: 10.5px; margin: 0 0 5px; }
+.comp-bar { height: 8px; border-radius: 4px; overflow: hidden; display: flex; background: var(--panel2); margin-bottom: 7px; }
+.comp-bar span { display: block; height: 100%; }
+.comp-bar .c-tool { background: var(--acc); }
+.comp-bar .c-think { background: #8FA3B8; }
+.comp-bar .c-dialog { background: var(--ok); }
+.comp-legend { display: flex; gap: 12px; color: var(--dim); font-size: 11px; margin-bottom: 12px; }
+.comp-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.mini-stats { color: var(--dim); font-size: 11.5px; margin: 0 0 12px; }
+.mini-stats b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.c-mrow { display: flex; align-items: baseline; gap: 8px; }
+.c-mname { font-weight: 600; font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-musd { font: 600 12.5px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.c-msub { color: var(--faint); font-size: 10.5px; margin: 1px 0 7px; }
+.ce-back { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 13.5px; }
+.ce-back .lnk { color: var(--acc-strong); cursor: pointer; font-size: 12.5px; }
+.o-arr { flex: none; color: var(--faint); }
+.frow { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.frow .fl { flex: none; width: 42px; color: var(--dim); font-size: 12.5px; }
+.frow .pin { flex: 1; margin-bottom: 0; padding: 10px 12px; font: 600 14px var(--mono); font-variant-numeric: tabular-nums; }
+.frow .unit { flex: none; width: 52px; text-align: right; color: var(--faint); font-size: 11px; }
+.pgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.pcell { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px; transition: border-color .15s; }
+.pcell:focus-within { border-color: var(--acc); }
+.pcell input { width: 100%; background: none; border: 0; border-radius: 0; color: var(--fg); font: 600 12px var(--mono); font-variant-numeric: tabular-nums; text-align: center; padding: 6px 0; margin: 0; }
+.pcell input:focus { outline: none; box-shadow: none; }
+.pcell span { display: block; color: var(--faint); font-size: 9.5px; text-align: center; }
+.phead { color: var(--dim); font-size: 11.5px; font-weight: 600; margin: 2px 0 5px; }
+
 /* ---------- v45：总结卡内改动文件汇总（6C 折叠行，展开=6B 每文件明细） ---------- */
 .fsum { margin: 10px 0 0; background: var(--panel); border-radius: 12px; padding: 0 12px; box-shadow: var(--sh-1); }
 .fsum summary { list-style: none; cursor: pointer; min-height: 42px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--dim); user-select: none; -webkit-user-select: none; }

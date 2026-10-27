@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=47">
+  <link rel="stylesheet" href="/style.css?v=48">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
-        <span id="build" class="build-badge">v47</span>
+        <span id="build" class="build-badge">v48</span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -193,6 +193,32 @@
       </div>
     </div>
 
+    <!-- v48 cost panel: entry = header cost text; drops from under the header -->
+    <div id="cost-sheet" class="overlay top hidden">
+      <div class="sheet">
+        <div id="cost-main">
+          <div class="sheet-title">累计消耗</div>
+          <div class="cost-hero"><b id="cost-usd">—</b><span id="cost-cap" class="cost-cap"></span></div>
+          <div class="tok-grid" id="cost-grid"></div>
+          <div id="cost-models" hidden></div>
+          <p class="comp-cap">转录体积构成（字符占比，纯前端估算）</p>
+          <div class="comp-bar" id="comp-bar"></div>
+          <div class="comp-legend" id="comp-legend"></div>
+          <p class="mini-stats" id="cost-ministats"></p>
+          <button id="cost-price-row" class="opt" type="button">
+            <span class="o-main"><span class="o-label">单价与口径</span><span class="o-sub" id="cost-mode-sub"></span></span>
+            <span class="o-arr">›</span>
+          </button>
+        </div>
+        <div id="cost-editor" hidden>
+          <div class="ce-back"><span id="cost-back" class="lnk">‹ 返回</span><b>单价与口径</b></div>
+          <div class="seg" id="cost-modes"></div>
+          <div id="cost-pane"></div>
+          <p class="sheet-note">设置存本机 PWA（localStorage），不进 bridge、多设备各自独立。本项目不维护价目表：官方口径 = CC 算好的原值，倍率/自定义只用到 token 聚合与你的输入。</p>
+        </div>
+      </div>
+    </div>
+
     <!-- model + effort picker bubble (v36: effort merged into the model sheet) -->
     <div id="model-sheet" class="overlay bub hidden">
       <div class="sheet bubble">
@@ -238,6 +264,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=47"></script>
+  <script type="module" src="/app.js?v=48"></script>
 </body>
 </html>

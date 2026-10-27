@@ -105,25 +105,25 @@ claude-remote/
 
 **P0 · 核心场景断点**（"远程派活"闭环缺口）
 
-- [ ] **锁屏/后台完成通知**：ntfy 推送代码已就绪（`notify.ntfyTopic` 配置即用），进阶 Web Push（SW + VAPID）
-- [ ] **手动 /compact**：上下文自救按钮——`-p` 模式斜杠命令路线已由 `/context` 探针验证；勘测压缩后返回行为
-- [ ] **审批卡 diff 视图**：ask 模式审批 Edit/Write 时渲染 +/- diff（复用时间线 toolDiff 逻辑），替代 JSON 原文
-- [ ] **历史回看分页**：去掉 `readTranscript` 400 事件硬上限，加"加载更早"
+- [x] ~~锁屏/后台完成通知~~（已裁定不做，2026-10-28：无锁屏推送需求；ntfy 桥侧代码保留但默认不配）
+- [x] ~~手动 /compact~~（已裁定不做，2026-10-28）
+- [x] ~~审批卡 diff 视图~~（v44 已实现：Edit/Write/MultiEdit/NotebookEdit 渲染 ±diff，其余工具 JSON 明细）
+- [x] ~~历史回看分页~~（v44/v46 已实现：400 条展示切片上开"加载更早"，header 加载行 + 切轮缝合 + 跨页 toolres 配对）
 - [x] ~~手机发图~~（v19 已实现：📎 附件上传 + 图片/文本预览 + 转录渲染 + 灯箱；注意：模型能否"看懂"图取决于后端——实测当前中转对图是盲的，链路已就绪即插即用）
 
 **P1 · 明显缺失**
 
-- [ ] always-allow 工具白名单（审批疲劳：ask 模式下按 tool_name 自动放行，存 config）
-- [ ] 会话改动文件总览（聚合转录 Edit/Write，或 bridge 跑 `git status --porcelain`）
+- [x] ~~always-allow 工具白名单~~（v44 已实现：会话级内存 Map，审批卡勾选；bridge 重启即重新布防）
+- [x] ~~会话改动文件总览~~（v45 已实现：总结卡内折叠行"改动 N 个文件 +a −d"，展开每文件 ± 行数）
 - [x] ~~会话重命名~~（v34 已实现：列表长按/右键 → 操作气泡；写原生 `custom-title` 行入转录，落盘即持久、桌面端同款机制，非本地覆盖）
 - [x] ~~队列单条管理~~（v17 已实现：队列面板 + 删单条/拖动重排/▶插队/清空）
 - [x] ~~会话搜索~~（v43 已实现：列表页搜索框，标题/项目路径/id 实时过滤，命中平铺展示；批量管理同批落地：header 管理钮 → 多选 → 底部栏全选/删除，运行中自动跳过）
-- [ ] 导出 Markdown
+- [x] ~~导出 Markdown~~（v44 已实现：full/summary 双档，⋯ 气泡二级范围选择）
 
 **P2 · 体验增强**
 
 - [ ] 斜杠命令快捷面板（/cost /model /clear…）
-- [ ] token/费用累计统计面板（cost-state 数据已聚合，缺汇总视图）
+- [x] ~~token/费用累计统计面板~~（v48 已实现：header 费用文本即入口，面板从上落下；官方口径/倍率/自定义单价三档，分模型各归各账，价格偏好存 localStorage）
 - [ ] 配额/速率显示（探测 statusline 的 rate_limits 字段）
 - [ ] 离线 PWA shell（service worker）
 - [ ] `cr.ps1 status/watch`
