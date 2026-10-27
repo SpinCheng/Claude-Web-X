@@ -309,8 +309,8 @@ function renderCostSheet() {
   $('cost-usd').textContent = usd != null ? '$' + usd.toFixed(2) : '—';
   $('cost-cap').textContent = mode === 'mult' ? '官方 $' + (Number(c.usd) || 0).toFixed(2) + ' × ' + costMult() + ' · 本会话累计'
     : mode === 'cust' ? '自定义单价 × token · 本会话累计' : '官方口径（CC 内置价表）· 本会话累计';
-  $('cost-mode-sub').textContent = mode === 'off' ? '官方口径 · CC 原值'
-    : mode === 'mult' ? '官方 × ' + costMult() : '自定义单价（分模型）';
+  $('cost-mode-sub').textContent = mode === 'off' ? '官方口径'
+    : mode === 'mult' ? '官方 × ' + costMult() : '自定义单价';
   const grid = $('cost-grid');
   grid.textContent = '';
   const cell = (v, k) => {
