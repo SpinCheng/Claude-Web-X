@@ -47,7 +47,7 @@ button { font-family: inherit; }
 .lamp[data-st="waiting"] { background: var(--acc); box-shadow: 0 0 8px rgba(217, 119, 87, .5); animation: breathe 1.6s ease-in-out infinite; }
 .st-word[data-st="waiting"] { color: var(--acc-strong); }
 @keyframes breathe { 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .caret, .timeline, .node-body { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .pgroup-ico[data-st="running"], .pgroup-ico[data-st="waiting"], .caret, .timeline, .node-body { animation: none !important; } }
 
 /* ---------- brand ---------- */
 .brand { display: flex; align-items: center; gap: 9px; }
@@ -90,7 +90,14 @@ button { font-family: inherit; }
 .pgroup { flex: none; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: var(--sh-1); }
 .pgroup-head { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 48px; padding: 12px 15px; border: 0; background: none; color: var(--fg); font: inherit; cursor: pointer; text-align: left; transition: background .12s; touch-action: manipulation; }
 .pgroup-head:active { background: var(--panel2); }
-.pgroup-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pgroup-ico { flex: none; color: var(--faint); }
+.pgroup-ico[data-st="running"] { color: var(--warn); animation: breathe 1.6s ease-in-out infinite; }
+.pgroup-ico[data-st="waiting"] { color: var(--acc); animation: breathe 1.6s ease-in-out infinite; }
+.pgroup-ico[data-st="failed"]  { color: var(--err); }
+.pgroup-ico[data-st="stopped"] { color: var(--warn); opacity: .5; }
+.pgroup-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pgroup-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pgroup-path { font-family: var(--mono); font-size: 10px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tally { display: flex; gap: 7px; flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .tally .t { color: var(--faint); display: inline-flex; align-items: center; gap: 4px; }
 .tally .t .lamp { width: 5px; height: 5px; }

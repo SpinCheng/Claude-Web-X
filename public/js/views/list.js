@@ -41,7 +41,7 @@ function renderList() {
   const groups = new Map();
   for (const s of cc) {
     const k = groupKey(s);
-    if (!groups.has(k)) groups.set(k, { label: projectLabel(s), sessions: [], latest: 0 });
+    if (!groups.has(k)) groups.set(k, { label: projectLabel(s), path: s.cwd || '', sessions: [], latest: 0 });
     const g = groups.get(k);
     g.sessions.push(s);
     if (s.lastActive > g.latest) g.latest = s.lastActive;
@@ -68,8 +68,13 @@ function renderGroup(g) {
   head.className = 'pgroup-head';
   head.setAttribute('aria-expanded', closed ? 'false' : 'true');
   head.innerHTML =
-    '<span class="lamp" data-st="' + top + '"></span>' +
-    '<span class="pgroup-name"></span>' +
+    // folder icon carries the group's top state as a tint (same palette the
+    // lamps used); per-state exact counts stay in the tally chips
+    '<svg class="pgroup-ico" data-st="' + top + '" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>' +
+    '<span class="pgroup-main">' +
+      '<span class="pgroup-name"></span>' +
+      (g.path ? '<span class="pgroup-path"></span>' : '') +
+    '</span>' +
     '<span class="tally">' +
       // actionable first: waiting (phone can act) > running > failed > stopped
       (counts.waiting ? '<span class="t wait"><span class="lamp" data-st="waiting"></span>' + counts.waiting + '</span>' : '') +
@@ -80,6 +85,7 @@ function renderGroup(g) {
     '</span>' +
     '<svg class="chev" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>';
   head.querySelector('.pgroup-name').textContent = g.label;
+  if (g.path) head.querySelector('.pgroup-path').textContent = g.path;
   head.onclick = () => {
     if (state.closedGroups.has(g.label)) state.closedGroups.delete(g.label);
     else state.closedGroups.add(g.label);

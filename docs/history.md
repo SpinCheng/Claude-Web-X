@@ -186,3 +186,7 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## 2026-10-26 · 公开化整改
 
 隐私扫描清除三处（vbs 写死管理员路径/中转商端点/绝对路径）→ LOCAL.md 承接本机事实；自启 vbs 改"仓库自定位模板 + pairing 现场生成绝对路径版"双职责；补 LICENSE/SECURITY/CONTRIBUTING/.gitattributes/.editorconfig/CI；phase0 → docs/phase0。运行环境表修正：桌面客户端不是依赖（bridge 从不与桌面 App 通信），CLI 才是（版本强关联，README 有对照清单）。
+
+## 2026-10-27 · v38 项目组头：文件夹图标 + 路径副行
+
+用户点名两处列表改进：组头前导状态灯改**文件夹图标**（态色沿用 lamp 调色板：running=warn/waiting=acc 且保呼吸动画、failed=err、stopped=warn 半透明——组态信息零丢失，tally 仍给精确计数；呼吸动画纳入 reduced-motion 列表）；标题下方加**完整 cwd 路径副行**（mono 10px faint，ellipsis，无 cwd 的组不渲染该行）。结构上 `.pgroup-name` 让出 `flex:1` 给新 `.pgroup-main` 两行容器（与 `.srow-main` 同构）。e2e list 场景补两条断言（图标存在 + 路径副行以 `D:` 开头、`e2e` 结尾——断言里不写反斜杠，规避老坑）。纯静态改动，无需重启 bridge。

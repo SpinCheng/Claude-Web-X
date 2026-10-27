@@ -12,4 +12,9 @@ await withEnv(async (h, page) => {
   assert(info.sh > info.ch + 300, `list overflows viewport (sh=${info.sh} ch=${info.ch})`);
   assert(info.st === 200, `list scrolls (scrollTop=${info.st})`);
   assert(await page.ev('(function(){var g=document.getElementById("groups");return g.scrollTop>0 && !!g.querySelector(".srow:last-of-type")})()'), 'last row reachable');
+
+  // v38: group head = folder icon + title + full path as a dim sub-line
+  assert(await page.waitFor('!!document.querySelector(".pgroup-head .pgroup-ico")'), 'folder icon on group head');
+  assert(await page.waitFor('(function(){var p=document.querySelector(".pgroup-path");' +
+    'return !!p && p.textContent.indexOf("D:") === 0 && /e2e$/.test(p.textContent)})()'), 'path sub-line under title');
 });
