@@ -476,12 +476,14 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) { .hist-more, .hist-more.show, .hist-more .in { transition-duration: 1ms !important; transition-delay: 0s !important; } }
 
 /* ---------- v48：费用面板（header 费用文本入口 → 从 header 下落下的面板） ---------- */
-.cost-entry { color: var(--acc-strong); font-weight: 600; display: inline-block; text-decoration: underline dotted rgba(232, 146, 111, .55); text-underline-offset: 3px; cursor: pointer; }
+.cost-entry { display: inline-block; text-decoration: underline dotted rgba(232, 146, 111, .55); text-underline-offset: 3px; cursor: pointer; }
+/* .d-title span (0-1-1) sets faint/10.5px - the entry must out-rank it to read as the mock */
+.d-title span.cost-entry { color: var(--acc-strong); font-weight: 600; font-size: 11px; letter-spacing: 0; }
 .cost-entry.pulse { animation: costPulse .55s cubic-bezier(.34, 1.4, .5, 1); }
 @keyframes costPulse { 0% { transform: scale(1); } 35% { transform: scale(1.22); color: #fff; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .cost-entry.pulse { animation: none; } }
 .overlay.top { align-items: flex-start; padding-top: calc(58px + env(safe-area-inset-top)); }
-.overlay.top .sheet { width: 100%; border-radius: 0 0 20px 20px; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); margin-bottom: 0; animation: topIn .3s cubic-bezier(.22, 1, .36, 1); transform-origin: 50% 0; }
+.overlay.top .sheet { flex: 1 1 auto; margin: 0 12px; border-radius: 0 0 20px 20px; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); animation: topIn .3s cubic-bezier(.22, 1, .36, 1); transform-origin: 50% 0; }
 @keyframes topIn { from { transform: translateY(-16px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .overlay.top .sheet { animation: none; } }
 .cost-hero { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 12px; }
