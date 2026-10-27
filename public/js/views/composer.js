@@ -476,4 +476,4 @@ if (window.ResizeObserver && composerEl) {
   }).observe(composerEl);
 }
 
-export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips };
+export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal };

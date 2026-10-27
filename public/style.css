@@ -85,33 +85,43 @@ button { font-family: inherit; }
 .d-title b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .d-title span { font-size: 10.5px; font-family: var(--mono); color: var(--faint); letter-spacing: .02em; }
 
-/* ---------- 会话列表：行卡片，浮起而非描边 ---------- */
+/* ---------- 会话列表：行卡片，浮起而非描边（v33 重排：状态右置/语义按钮/待确认计数） ---------- */
 .groups { padding: 14px 14px 28px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .pgroup { flex: none; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: var(--sh-1); }
-.pgroup-head { display: flex; align-items: center; gap: 9px; width: 100%; padding: 13px 15px; border: 0; background: none; color: var(--fg); font: inherit; cursor: pointer; text-align: left; transition: background .12s; }
+.pgroup-head { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 48px; padding: 12px 15px; border: 0; background: none; color: var(--fg); font: inherit; cursor: pointer; text-align: left; transition: background .12s; touch-action: manipulation; }
 .pgroup-head:active { background: var(--panel2); }
 .pgroup-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tally { display: flex; gap: 7px; flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .tally .t { color: var(--faint); display: inline-flex; align-items: center; gap: 4px; }
 .tally .t .lamp { width: 5px; height: 5px; }
+.tally .t.wait { color: var(--acc-strong); }
 .tally .t.live { color: var(--warn); }
 .tally .t.fail { color: var(--err); }
 .tally .t.hold { color: var(--warn); opacity: .75; }
 .chev { color: var(--faint); flex: none; transition: transform .18s ease; }
 .pgroup.closed .chev { transform: rotate(-90deg); }
 .pgroup.closed .pgroup-body { display: none; }
-.srow { display: flex; align-items: center; gap: 11px; padding: 12px 15px; cursor: pointer; border-top: 1px solid rgba(54, 51, 45, .5); transition: background .12s; }
+/* row is a real <button>: keyboard focus + native tap semantics; the whole
+   row is the target (no go-arrow) - the right slot is the status word */
+.srow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 11px 15px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-top: 1px solid rgba(54, 51, 45, .5); transition: background .12s; touch-action: manipulation; }
 .srow:active { background: var(--panel2); }
-.srow-main { flex: 1; min-width: 0; }
-.srow-title { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.srow-sub { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 3px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
-.st-word { margin-right: 6px; font-size: 10.5px; letter-spacing: .04em; }
+.srow:focus-visible, .pgroup-head:focus-visible { outline: 2px solid rgba(217, 119, 87, .55); outline-offset: -2px; }
+.srow-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.srow-title { font-size: 14.5px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow-info { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.st-word { flex: none; margin-left: 8px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; }
 .st-word[data-st="running"] { color: var(--warn); }
 .st-word[data-st="failed"]  { color: var(--err); }
 .st-word[data-st="stopped"] { color: var(--warn); opacity: .8; }
 .st-word[data-st="idle"]    { color: var(--faint); }
-.srow-go { color: var(--faint); opacity: .4; flex: none; }
 .empty { color: var(--faint); font-size: 13px; text-align: center; padding: 28px 20px; }
+/* empty list state: icon + copy + the screen's single primary CTA */
+.list-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 58px 24px 48px; }
+.list-empty svg { color: var(--faint); margin-bottom: 6px; }
+.le-t { font-size: 15px; font-weight: 600; color: var(--dim); }
+.le-s { font-size: 12.5px; color: var(--faint); }
+.le-btn { margin-top: 16px; border: 0; background: var(--acc); color: #fff; font: 600 14px/1 var(--sans); padding: 13px 28px; border-radius: 999px; box-shadow: 0 2px 10px rgba(217, 119, 87, .3); cursor: pointer; transition: transform .12s, background .12s; }
+.le-btn:active { background: var(--acc-strong); transform: scale(.96); }
 
 /* ---------- driver chip ---------- */
 .chip { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 3px 9px; letter-spacing: .05em; }

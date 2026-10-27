@@ -1,5 +1,11 @@
 # 版本演进与调试史（症状 → 根因）
 
+## 2026-10-27 · 会话列表重排（v33，ui-ux-pro-max 技能驱动）
+
+主动重设计（非修 bug）。布局决策：①状态词右置成独立着色槽位（idle 不渲染减噪；色彩+文字双通道）；②行改语义 `<button>`（键盘可达+focus-visible 弱珊瑚环），min-height 52px/组头 48px/touch-action:manipulation；③去掉每行 go 箭头（全行可点+按压反馈已表达）；④组头 tally 补 waiting 计数（acc 色排最前，折叠时仍可见——待确认是手机端唯一可行动状态）+ aria-expanded；⑤空态=图标+文案+全屏唯一珊瑚 CTA 直开新会话弹窗。刻意不做入场 stagger：renderList 每次 sessions 帧全量重建，动画=闪烁+费帧。视觉纪律未破（沿用既有 token，珊瑚只给唯一 CTA）。
+
+验证方式：Read 本会话不支持看图 → 改 CDP 数值验收（10 断言：几何/右槽对齐/折叠/空态 CTA 配色线宽）全过。**harness 事实**：`fakeRun` 直接 `runner.emit` 绕过内部 runs map，mergedSessions 的 running 只来自真实 spawn 生命周期——E2E 断言列表 running 态必须**先开页再 fakeRun**（客户端 state.runs 经 run 帧+sessions 重广播兜住）。
+
 ## 2026-10-27 · 会话列表不可滚（v31）
 
 症状：列表页无法滚动。根因两层：① `.groups` 从 v16 起就没有 overflow/min-height——flex 列里 main 默认 `min-height:auto`，内容超出即被 `.page` 的 `overflow:hidden` 剪掉，**从来没有真正的滚动容器**（此前分组多折叠态没暴露）；② 补 `overflow-y:auto` 后又踩 flex 第二坑——`.pgroup` 作为滚动容器的 flex 子项且自带 `overflow:hidden`（min-height 退化为 0），被**压缩**到视口高（14 行只显 5.7 行）而不是撑开滚动。完整修复=滚动容器+子项不缩：`.groups { overflow-y:auto; min-height:0 }` + `.pgroup { flex:none }`。E2E 新增 list 场景（14 会话断言 sh>ch+300 且 scrollTop 生效）。教训：**flex 布局里"可滚"=容器约束(overflow+min-height:0)+子项不缩(flex:none)成对出现**，缺一半就是"剪掉"或"压扁"。

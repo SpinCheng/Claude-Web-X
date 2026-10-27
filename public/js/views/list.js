@@ -5,6 +5,7 @@
 import { $, shortPath, relTime } from '../util.js';
 import { state, CLOSED_KEY } from '../state.js';
 import { openDetail } from './detail.js';
+import { openNewModal } from './composer.js';
 
 function sessState(s) {
   if (s.running || state.runs[s.id]?.state === 'running') return 'running';
@@ -28,7 +29,12 @@ function renderList() {
   box.innerHTML = '';
   const cc = state.sessions.filter((s) => s.kind === 'cc');
   if (cc.length === 0) {
-    box.innerHTML = '<div class="empty">还没有 Claude Code 会话<br>点右上角 ＋ 从手机发起一个任务</div>';
+    box.innerHTML = '<div class="empty list-empty">' +
+      '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8.5v7M8.5 12h7"/></svg>' +
+      '<div class="le-t">还没有 Claude Code 会话</div>' +
+      '<div class="le-s">从手机发起一个任务，让它跑在你电脑的工程里</div>' +
+      '<button class="le-btn" type="button">发起任务</button></div>';
+    box.querySelector('.le-btn').onclick = openNewModal;
     return;
   }
   const groups = new Map();
@@ -48,19 +54,24 @@ function renderList() {
 
 function renderGroup(g) {
   const wrap = document.createElement('div');
-  wrap.className = 'pgroup' + (state.closedGroups.has(g.label) ? ' closed' : '');
+  const closed = state.closedGroups.has(g.label);
+  wrap.className = 'pgroup' + (closed ? ' closed' : '');
 
   const states = g.sessions.map(sessState);
   const top = states.reduce((acc, st) => (GROUP_RANK[st] > GROUP_RANK[acc] ? st : acc), 'idle');
-  const counts = { running: 0, failed: 0, stopped: 0 };
+  const counts = { running: 0, waiting: 0, failed: 0, stopped: 0 };
   for (const st of states) if (counts[st] != null) counts[st]++;
 
   const head = document.createElement('button');
+  head.type = 'button';
   head.className = 'pgroup-head';
+  head.setAttribute('aria-expanded', closed ? 'false' : 'true');
   head.innerHTML =
     '<span class="lamp" data-st="' + top + '"></span>' +
     '<span class="pgroup-name"></span>' +
     '<span class="tally">' +
+      // actionable first: waiting (phone can act) > running > failed > stopped
+      (counts.waiting ? '<span class="t wait"><span class="lamp" data-st="waiting"></span>' + counts.waiting + '</span>' : '') +
       (counts.running ? '<span class="t live"><span class="lamp" data-st="running"></span>' + counts.running + '</span>' : '') +
       (counts.failed ? '<span class="t fail"><span class="lamp" data-st="failed"></span>' + counts.failed + '</span>' : '') +
       (counts.stopped ? '<span class="t hold"><span class="lamp" data-st="stopped"></span>' + counts.stopped + '</span>' : '') +
@@ -73,6 +84,7 @@ function renderGroup(g) {
     else state.closedGroups.add(g.label);
     localStorage.setItem(CLOSED_KEY, JSON.stringify([...state.closedGroups]));
     wrap.classList.toggle('closed');
+    head.setAttribute('aria-expanded', wrap.classList.contains('closed') ? 'false' : 'true');
   };
 
   const body = document.createElement('div');
@@ -84,15 +96,19 @@ function renderGroup(g) {
 
 function renderRow(s) {
   const st = sessState(s);
-  const el = document.createElement('div');
+  // real <button>: keyboard reachable + free focus semantics; the whole row
+  // is the target so no per-row go-arrow is needed - the right slot is the
+  // status word (color + text, never color alone)
+  const el = document.createElement('button');
+  el.type = 'button';
   el.className = 'srow';
   el.innerHTML =
     '<span class="lamp" data-st="' + st + '"></span>' +
-    '<div class="srow-main">' +
-      '<div class="srow-title"></div>' +
-      '<div class="srow-sub"><span class="st-word" data-st="' + st + '">' + ST_WORD[st] + '</span><span class="srow-info"></span></div>' +
-    '</div>' +
-    '<svg class="srow-go" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M9 6l6 6-6 6"/></svg>';
+    '<span class="srow-main">' +
+      '<span class="srow-title"></span>' +
+      '<span class="srow-info"></span>' +
+    '</span>' +
+    (st !== 'idle' ? '<span class="st-word" data-st="' + st + '">' + ST_WORD[st] + '</span>' : '');
   el.querySelector('.srow-title').textContent = s.title || s.id.slice(0, 8);
   const info = [relTime(s.lastActive), (s.lines || 0) + ' 行'];
   if (s.cost && s.cost.usd != null) info.push('$' + Number(s.cost.usd).toFixed(2));
