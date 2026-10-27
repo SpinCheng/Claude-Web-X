@@ -243,3 +243,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 缝合：older 尾 bot 与当前首 bot 相邻 ⟺ 切点落在一轮 assistant 流中间（user 会以 role:'user' 出现在任一侧，stop/sys 都不建 turn）→ mergeBotTurns 拼接（桶+steps concat，ts 取早）；frag 末尾携带合并节点，insertBefore 后删除右移一位的旧首子节点——DOM/turns 仍 1:1，renderTail 无感。
 - 跨页配对：切点恰在 tool_use 与 tool_result 之间时 res 先到，进 state.orphanToolRes（上限 1000 防御），prepend 后 drainOrphanRes 按 id 回填；pairToolResults 顺势改 per-item 独立搜索——原「配到即停」语义会遗弃同批后续 item。
 - e2e 新增 paged 场景（140 轮 fixture）：首屏 266 turns、滚顶出加载行（带剩余计数）、点击后 280、排空收起、最老轮在顶。
+
+## v47（2026-10-27）历史加载行方案A（拍板：极简融入）
+
+- 用户嫌 v46 加载行「背景色与过渡突兀」。ui-ux-pro-max skill 数据定位两病根：①双向同曲线同时长（数据条目：进场 ease-out / 离场加速；「一个时长抄所有过渡」是反模式）；②height 做动画主角且整宽色块压下像弹窗。评审页 design-histbar.html 四稿可交互演示（A 纯文字 / B hairline 生长 / C 弹簧胶囊 / D raise 材质），拍板 A。
+- 实现：无底色纯 dim 文字 38px 槽位；进场槽位 height/opacity/margin 走 ease-out（.3s cubic-bezier(.22,1,.36,1)）+ 内层 .in span translateY(-9px)→0 滑落（opacity 延迟 .05s）；离场一律加速收走（height .18s ease-in / opacity .13s）——不对称时序。文字位移走 transform；transform 挂内层 span 而非按钮自身（transform 建 stacking context 会盖过 header 底边），detail.js 文案改写 firstElementChild 防 span 被 textContent 清掉。prefers-reduced-motion 降为瞬时。
+- 纯样式改版，机制（≤48px 显隐、切轮缝合、孤儿配对）未动；三处 bump v47，评审页随拍板删除（未入库）。

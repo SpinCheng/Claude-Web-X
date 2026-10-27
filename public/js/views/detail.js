@@ -77,7 +77,7 @@ function updateHistoryPill() {
   if (!el) return;
   if (!state.currentId) { el.classList.remove('show', 'busy'); return; }
   el.classList.toggle('busy', state.histLoading);
-  el.textContent = state.histLoading ? '加载中…'
+  el.firstElementChild.textContent = state.histLoading ? '加载中…'
     : '加载更早 · 还有 ' + (state.histTotal - state.histBefore) + ' 条';
   const hasMore = state.histBefore < state.histTotal;
   // reveal rule: anything to load AND (pinned at the top OR a load in flight

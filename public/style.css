@@ -466,11 +466,14 @@ button { font-family: inherit; }
 .ap-allow.on { color: var(--fg); }
 .ap-allow.on .ckb { background: var(--acc); border-color: var(--acc); }
 .ap-allow.on .ckb::after { content: ""; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(42deg); }
-/* ---------- v46：历史加载行（header 下、到顶展开过渡；悬浮 pill 废弃） ---------- */
-.hist-more { flex: none; height: 0; opacity: 0; overflow: hidden; margin: 0 12px; border: 0; border-radius: 12px; background: var(--panel2); color: var(--dim); font: 600 12.5px/40px var(--sans); text-align: center; cursor: pointer; pointer-events: none; transition: height .22s ease, opacity .18s ease, margin .22s ease; }
-.hist-more.show { height: 40px; opacity: 1; margin-bottom: 6px; pointer-events: auto; }
-.hist-more:active { background: var(--raise); color: var(--fg); }
+/* ---------- v47：历史加载行方案A（无底色纯文字；进场 ease-out 滑落、离场加速的不对称时序；height 只做槽位塌缩不做动画主角） ---------- */
+.hist-more { flex: none; height: 0; opacity: 0; overflow: hidden; margin: 0 12px; border: 0; background: transparent; color: var(--dim); font: 500 12.5px/38px var(--sans); text-align: center; cursor: pointer; pointer-events: none; transition: height .18s ease-in, opacity .13s ease, margin .18s ease-in; }
+.hist-more .in { display: inline-block; transform: translateY(-9px); transition: transform .34s cubic-bezier(.22,1,.36,1); }
+.hist-more.show { height: 38px; opacity: 1; margin-bottom: 4px; pointer-events: auto; transition: height .3s cubic-bezier(.22,1,.36,1), opacity .24s ease .05s, margin .3s cubic-bezier(.22,1,.36,1); }
+.hist-more.show .in { transform: none; }
+.hist-more:active { color: var(--fg); }
 .hist-more.busy { color: var(--faint); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .hist-more, .hist-more.show, .hist-more .in { transition-duration: 1ms !important; transition-delay: 0s !important; } }
 
 /* ---------- v45：总结卡内改动文件汇总（6C 折叠行，展开=6B 每文件明细） ---------- */
 .fsum { margin: 10px 0 0; background: var(--panel); border-radius: 12px; padding: 0 12px; box-shadow: var(--sh-1); }
