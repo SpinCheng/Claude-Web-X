@@ -202,3 +202,12 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## 2026-10-27 · v40b 分支会话 "Fork-" 前缀
 
 分支会话标题 = `Fork-<源标题>`：runner 从 init 行采纳 fork 真实 sid 的那一刻（server.js 接线 `_emit` 新增的 `forkFrom` 字段）→ `adapter.titleFork(forkFrom, newId)` 往**新**转录追加原生 custom-title 行——若 CLI 把源历史（含源 custom-title）拷进 fork 文件，我们的行在文件序最后、必胜。时机约束：adopt 时 adapter 可能尚未发现新文件（fs.watch 200ms 防抖）→ `appendTitle` 返回 false 时 1.2s×4 重试。不钉（Desktop 对全新 sid 无缓存可回冲）；前缀幂等（对已带 Fork- 的源再分支不叠加）。顺带重构：改名路由的"补换行边界再追加"逻辑提取为 `adapter.appendTitle(id, title)`，rename 路由与 fork 命名共用（sessops e2e 对真实服务端验证该链路）。纯后端，无版本 bump，需重启 bridge。
+
+## v40c — 重命名还原（第二幕）：boot 重放误杀钉（2026-10-27）
+
+- 症状：用户已关闭全部桌面客户端，改名 main-chat 后 bridge 重启（部署 v40b），标题又被还原；且 `renames.json` 变回 `{}`。
+- 取证：转录 raw 行显示回冲 bundle（last-prompt/cost-state/queue-operation/custom-title）**带本会话自己的 sessionId**、落在 bridge 拉起的 resume turn 期间 → 写入者是 CLI resume 进程本身（关桌面客户端无效）；回冲值恒为 1149477e 的自动标题（跨会话串值）。
+- 根因：fence 的 `disarm` 分支不看行的新旧。**boot 全量重放**（`_ensureSession` 的 backfill drain / `readTranscript`）会重放历史里所有 custom-title 行——只要存在一条既 ≠ pin.title 又 ≠ pin.prev 的旧行（本例是前一天的测试值 "new"，L18515），重放就误判"真·新改名"→ 解除钉并写盘 → 随后两条回冲行不再受拦，标题还原。16:49 的钉就是这样死于 16:54 的启动重放。
+- 修复：`_applyLine` 增加 `live` 形参（`_drain` 传 `emitAppends`，backfill/readTranscript 为 false）。**钉只能被活流新到的行解除**（桌面端真改名必然发生在钉建立之后）；历史行里的未知值一律视为过期——不但不解钉，还强制 `patch.title = pin.title`（历史无权重过钉）。测试：test/unit/adapter.test.mjs（4 例：历史不解钉+不夺标题 / 历史过期值吞掉 / 活流真改名解钉 / 活流过期值吞掉）。
+- 恢复现场：写入 pin + 追加一条 main-chat custom-title 行（Title 用户的最后一次改名意图），重启后 fence 重建标题。
+- 教训：**凡是"持久化状态 + 全量重放"的设计，重放路径必须与活流路径在状态变更权限上有所区分**——判定函数（fenceTitle 纯函数）没错，错在调用侧没把"这行是新到的还是重放的"传进去。

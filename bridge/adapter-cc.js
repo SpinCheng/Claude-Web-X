@@ -141,7 +141,7 @@ export class CcAdapter extends EventEmitter {
     for (const line of lines) {
       let obj;
       try { obj = JSON.parse(line); } catch { continue; } // tolerate partial/garbage
-      const ev = this._applyLine(entry.id, obj, patch, events);
+      const ev = this._applyLine(entry.id, obj, patch, events, emitAppends);
       if (ev) events.push(ev);
       const ts = Date.parse(obj.timestamp || '');
       if (Number.isFinite(ts) && ts > latestTs) latestTs = ts;
@@ -167,7 +167,13 @@ export class CcAdapter extends EventEmitter {
     }
   }
 
-  _applyLine(id, obj, patch, events) {
+  // live=true only for drains of freshly-appended lines. Historical replays
+  // (boot backfill, detail-view re-read) must NEVER disarm a rename pin: the
+  // transcript may contain custom-title values older than the pin (earlier
+  // renames, CLI test values) and a naive replay disarms the fence, letting
+  // the pre-rename title win again (the v40b production bug - boot replay
+  // killed the 16:49 pin via a day-old "new" line).
+  _applyLine(id, obj, patch, events, live = false) {
     const ev = applyLine(id, obj, patch, events, this.store.get(id));
     // write-fence (v39): Desktop re-emits its cached pre-rename title in
     // metadata flushes; swallow exactly that stale value, disarm on real news
@@ -177,8 +183,15 @@ export class CcAdapter extends EventEmitter {
       patch.title = pin.title;
       if (ev) ev.title = pin.title;
     } else if (act === 'disarm') {
-      this.renames.delete(id);
-      this._saveRenames();
+      if (live) {
+        this.renames.delete(id);
+        this._saveRenames();
+      } else {
+        // historical value predating the pin: pin is the newer truth, don't
+        // let a day-old title line win during boot/readTranscript replays
+        patch.title = pin.title;
+        if (ev) ev.title = pin.title;
+      }
     }
     return ev;
   }
