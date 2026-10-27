@@ -36,7 +36,8 @@ export const slashCommand = (i, name, args = '') =>
   ({ type: 'user', timestamp: ts(i), cwd: 'D:\\e2e', origin: { kind: 'human' },
      message: { role: 'user', content: `<command-message>${name}</command-message>\n<command-name>/${name}</command-name>\n<command-args>${args}</command-args>` } });
 
-// scenario: chronological timeline with tool result pairing
+// scenario: chronological timeline with tool result pairing; a second turn
+// carries an Edit so the conclusion-card file rollup (v45 fsum) is exercised
 export function timelineLines() {
   return [
     user(1, '做时间轴测试'),
@@ -44,6 +45,9 @@ export function timelineLines() {
     toolResult(3, 't1', 'timeline-order-ok'),
     assistant(4, [text('命令输出：timeline-order-ok')]),
     stop(5),
+    user(6, '改文件汇总'),
+    assistant(7, [toolUse('t2', 'Edit', { file_path: 'D:\\e2e\\a.txt', old_string: 'x\ny', new_string: 'x1\ny1\nz' }), text('已修改 a.txt')]),
+    stop(8),
   ];
 }
 

@@ -24,7 +24,7 @@ globalThis.document = globalThis.document || {
 };
 globalThis.window = globalThis.window || { addEventListener: () => {} };
 
-const { applyEventToTurns } = await import('../../public/js/views/transcript.js');
+const { applyEventToTurns, fileChanges } = await import('../../public/js/views/transcript.js');
 const { state } = await import('../../public/js/state.js');
 
 const userTurns = () => state.turns.filter((t) => t.role === 'user');
@@ -80,4 +80,23 @@ test('queued dispatch still folds into a pending optimistic twin', () => {
   assert.notEqual(at, null, 'fold returns the edited index');
   assert.equal(userTurns().length, 1, 'twin confirmed in place, no duplicate');
   assert.equal(userTurns()[0].optimistic, false);
+});
+
+test('fileChanges merges edits per file (case-insensitive) with ± lines', () => {
+  const t = { steps: [
+    { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'D:\\x\\A.ts', old_string: 'a\nb', new_string: 'a1\nb1\nc1' }) } },
+    { t: 'tool', tool: { name: 'MultiEdit', v: JSON.stringify({ file_path: 'D:\\X\\a.ts', edits: [
+      { old_string: 'p', new_string: 'q\nr' },
+      { old_string: 's\nt', new_string: 'u' },
+    ] }) } },
+    { t: 'tool', tool: { name: 'Write', v: JSON.stringify({ file_path: 'D:\\x\\b.md', content: 'l1\nl2' }) } },
+    { t: 'tool', tool: { name: 'Bash', v: JSON.stringify({ command: 'echo hi' }) } },
+    { t: 'tool', tool: { name: 'Edit', v: 'not-json' } },
+  ] };
+  const files = fileChanges(t);
+  assert.equal(files.length, 2, 'case-insensitive merge; non-edit tools / bad json ignored');
+  const a = files.find((f) => /a\.ts$/i.test(f.path));
+  assert.deepEqual([a.add, a.del], [6, 5], 'edit + multiedit hunks merged (+3-2 then +3-3)');
+  const b = files.find((f) => /b\.md$/i.test(f.path));
+  assert.deepEqual([b.add, b.del], [2, 0], 'write counts every line as an addition');
 });

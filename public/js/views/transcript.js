@@ -267,6 +267,41 @@ function toolDiff(t) {
   return null;
 }
 
+// v45 (P1-6R): per-turn changed-file rollup for the conclusion card. Pure
+// function of the turn's steps - recomputed on each renderTurn, not cached.
+// The tool_use input already carries file_path + old/new, so this needs no
+// bridge support. Path identity is case-insensitive (Windows); Write counts
+// every line as an addition (the old content is unknowable from the input).
+const EDIT_TOOLS = { Edit: 1, Write: 1, MultiEdit: 1 };
+const lineCount = (v) => (typeof v === 'string' ? v.split('\n').length : 0);
+function fileChanges(t) {
+  const byKey = new Map();
+  const bump = (p, add, del) => {
+    if (!p) return;
+    const k = p.toLowerCase();
+    let rec = byKey.get(k);
+    if (!rec) { rec = { path: p, add: 0, del: 0 }; byKey.set(k, rec); }
+    rec.path = p; // last spelling wins
+    rec.add += add; rec.del += del;
+  };
+  for (const s of t.steps || []) {
+    if (s.t !== 'tool' || !EDIT_TOOLS[s.tool.name]) continue;
+    let input = null;
+    try { input = JSON.parse(s.tool.v); } catch { continue; }
+    if (!input || typeof input !== 'object') continue;
+    const p = input.file_path || input.path || input.notebook_path;
+    if (typeof p !== 'string' || !p) continue;
+    if (Array.isArray(input.edits)) {
+      for (const e of input.edits) bump(p, lineCount(e && e.new_string), lineCount(e && e.old_string));
+    } else if (typeof input.content === 'string') {
+      bump(p, lineCount(input.content), 0);
+    } else {
+      bump(p, lineCount(input.new_string), lineCount(input.old_string));
+    }
+  }
+  return [...byKey.values()];
+}
+
 function renderTurn(t) {
   if (t.role === 'sys') {
     const d = document.createElement('div');
@@ -410,9 +445,52 @@ function renderTurn(t) {
     if (concl) b.innerHTML = miniMd(concl);
     if (live) appendCaret(b);
     wrap.appendChild(b);
-    // v40: meta row under the card - time extracted out of it + copy + branch
-    // (branch only for finished turns: forking mid-stream makes no sense)
+    // v45 (6C+6B): changed-files rollup under the conclusion - one collapsed
+    // summary row, expanded body lists per-file ± lines; row tap opens the
+    // artifact preview. Capped at MAXF rows instead of markCapped: the capped
+    // regime is reserved for .think/.tool-chip/.tool-out (gesture dead-zone
+    // laws), a flat truncation row never grows a scroller.
     if (!live && concl) {
+      const files = fileChanges(t);
+      if (files.length) {
+        const MAXF = 12;
+        let adds = 0, dels = 0;
+        for (const f of files) { adds += f.add; dels += f.del; }
+        const det = document.createElement('details');
+        det.className = 'fsum';
+        const sum = document.createElement('summary');
+        const lb = document.createElement('span');
+        lb.textContent = '改动 ' + files.length + ' 个文件';
+        const st = document.createElement('span');
+        st.className = 'fd';
+        const si = document.createElement('i'); si.className = 'ins'; si.textContent = '+' + adds;
+        const sd = document.createElement('i'); sd.className = 'dele'; sd.textContent = '−' + dels;
+        st.append(si, sd);
+        const ch = document.createElement('span'); ch.className = 'chev'; ch.textContent = '▾';
+        sum.append(lb, st, ch);
+        det.appendChild(sum);
+        for (const f of files.slice(0, MAXF)) {
+          const row = document.createElement('div');
+          row.className = 'frow';
+          const nm = document.createElement('span'); nm.className = 'fname mono'; nm.textContent = f.path;
+          const fd = document.createElement('span'); fd.className = 'fd';
+          const fi = document.createElement('i'); fi.className = 'ins'; fi.textContent = '+' + f.add;
+          const fe = document.createElement('i'); fe.className = 'dele'; fe.textContent = '−' + f.del;
+          fd.append(fi, fe);
+          row.append(nm, fd);
+          row.onclick = () => previewArtifact(f.path);
+          det.appendChild(row);
+        }
+        if (files.length > MAXF) {
+          const more = document.createElement('div');
+          more.className = 'fmore';
+          more.textContent = '… 还有 ' + (files.length - MAXF) + ' 个文件';
+          det.appendChild(more);
+        }
+        wrap.appendChild(det);
+      }
+      // v40: meta row under the card - time extracted out of it + copy + branch
+      // (branch only for finished turns: forking mid-stream makes no sense)
       const meta = document.createElement('div');
       meta.className = 'bmeta final-meta';
       if (t.ts) addTs(meta, t.ts);
@@ -600,4 +678,4 @@ window.addEventListener('resize', updateJumpFab);
 
 export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderAllTurns, renderTurn, renderTail, updateJumpFab, scrollBottom,
-  pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns };
+  pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns, fileChanges };

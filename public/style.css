@@ -469,3 +469,18 @@ button { font-family: inherit; }
 .hist-more { position: fixed; top: calc(env(safe-area-inset-top) + 56px); left: 50%; transform: translateX(-50%); z-index: 8; border: 0; border-radius: 999px; background: var(--raise); color: var(--dim); font: 600 12px/1 var(--sans); padding: 10px 16px; box-shadow: var(--sh-2); cursor: pointer; }
 .hist-more:active { color: var(--fg); transform: translateX(-50%) scale(.96); }
 .hist-more.busy { color: var(--faint); pointer-events: none; }
+
+/* ---------- v45：总结卡内改动文件汇总（6C 折叠行，展开=6B 每文件明细） ---------- */
+.fsum { margin: 10px 0 0; background: var(--panel); border-radius: 12px; padding: 0 12px; box-shadow: var(--sh-1); }
+.fsum summary { list-style: none; cursor: pointer; min-height: 42px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--dim); user-select: none; -webkit-user-select: none; }
+.fsum summary::-webkit-details-marker { display: none; }
+.fsum summary .chev { margin-left: auto; color: var(--faint); font-size: 10px; transition: transform .18s; }
+.fsum[open] summary .chev { transform: rotate(180deg); }
+.fsum .fd { display: inline-flex; gap: 6px; font: 11.5px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.fsum .ins { color: var(--ok); font-style: normal; }
+.fsum .dele { color: var(--err); font-style: normal; }
+.fsum .frow { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 38px; border-top: 1px solid var(--line); cursor: pointer; }
+.fsum .frow:active { background: rgba(255, 250, 240, .03); }
+.fsum .frow .fd { font-size: 11px; flex: none; }
+.fsum .fname { font-size: 11.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fsum .fmore { border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; padding: 7px 0 8px; }

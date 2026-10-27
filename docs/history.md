@@ -228,3 +228,11 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - parseOlderTurns 刻意不复用 applyEventToTurns：活流路径带乐观折叠和 expectQueuedUser/userCollapsedLive 旗标写入，历史重放碰旗标会污染活流状态；两路共用抽出的 newBotTurn/addAssistantPart/pairToolResults/sysMarkerTurn 纯构造器。
 - 白名单放 wshub 内存 Map、不落盘：会话级信任应随 bridge 生命周期过期，落盘会退化成永久放行。
 - 导出走 blob + a[download]，Content-Disposition 只作 hint：PWA webview 对 attachment 头处理不可靠。
+
+## v45（2026-10-27）总结卡内改动文件汇总
+
+- 用户拍板 P1-6R：默认 6C（一行折叠「改动 N 个文件 +a −d ▾」），展开即 6B（每文件 ± 行数明细，行点击=产物预览）；评审页 design-drafts.html 随拍板删除（未入库）。
+- 纯前端聚合（fileChanges 纯函数，turns.test.mjs 有单测）：转录 tool_use 输入已含 file_path/old/new，不需要 bridge 按 run 聚合——少一个 API、少一份 run 边界状态机。
+- 路径身份按 lower() 合并（Windows 大小写不敏感），显示名取最后一次拼写；Write 全记增（旧内容行数从输入不可知）。
+- 展开体 >12 文件截断报「还有 N 个」——刻意不进 markCapped 体系：限高纪律只认 .think/.tool-chip/.tool-out，新元素硬挂 overflow:max-height 会造手势死区，平铺截断行永不长出滚动器。
+- timeline fixture 追加 Edit 第二轮，e2e 断言 fsum 汇总行与文件名（badges 串相应扩为五节）。
