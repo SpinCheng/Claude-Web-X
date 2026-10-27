@@ -211,3 +211,11 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 修复：`_applyLine` 增加 `live` 形参（`_drain` 传 `emitAppends`，backfill/readTranscript 为 false）。**钉只能被活流新到的行解除**（桌面端真改名必然发生在钉建立之后）；历史行里的未知值一律视为过期——不但不解钉，还强制 `patch.title = pin.title`（历史无权重过钉）。测试：test/unit/adapter.test.mjs（4 例：历史不解钉+不夺标题 / 历史过期值吞掉 / 活流真改名解钉 / 活流过期值吞掉）。
 - 恢复现场：写入 pin + 追加一条 main-chat custom-title 行（Title 用户的最后一次改名意图），重启后 fence 重建标题。
 - 教训：**凡是"持久化状态 + 全量重放"的设计，重放路径必须与活流路径在状态变更权限上有所区分**——判定函数（fenceTitle 纯函数）没错，错在调用侧没把"这行是新到的还是重放的"传进去。
+
+## 2026-10-27 · v41c 僵尸分组：探针边车泄漏 + cwd 收割面太窄
+
+用户报列表出现"D--dev-workspaces-claude-remote"分组（无路径、无 ➕）。取证链：live API 找到无 cwd 记录 38f95cbf（7 行、标题 (loading)）→ 转录内容全是 `mode`/`permission-mode`/`system local_command`(isSidechain)/`cost-state`——**没有任何对话行**。定性：ctxprobe 在 `-p` 模式跑 `/context` 的边车转录；归档代码原在**成功路径内**（parseContextReport 通过后才 archiveSession），探针失败（超时/中转抖动）→ reject 跳过归档 → 边车永久泄漏。为什么显示成 slug：解析器只在 user 行取 `obj.cwd`，纯边车没有 user 行 → 记录无 cwd → 分组键退回 `s.project`（工作区 slug）。双修：① archiveSession 挪到解析判定之前（sessionId 在行扫描阶段已拿到，成败都归档）；② parser 的 cwd 收割上提到 applyLine 开头——**任意行类型带 cwd 都入账**（system/local_command 本来就带）。测试：parsers 增"边车形状"单测（无 user 行也能收割 cwd）。顺带清了两只僵尸（38f95cbf 边车 + dd864ceb 前天的权限测试会话，均走 DELETE API 进 trash）。教训：**"用完即删"的资源，清理必须挂在成败都会经过的路径上**；分组/显示的兜底路径（slug fallback）会让"数据缺失"伪装成"新分组"，排查时先看记录字段而不是猜前端。
+
+## 2026-10-27 · v41/v42/v43 组头 ➕、输入区微调、列表搜索+批量管理
+
+三批 UI 迭代。**v41**：项目组头右侧 ➕（span role=button——组头是真 `<button>`，嵌套 button 会被 fragment 解析器拆掉；stopPropagation 防误触折叠；Enter/Space 键盘可达）→ `openNewModal(presetCwd)` 预选项目目录（onclick= 直接赋值会传入 event 对象——新参数必须做 `typeof !== 'string'` 守卫）。**v42**：模型 chip 色阶 `--faint`→`--dim`（与附件图标一致）；队列插队 ▶ 13→18px（CSS 覆盖 svg 属性）。**v43**：列表搜索（`visibleSessions()` 本地过滤：标题/cwd/slug/id，命中平铺+最新序，无命中空态；输入行与批量共用同一过滤函数——先搜索缩小范围再全选）+ 批量管理（header 管理钮 → `state.batchMode/batchSel` → 行首圆圈勾选、点行=切换（不开会话、不渲染 ⋯）、底部栏 全选/清空 + 计数 + 删除 + 完成；删除逐个走 DELETE API，409 busy 跳过并 toast 报数）。e2e list 场景累计新增 14 条断言。全部纯前端 + pairing BUILD bump；组头 ➕ 与批量删除均无需后端改动（复用既有接口）。
