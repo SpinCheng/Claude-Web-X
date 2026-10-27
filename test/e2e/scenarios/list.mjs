@@ -36,4 +36,27 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!document.querySelector(".pgroup").classList.contains("closed")'), 'group stays expanded after + click');
   await page.ev('document.getElementById("new-cancel").click()');
   assert(await page.waitFor(`document.getElementById("new-modal").classList.contains("hidden")`), 'modal closes again');
+
+  // v43: search - query matches every fixture path (T:\e2e), results are flat
+  const setSearch = (v) => page.ev(`(function(){var i=document.getElementById("list-search");i.value="${v}";i.dispatchEvent(new Event("input"))})()`);
+  await setSearch('E2E');
+  assert(await page.waitFor('document.querySelectorAll("#groups .srow").length >= 14'), 'search by path keeps all rows');
+  assert(await page.waitFor('document.querySelectorAll(".pgroup-head").length === 0'), 'search results render flat');
+  await setSearch('zzz-no-match');
+  assert(await page.waitFor('(function(){var t=document.querySelector("#groups .le-t");return !!t && t.textContent.indexOf("没有匹配") === 0})()'), 'no-match hint shows');
+  await setSearch('');
+  assert(await page.waitFor('document.querySelectorAll(".pgroup-head").length > 0'), 'clearing search restores groups');
+
+  // v43: batch select + delete (harness auto-answers the confirm)
+  await page.ev('document.getElementById("list-manage").click()');
+  assert(await page.waitFor('!document.getElementById("batch-bar").classList.contains("hidden")'), 'batch bar shows');
+  await page.ev('document.querySelectorAll("#groups .srow")[0].click()');
+  await page.ev('document.querySelectorAll("#groups .srow")[1].click()');
+  assert(await page.waitFor('document.getElementById("b-count").textContent.indexOf("2") >= 0'), 'count shows 2');
+  assert(await page.waitFor('document.querySelectorAll("#groups .srow.sel").length === 2'), 'selected rows highlighted');
+  await page.ev('document.getElementById("b-del").click()');
+  assert(await page.waitFor('(function(){var n=document.querySelectorAll("#groups .srow").length;return n===12})()'), 'two rows deleted');
+  assert(await page.waitFor('document.getElementById("b-count").textContent.indexOf("0") >= 0'), 'selection cleared after delete');
+  await page.ev('document.getElementById("b-done").click()');
+  assert(await page.waitFor('document.getElementById("batch-bar").classList.contains("hidden")'), 'done exits batch mode');
 });

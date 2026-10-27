@@ -32,6 +32,9 @@ export const state = {
   attach: [],        // pending attachments for the open session (uploaded)
   waits: {},         // sessionId -> {kind,tool,msg,at} PC stuck on a prompt (v21)
   armedBranch: null,      // v40: session id whose NEXT message forks a new thread
+  listQuery: '',          // v43: list-page search box content
+  batchMode: false,       // v43: list-page multi-select mode
+  batchSel: new Set(),    // v43: session ids ticked in batch mode
   pendingBranch: false,   // a fork send is in flight; adopt its real session id
   pendingBranchRun: null, // that fork's runId (known once the 202 lands)
 };

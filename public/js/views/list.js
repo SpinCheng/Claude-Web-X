@@ -1,12 +1,16 @@
-// js/views/list.js - the session list page: project groups, state lamps,
-// per-group tallies and collapse persistence (cr_closed_groups).
-// Opening a row routes into the detail view (detail.js owns that transition).
-
+// js/views/list.js - the session list page: search (v43), project groups,
+// state lamps, per-group tallies, collapse persistence (cr_closed_groups) and
+// batch select+delete (v43). Opening a row routes into the detail view
+// (detail.js owns that transition).
 import { $, shortPath, relTime } from '../util.js';
 import { state, CLOSED_KEY } from '../state.js';
+import { api } from '../api.js';
+import { toast } from './toast.js';
 import { openDetail } from './detail.js';
 import { openNewModal } from './composer.js';
 import { wireRowOps } from './sessops.js';
+
+const CK_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.5l5 5 10-11"/></svg>';
 
 function sessState(s) {
   if (s.running || state.runs[s.id]?.state === 'running') return 'running';
@@ -25,17 +29,39 @@ function projectLabel(s) {
 }
 function groupKey(s) { return s.cwd || s.project || '?'; }
 
+// sessions matching the search box (title / cwd / project slug / id prefix)
+function visibleSessions() {
+  const q = (state.listQuery || '').trim().toLowerCase();
+  const cc = state.sessions.filter((s) => s.kind === 'cc');
+  if (!q) return cc;
+  return cc.filter((s) =>
+    (s.title || '').toLowerCase().includes(q) ||
+    (s.cwd || '').toLowerCase().includes(q) ||
+    (s.project || '').toLowerCase().includes(q) ||
+    s.id.toLowerCase().includes(q));
+}
+
 function renderList() {
   const box = $('groups');
   box.innerHTML = '';
-  const cc = state.sessions.filter((s) => s.kind === 'cc');
+  const cc = visibleSessions();
   if (cc.length === 0) {
+    const searching = (state.listQuery || '').trim();
     box.innerHTML = '<div class="empty list-empty">' +
       '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8.5v7M8.5 12h7"/></svg>' +
-      '<div class="le-t">还没有 Claude Code 会话</div>' +
-      '<div class="le-s">从手机发起一个任务，让它跑在你电脑的工程里</div>' +
-      '<button class="le-btn" type="button">发起任务</button></div>';
-    box.querySelector('.le-btn').onclick = openNewModal;
+      (searching
+        ? '<div class="le-t">没有匹配的会话</div><div class="le-s">换个关键词试试</div>'
+        : '<div class="le-t">还没有 Claude Code 会话</div><div class="le-s">从手机发起一个任务，让它跑在你电脑的工程里</div><button class="le-btn" type="button">发起任务</button>') +
+      '</div>';
+    const btn = box.querySelector('.le-btn');
+    if (btn) btn.onclick = openNewModal;
+    return;
+  }
+  if ((state.listQuery || '').trim()) {
+    // search: flat result list, newest first - group chrome just gets in the way
+    const flat = document.createElement('div');
+    for (const s of [...cc].sort((a, b) => b.lastActive - a.lastActive)) flat.appendChild(renderRow(s));
+    box.appendChild(flat);
     return;
   }
   const groups = new Map();
@@ -119,7 +145,7 @@ function renderRow(s) {
   // never color alone) and the trailing ⋯ (v35 session ops)
   const el = document.createElement('button');
   el.type = 'button';
-  el.className = 'srow';
+  el.className = 'srow' + (state.batchSel.has(s.id) ? ' sel' : '');
   el.innerHTML =
     '<span class="lamp" data-st="' + st + '"></span>' +
     '<span class="srow-main">' +
@@ -131,6 +157,23 @@ function renderRow(s) {
   const info = [relTime(s.lastActive), (s.lines || 0) + ' 行'];
   if (s.cost && s.cost.usd != null) info.push('$' + Number(s.cost.usd).toFixed(2));
   el.querySelector('.srow-info').textContent = info.join(' · ');
+
+  // v43 batch mode: row = selection toggle, no open / no ⋯ bubble
+  if (state.batchMode) {
+    const ck = document.createElement('span');
+    ck.className = 'ck' + (state.batchSel.has(s.id) ? ' on' : '');
+    ck.innerHTML = CK_SVG;
+    el.insertBefore(ck, el.firstChild);
+    el.title = '点击选择';
+    el.onclick = () => {
+      if (state.batchSel.has(s.id)) state.batchSel.delete(s.id);
+      else state.batchSel.add(s.id);
+      renderList();
+      updateBatchBar();
+    };
+    return el;
+  }
+
   el.title = '点击打开 · 右键更多操作';
   el.onclick = () => openDetail(s.id);
   // trailing ⋯: the touch path to the action bubble. A span with role=button,
@@ -146,5 +189,62 @@ function renderRow(s) {
   wireRowOps(el, s.id); // ⋯ click / right-click -> action bubble (sessops.js)
   return el;
 }
+
+/* ---------------- v43 batch management ---------------- */
+function updateBatchBar() {
+  const vis = visibleSessions();
+  const all = vis.length > 0 && vis.every((s) => state.batchSel.has(s.id));
+  $('b-selall').textContent = all ? '清空' : '全选';
+  $('b-count').textContent = '已选 ' + state.batchSel.size;
+  $('b-del').disabled = state.batchSel.size === 0;
+}
+
+function setBatch(on) {
+  state.batchMode = on;
+  if (!on) state.batchSel.clear();
+  $('list-manage').classList.toggle('active', on);
+  $('batch-bar').classList.toggle('hidden', !on);
+  document.getElementById('list').classList.toggle('batching', on);
+  renderList();
+  if (on) updateBatchBar();
+}
+
+async function batchDelete() {
+  const ids = [...state.batchSel];
+  if (!ids.length) return;
+  if (!window.confirm('删除选中的 ' + ids.length + ' 个会话？（可从回收站找回）')) return;
+  let ok = 0, busy = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const r = await api('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (r.status === 409) busy++;       // running: skipped, not lost
+      else if (r.ok) ok++;
+      else fail++;
+    } catch { fail++; }
+    state.batchSel.delete(id);
+  }
+  toast('已删除 ' + ok + ' 个' + (busy ? '，' + busy + ' 个运行中已跳过' : '') + (fail ? '，' + fail + ' 个失败' : ''));
+  renderList();
+  updateBatchBar();
+}
+
+/* ---------------- wiring ---------------- */
+$('list-search').addEventListener('input', function () {
+  state.listQuery = this.value;
+  renderList();
+});
+$('list-manage').onclick = () => setBatch(!state.batchMode);
+$('b-done').onclick = () => setBatch(false);
+$('b-del').onclick = batchDelete;
+$('b-selall').onclick = () => {
+  const vis = visibleSessions();
+  const all = vis.length > 0 && vis.every((s) => state.batchSel.has(s.id));
+  for (const s of vis) {
+    if (all) state.batchSel.delete(s.id);
+    else state.batchSel.add(s.id);
+  }
+  renderList();
+  updateBatchBar();
+};
 
 export { renderList };

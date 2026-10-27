@@ -102,6 +102,24 @@ button { font-family: inherit; }
 .pgroup-new { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin: 0 -6px 0 -2px; border-radius: 50%; color: var(--faint); cursor: pointer; transition: background .12s, color .12s; touch-action: manipulation; }
 .pgroup-new:active { background: var(--panel2); color: var(--dim); }
 .pgroup-new:focus-visible { outline: 2px solid rgba(217, 119, 87, .55); outline-offset: -2px; }
+
+/* ---------- v43 列表搜索 + 批量管理 ---------- */
+.search-row { display: flex; align-items: center; gap: 7px; margin: 4px 12px 2px; padding: 8px 12px; background: var(--panel); border-radius: 12px; color: var(--faint); box-shadow: var(--sh-1); }
+.search-row input { flex: 1; min-width: 0; border: 0; background: none; color: var(--fg); font: 13.5px/1.3 var(--sans); outline: none; }
+.search-row input::placeholder { color: var(--faint); }
+.search-row input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.icon-btn.active { color: var(--acc); }
+.srow .ck { flex: none; width: 21px; height: 21px; margin-right: 1px; border-radius: 50%; border: 1.5px solid var(--line); color: #fff; display: inline-flex; align-items: center; justify-content: center; transition: background .12s, border-color .12s; }
+.srow .ck.on { background: var(--acc); border-color: var(--acc); }
+.srow.sel { background: var(--panel2); }
+.batch-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; display: flex; align-items: center; gap: 10px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--panel); box-shadow: 0 -6px 22px rgba(0, 0, 0, .28); }
+#list.batching .groups { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+.bb-btn { flex: none; border: 0; background: var(--panel2); color: var(--fg); font: 600 13px/1 var(--sans); padding: 10px 14px; border-radius: 999px; cursor: pointer; }
+.bb-btn:active { background: var(--raise); }
+.bb-btn:disabled { opacity: .4; }
+.bb-btn.danger { background: none; color: var(--err); }
+.bb-btn.danger:active { background: var(--panel2); }
+.bb-count { flex: 1; font-family: var(--mono); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .tally { display: flex; gap: 7px; flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .tally .t { color: var(--faint); display: inline-flex; align-items: center; gap: 4px; }
 .tally .t .lamp { width: 5px; height: 5px; }
