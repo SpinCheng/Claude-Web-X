@@ -83,6 +83,10 @@ function renderGroup(g) {
       (counts.stopped ? '<span class="t hold"><span class="lamp" data-st="stopped"></span>' + counts.stopped + '</span>' : '') +
       '<span class="t">' + g.sessions.length + '</span>' +
     '</span>' +
+    // v41: new-session shortcut for this project (span role=button, NOT a
+    // nested <button> - the fragment parser hoists those out of the head)
+    (g.path ? '<span class="pgroup-new" role="button" tabindex="0" aria-label="在此项目新建会话">' +
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
     '<svg class="chev" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>';
   head.querySelector('.pgroup-name').textContent = g.label;
   if (g.path) head.querySelector('.pgroup-path').textContent = g.path;
@@ -93,6 +97,13 @@ function renderGroup(g) {
     wrap.classList.toggle('closed');
     head.setAttribute('aria-expanded', wrap.classList.contains('closed') ? 'false' : 'true');
   };
+  // the + must not toggle collapse: swallow the event before it reaches head
+  const nw = head.querySelector('.pgroup-new');
+  if (nw) {
+    const open = (e) => { e.preventDefault(); e.stopPropagation(); openNewModal(g.path); };
+    nw.onclick = open;
+    nw.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); };
+  }
 
   const body = document.createElement('div');
   body.className = 'pgroup-body';

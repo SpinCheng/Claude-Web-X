@@ -420,7 +420,10 @@ function stopRun() {
 }
 
 /* ---------------- new session ---------------- */
-function openNewModal() {
+// presetCwd: preselect the project dir (list-page group-head + button).
+// Existing onclick= wiring passes the event object here, so non-strings reset.
+function openNewModal(presetCwd) {
+  if (typeof presetCwd !== 'string') presetCwd = '';
   const sel = $('new-cwd');
   sel.innerHTML = '';
   const seen = new Set();
@@ -439,6 +442,16 @@ function openNewModal() {
       o.textContent = shortPath(c) + '  —  ' + c;
       sel.appendChild(o);
     }
+  }
+  if (presetCwd) {
+    // target dir not among known cwds -> add it so the select can show it
+    if (![...sel.options].some((o) => o.value === presetCwd)) {
+      const o = document.createElement('option');
+      o.value = presetCwd;
+      o.textContent = shortPath(presetCwd) + '  —  ' + presetCwd;
+      sel.insertBefore(o, sel.firstChild);
+    }
+    sel.value = presetCwd;
   }
   $('new-cwd-custom').value = '';
   $('new-text').value = '';

@@ -25,4 +25,15 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor(`!document.getElementById("new-modal").classList.contains("hidden")`), 'new modal opens on list');
   await page.ev('document.getElementById("new-cancel").click()');
   assert(await page.waitFor(`document.getElementById("new-modal").classList.contains("hidden")`), 'new modal closes');
+
+  // v41: group-head + opens the modal preset to THIS project's cwd, and must
+  // not toggle the group collapse (stopPropagation)
+  assert(await page.waitFor('!!document.querySelector(".pgroup-head .pgroup-new")'), 'new-session icon on group head');
+  await page.ev('document.querySelector(".pgroup-head .pgroup-new").click()');
+  assert(await page.waitFor(`!document.getElementById("new-modal").classList.contains("hidden")`), 'group-head + opens modal');
+  assert(await page.waitFor('(function(){var s=document.querySelector(".pgroup-head .pgroup-path");' +
+    'return s && document.getElementById("new-cwd").value === s.textContent})()'), 'cwd preset to the group project');
+  assert(await page.waitFor('!document.querySelector(".pgroup").classList.contains("closed")'), 'group stays expanded after + click');
+  await page.ev('document.getElementById("new-cancel").click()');
+  assert(await page.waitFor(`document.getElementById("new-modal").classList.contains("hidden")`), 'modal closes again');
 });

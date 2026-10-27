@@ -98,6 +98,10 @@ button { font-family: inherit; }
 .pgroup-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .pgroup-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pgroup-path { font-family: var(--mono); font-size: 10px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* v41 group-head + (new session in this project): same muted idiom as srow-more */
+.pgroup-new { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin: 0 -6px 0 -2px; border-radius: 50%; color: var(--faint); cursor: pointer; transition: background .12s, color .12s; touch-action: manipulation; }
+.pgroup-new:active { background: var(--panel2); color: var(--dim); }
+.pgroup-new:focus-visible { outline: 2px solid rgba(217, 119, 87, .55); outline-offset: -2px; }
 .tally { display: flex; gap: 7px; flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .tally .t { color: var(--faint); display: inline-flex; align-items: center; gap: 4px; }
 .tally .t .lamp { width: 5px; height: 5px; }
