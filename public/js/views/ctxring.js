@@ -257,7 +257,7 @@ function renderModelChip() {
    (~48k in / 12.6k out / 892k cacheRead / 31k cacheWrite). */
 const COST_MULT_DEFAULT = 0.07;
 const COST_MODES = [
-  { v: 'off', label: '官方口径' },
+  { v: 'off', label: '官方价格' },
   { v: 'mult', label: '倍率' },
   { v: 'cust', label: '自定义单价' },
 ];
@@ -308,8 +308,8 @@ function renderCostSheet() {
   const usd = costDisplay(c);
   $('cost-usd').textContent = usd != null ? '$' + usd.toFixed(2) : '—';
   $('cost-cap').textContent = mode === 'mult' ? '官方 $' + (Number(c.usd) || 0).toFixed(2) + ' × ' + costMult() + ' · 本会话累计'
-    : mode === 'cust' ? '自定义单价 × token · 本会话累计' : '官方口径（CC 内置价表）· 本会话累计';
-  $('cost-mode-sub').textContent = mode === 'off' ? '官方口径'
+    : mode === 'cust' ? '自定义单价 × token · 本会话累计' : '官方价格（CC 内置价表）· 本会话累计';
+  $('cost-mode-sub').textContent = mode === 'off' ? '官方价格'
     : mode === 'mult' ? '官方 × ' + costMult() : '自定义单价';
   const grid = $('cost-grid');
   grid.textContent = '';
