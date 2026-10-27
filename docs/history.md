@@ -272,3 +272,10 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 实现：updateHistoryPill 每 scroll 事件按 f=clamp((64−scrollTop)/64) 直接写行高/opacity/margin/内字位移（setHistRow；.in 的 translateY(-9px) 滑落保留为 f 驱动）；**CSS transition 全删**——过渡会让行高滞后手指一个时长，1:1 跟随感即失效。RAMP 48→64（连续映射下可放宽，手感更顺）。
 - 无振荡论证升级：行在 #chat 外，行高只缩 #chat 盒高、永不改其 scrollTop——连续映射单调性由构造保证（原阈值法的论证是它的特例）。
 - 加载中钉满 38px（反馈不变）；排空即 0；.show 语义收窄为 f>0.1 时开 pointer-events。行左右 margin 12→14 对齐 v53 页面网格。paged e2e 加中段断言（scrollTop=32 → 计算高 1~37px 之间，证 1:1）。
+
+## v55（2026-10-28）权限钮两态区分 + 文案
+
+- 用户反馈：选「需要审批」后按钮的文本颜色和图标需要换；文案「需要时手机审批」→「需要时审批」。
+- 根因：auto=珊瑚 #E8926F、ask=琥珀 #D9A262——色相明度近似（肉眼难分），且两态共用同一枚盾牌图标，区分全靠「自动/审批」两个字的差异。
+- v55 双通道区分：auto 回落 .cbtn 基础中性色（与附件/圆环/模型钮统一；珊瑚纪律只留活态）+ 盾牌；ask=琥珀 + **问号圆圈图标**（svg.q/shield 按 data-v 显隐切换）。色觉障碍下图标仍可分。
+- 文案 4 处统一（toggle title、perm-sheet 选项、new-modal seg）。

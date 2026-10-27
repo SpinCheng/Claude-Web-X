@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=54">
+  <link rel="stylesheet" href="/style.css?v=55">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
-        <span id="build" class="build-badge">v54</span>
+        <span id="build" class="build-badge">v55</span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -126,7 +126,8 @@
           </button>
           <span class="tdot"></span>
           <button id="perm" class="cbtn mode" title="权限模式：点击选择">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>
+            <svg class="shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>
+            <svg class="q" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <span id="perm-label">自动</span>
           </button>
           <span class="tdot"></span>
@@ -253,7 +254,7 @@
       <p class="sheet-note">权限模式</p>
       <div class="seg" id="new-perm">
         <button class="seg-btn active" data-v="auto">自动执行</button>
-        <button class="seg-btn" data-v="ask">需要时手机审批</button>
+        <button class="seg-btn" data-v="ask">需要时审批</button>
       </div>
       <div class="sheet-actions">
         <button id="new-cancel" class="btn ghost">取消</button>
@@ -276,6 +277,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=54"></script>
+  <script type="module" src="/app.js?v=55"></script>
 </body>
 </html>

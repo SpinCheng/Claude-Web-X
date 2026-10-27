@@ -22,7 +22,7 @@ function setPerm(v) {
   const label = $('perm-label');
   if (label) label.textContent = v === 'ask' ? '审批' : '自动';
   const btn = $('perm');
-  if (btn) { btn.dataset.v = v; btn.title = v === 'ask' ? '需要时手机审批（点击切换）' : '自动执行（点击切换）'; }
+  if (btn) { btn.dataset.v = v; btn.title = v === 'ask' ? '需要时审批（点击切换）' : '自动执行（点击切换）'; }
 }
 /* permission picker (bubble instead of direct toggle) */
 function openPermSheet() {
@@ -30,7 +30,7 @@ function openPermSheet() {
   box.innerHTML = '';
   const opts = [
     { v: 'auto', label: '自动执行', sub: 'YOLO · 工具免审批' },
-    { v: 'ask', label: '需要时手机审批', sub: '弹卡确认后继续' },
+    { v: 'ask', label: '需要时审批', sub: '弹卡确认后继续' },
   ];
   for (const o of opts) {
     const el = document.createElement('button');

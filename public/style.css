@@ -343,8 +343,11 @@ button { font-family: inherit; }
 .tdot { width: 2px; height: 2px; border-radius: 50%; background: var(--line); margin: 0 4px; flex: none; }
 .cbtn { height: 34px; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--dim); background: none; border: 0; padding: 0 8px; border-radius: 9px; cursor: pointer; flex: none; max-width: 34%; transition: background .12s; }
 .cbtn:active { background: var(--panel2); }
-.cbtn.mode { color: var(--acc-strong); font-weight: 600; }
+.cbtn.mode { font-weight: 600; } /* auto falls back to the neutral .cbtn color; coral stays reserved for live/active */
+.cbtn.mode svg.q { display: none; }
 .cbtn.mode[data-v="ask"] { color: var(--warn); }
+.cbtn.mode[data-v="ask"] svg.shield { display: none; }
+.cbtn.mode[data-v="ask"] svg.q { display: inline; }
 .cbtn.model { color: var(--dim); font-size: 11.5px; }
 /* v36: the model chip is the ONLY shrinkable toolbar element (flex 0 1) so a
    long model label ellipsifies instead of pushing the send button off-screen;
