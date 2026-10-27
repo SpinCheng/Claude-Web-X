@@ -105,20 +105,9 @@ export function register(router, ctx) {
     const title = String(jsonIn.title || '').trim().slice(0, 120);
     if (!title) { json(res, 400, { error: 'title required' }); return; }
     try {
-      // if the last line lacks its newline (crash mid-write), our line would
-      // CONCATENATE onto it and corrupt both - repair the boundary first
-      let pre = '';
-      try {
-        const st2 = fs.statSync(rec.transcriptPath);
-        if (st2.size > 0) {
-          const fd = fs.openSync(rec.transcriptPath, 'r');
-          try {
-            const buf = Buffer.alloc(1);
-            if (fs.readSync(fd, buf, 0, 1, st2.size - 1) === 1 && buf[0] !== 0x0A) pre = '\n';
-          } finally { fs.closeSync(fd); }
-        }
-      } catch { /* unreadable tail -> append as-is */ }
-      fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({ type: 'custom-title', customTitle: title }) + '\n');
+      // adapter.appendTitle repairs the newline boundary (crash-truncated
+      // tail) before appending the native custom-title line
+      if (!adapter.appendTitle(r.params.id, title)) { json(res, 500, { error: 'fs: append failed' }); return; }
     } catch (e) {
       json(res, 500, { error: 'fs: ' + (e && e.code || e) });
       return;

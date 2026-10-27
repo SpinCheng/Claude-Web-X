@@ -105,7 +105,7 @@ export class Runner extends EventEmitter {
     // queueing: a queued fork would fork once per queue drain.
     if (opts.forkFrom) {
       if (this.activeRunFor(sessionId)) return { error: 'busy', sessionId };
-      return this._spawnRun(['--resume', opts.forkFrom, '--fork-session'], text, cwd, null, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || []);
+      return this._spawnRun(['--resume', opts.forkFrom, '--fork-session'], text, cwd, null, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || [], opts.forkFrom);
     }
     const r = this._spawnRun(['--resume', sessionId], text, cwd, sessionId, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || []);
     if (r.error === 'busy') {
@@ -217,7 +217,7 @@ export class Runner extends EventEmitter {
     return this.outcomes.get(sessionId);
   }
 
-  _spawnRun(resumeArgs, text, cwd, sessionId, perm, model, effort, attachments = []) {
+  _spawnRun(resumeArgs, text, cwd, sessionId, perm, model, effort, attachments = [], forkFrom = '') {
     if (sessionId && this.activeRunFor(sessionId)) return { error: 'busy', sessionId };
     let live = 0;
     for (const r of this.runs.values()) if (r.state === 'running') live++;
@@ -287,7 +287,7 @@ export class Runner extends EventEmitter {
     if (stdinMsg) child.stdin.write(stdinMsg); // keep stdin open: closing right away stalls the CLI
     const run = {
       runId, sessionId, child, state: 'running', startedAt: Date.now(),
-      exitCode: null, stderrTail: '', cancelled: false,
+      exitCode: null, stderrTail: '', cancelled: false, forkFrom,
     };
     this.runs.set(runId, run);
 
@@ -346,6 +346,7 @@ export class Runner extends EventEmitter {
       error: run.error,
       cancelled: run.cancelled,
       startedAt: run.startedAt,
+      forkFrom: run.forkFrom || undefined,
       stderrTail: run.state === 'error' || (run.state === 'end' && run.exitCode !== 0)
         ? run.stderrTail : undefined,
     });

@@ -68,6 +68,9 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
 
   // ------- wire runner events (Phase 2) -------
   runner.on('update', (u) => {
+    // v40 fork naming: the moment the fork's real session id is adopted from
+    // the init line, brand the new transcript "Fork-<source title>"
+    if (u.forkFrom && u.sessionId && u.state === 'running') adapter.titleFork(u.forkFrom, u.sessionId);
     if (u.state === 'running' && u.sessionId) handoff.phoneRunStarted(u.sessionId);
     if (u.state === 'end' || u.state === 'error') {
       handoff.phoneRunEnded(u.sessionId);

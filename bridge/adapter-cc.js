@@ -29,6 +29,7 @@ export class CcAdapter extends EventEmitter {
     this.trashDir = trashDir || path.join(this.root, '..', 'claude-remote-trash');
     this.renamesPath = renamesPath || ''; // pins persist across boots (Desktop caches titles across boots too)
     this.renames = new Map(); // sessionId -> { title, prev } while a phone rename must be fenced
+    this.forkTitled = new Set(); // fork session ids already given their Fork- title
     try {
       if (this.renamesPath && fs.existsSync(this.renamesPath)) {
         this.renames = new Map(Object.entries(JSON.parse(fs.readFileSync(this.renamesPath, 'utf8'))));
@@ -195,6 +196,48 @@ export class CcAdapter extends EventEmitter {
   _saveRenames() {
     if (!this.renamesPath) return; // in-memory only (tests)
     try { fs.writeFileSync(this.renamesPath, JSON.stringify(Object.fromEntries(this.renames))); } catch { /* best effort */ }
+  }
+
+  // append a native custom-title line (newline boundary repaired first, so a
+  // crash-truncated tail can't concatenate). false = transcript not there (yet).
+  appendTitle(id, title) {
+    const rec = this.store.get(id);
+    if (!rec || !rec.transcriptPath) return false;
+    try {
+      let pre = '';
+      try {
+        const st2 = fs.statSync(rec.transcriptPath);
+        if (st2.size > 0) {
+          const fd = fs.openSync(rec.transcriptPath, 'r');
+          try {
+            const buf = Buffer.alloc(1);
+            if (fs.readSync(fd, buf, 0, 1, st2.size - 1) === 1 && buf[0] !== 0x0A) pre = '\n';
+          } finally { fs.closeSync(fd); }
+        }
+      } catch { /* unreadable tail -> append as-is */ }
+      fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({ type: 'custom-title', customTitle: title }) + '\n');
+      return true;
+    } catch { return false; }
+  }
+
+  // v40: name a freshly forked session "Fork-<source title>" - the fork's
+  // transcript may copy the source's custom-title line, so ours must be
+  // appended AFTER adoption (it is the last custom-title in file order and
+  // wins). The record may not exist yet when the init line lands; retry
+  // until the adapter discovers the file. Not pinned: Desktop has no cached
+  // title for a brand-new session id, so nothing can echo over it.
+  titleFork(forkFrom, newId) {
+    if (!newId || this.forkTitled.has(newId)) return;
+    this.forkTitled.add(newId);
+    const src = this.store.get(forkFrom) || {};
+    let base = src.title && src.title !== '(loading)' ? src.title : '';
+    if (!base && src.cwd) base = src.cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
+    this._appendTitleWithRetry(newId, 'Fork-' + String(base || '会话').replace(/^(Fork-)+/, ''), 0);
+  }
+  _appendTitleWithRetry(id, title, attempt) {
+    if (this.appendTitle(id, title)) return;
+    if (attempt >= 4) return; // transcript never appeared - give up quietly
+    setTimeout(() => this._appendTitleWithRetry(id, title, attempt + 1), 1200);
   }
 
   // Reversible delete: move the transcript into the trash dir (bridge data),
