@@ -4,6 +4,8 @@
 // append and SURVIVES a reload (replayed from the transcript), stop row
 // appears only for phone-driven runs, delete removes the row (window.confirm
 // auto-accepted by the harness CDP driver).
+import fs from 'node:fs';
+import path from 'node:path';
 import { withEnv, writeSession, fakeRun, assert } from '../harness.mjs';
 import { user, assistant, text, stop } from '../fixtures.mjs';
 
@@ -36,6 +38,22 @@ await withEnv(async (h, page) => {
   // persistence: reload and the title must come back from the transcript
   await page.navigate(`http://127.0.0.1:3799/?token=e2etok`);
   assert(await page.waitFor(`document.querySelector('.srow-title') && document.querySelector('.srow-title').textContent === 'ops 新名字'`), 'rename persisted across reload');
+
+  // v39 fence: Desktop flushes its CACHED (pre-rename) title back into the
+  // transcript (metadata bundle: last-prompt + custom-title with sessionId);
+  // the pinned rename must survive it. The '6 行' wait proves the drain
+  // actually processed the appended lines (non-vacuous assert): 3 fixture
+  // lines + 1 rename append + 2 flush lines.
+  fs.appendFileSync(path.join(h.tmp, 'projects', 'D--e2e', 'sid-ops.jsonl'),
+    JSON.stringify({ type: 'last-prompt' }) + '\n' +
+    JSON.stringify({ type: 'custom-title', customTitle: 'ops 测试', sessionId: 'sid-ops' }) + '\n');
+  assert(await page.waitFor(`(document.querySelector('.srow-info') || {}).textContent.includes('6 行')`, 8000), 'drain consumed the flush');
+  assert(await page.waitFor(`document.querySelector('.srow-title').textContent === 'ops 新名字'`), 'stale desktop title flush is fenced');
+
+  // a genuinely NEW title (a real desktop rename) disarms the pin and wins
+  fs.appendFileSync(path.join(h.tmp, 'projects', 'D--e2e', 'sid-ops.jsonl'),
+    JSON.stringify({ type: 'custom-title', customTitle: '桌面端新名', sessionId: 'sid-ops' }) + '\n');
+  assert(await page.waitFor(`document.querySelector('.srow-title').textContent === '桌面端新名'`, 8000), 'desktop rename disarms the pin');
 
   // stop row appears for a phone-driven running session (fake run frame)
   fakeRun(h, 'sid-ops', 'running', 'ops-run-1');

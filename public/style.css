@@ -88,7 +88,7 @@ button { font-family: inherit; }
 /* ---------- 会话列表：行卡片，浮起而非描边（v33 重排：状态右置/语义按钮/待确认计数） ---------- */
 .groups { padding: 14px 14px 28px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .pgroup { flex: none; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: var(--sh-1); }
-.pgroup-head { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 48px; padding: 12px 15px; border: 0; background: none; color: var(--fg); font: inherit; cursor: pointer; text-align: left; transition: background .12s; touch-action: manipulation; }
+.pgroup-head { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 48px; padding: 12px 15px 12px 9px; border: 0; background: none; color: var(--fg); font: inherit; cursor: pointer; text-align: left; transition: background .12s; touch-action: manipulation; }
 .pgroup-head:active { background: var(--panel2); }
 .pgroup-ico { flex: none; color: var(--faint); }
 .pgroup-ico[data-st="running"] { color: var(--warn); animation: breathe 1.6s ease-in-out infinite; }

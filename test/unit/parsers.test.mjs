@@ -2,7 +2,7 @@
 // judgment pitfalls documented in docs/history.md (v22/v24/v26/v28).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLine } from '../../bridge/parsers-cc.js';
+import { applyLine, fenceTitle } from '../../bridge/parsers-cc.js';
 
 const run = (lines, rec = {}) => { // rec defaults to a seeded (empty) record like _ensureSession creates
   const events = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
@@ -115,4 +115,22 @@ test('usage derivation also works with a pre-seeded record (second run)', () => 
   const asstUsage = { type: 'assistant', timestamp: 't', message: { role: 'assistant', model: 'm', content: [{ type: 'text', text: 'a' }], usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 1 } } };
   const { patch } = run([asstUsage], { usageFirst: 999, firstUserChars: 10 }); // rec snapshot
   assert.equal(patch.usageFirst, undefined); // already known: not re-derived
+});
+
+// v39: blank/malformed custom-title records must not blank the current title
+test('custom-title with a blank value is ignored', () => {
+  const { patch } = run([user({ message: { role: 'user', content: 'seed question here' } }), { type: 'custom-title' }, { type: 'custom-title', customTitle: '' }]);
+  assert.equal(patch.title, 'seed question here');
+});
+
+// v39: phone-rename write-fence classification (Desktop re-emits its cached
+// pre-rename title in metadata flushes and reverts phone renames)
+test('fenceTitle: stale prev is swallowed, real news disarms, matches pass', () => {
+  const pin = { title: '新名字', prev: '旧名字' };
+  assert.equal(fenceTitle(pin, '旧名字'), 'stale');
+  assert.equal(fenceTitle(pin, '桌面端起的名'), 'disarm');
+  assert.equal(fenceTitle(pin, '新名字'), null);   // desktop caught up: no action
+  assert.equal(fenceTitle(null, '旧名字'), null);  // no pin armed
+  assert.equal(fenceTitle(pin, undefined), null);  // not a title record
+  assert.equal(fenceTitle(pin, ''), null);         // malformed blank
 });

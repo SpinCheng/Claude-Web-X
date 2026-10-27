@@ -3,6 +3,22 @@
 // (compaction/skill), tool_result pairing, cost-state collapse, stop markers.
 // All the v22/v24/v28 judgment pitfalls live here, unit-tested in
 // test/unit/parsers.test.mjs - importable without any Tailer/Store.
+
+// Phone-rename write-fence (v39): the Desktop app re-emits its CACHED
+// (pre-rename) custom-title every time it flushes session metadata, instantly
+// reverting a phone rename (97 stale rewrites observed in one transcript).
+// The bridge pins {title, prev} at rename time; this classifier decides what
+// a custom-title line means while a pin is armed: 'stale' = exactly the pinned
+// prev value -> caller swallows it; 'disarm' = a genuinely new title (a real
+// desktop rename) -> desktop is authoritative, pin goes away; null = no fence
+// action (no pin / same-as-pinned title / malformed blank record).
+export function fenceTitle(pin, customTitle) {
+  if (!pin || typeof customTitle !== 'string') return null;
+  const t = customTitle.trim();
+  if (!t || t === pin.title) return null;
+  if (t === pin.prev) return 'stale';
+  return 'disarm';
+}
 // Applies one parsed transcript line: mutates `patch` (record fields,
 // est accounting) and pushes display events via the RETURN value (caller
 // pushes). `rec` is the current store record snapshot (read-only).
@@ -179,10 +195,13 @@ export function applyLine(id, obj, patch, events, rec) {
         if (parts.length === 0) return null;
         return { k: 'assistant', ts: obj.timestamp || '', parts };
       }
-      case 'custom-title':
-        patch.title = obj.customTitle || '';
+      case 'custom-title': {
+        const t = typeof obj.customTitle === 'string' ? obj.customTitle.trim() : '';
+        if (!t) return null; // malformed/blank record: keep the current title
+        patch.title = t;
         patch.titleFallback = false;
-        return { k: 'title', ts: '', title: patch.title };
+        return { k: 'title', ts: '', title: t };
+      }
       case 'cost-state': {
         // aggregate across ALL models (a session can switch models mid-way);
         // do NOT touch patch.model here - assistant lines own the display label

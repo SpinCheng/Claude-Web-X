@@ -190,3 +190,7 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## 2026-10-27 · v38 项目组头：文件夹图标 + 路径副行
 
 用户点名两处列表改进：组头前导状态灯改**文件夹图标**（态色沿用 lamp 调色板：running=warn/waiting=acc 且保呼吸动画、failed=err、stopped=warn 半透明——组态信息零丢失，tally 仍给精确计数；呼吸动画纳入 reduced-motion 列表）；标题下方加**完整 cwd 路径副行**（mono 10px faint，ellipsis，无 cwd 的组不渲染该行）。结构上 `.pgroup-name` 让出 `flex:1` 给新 `.pgroup-main` 两行容器（与 `.srow-main` 同构）。e2e list 场景补两条断言（图标存在 + 路径副行以 `D:` 开头、`e2e` 结尾——断言里不写反斜杠，规避老坑）。纯静态改动，无需重启 bridge。
+
+## 2026-10-27 · v39 改名防回冲（Desktop 标题缓存回写）+ 组头缩进
+
+用户报：手机重命名当时生效、过一会又被还原。实锤触发路径（本机转录直接取证）：Desktop 对打开中的项目缓存会话标题，每次元数据冲刷（last-prompt/agent-name/mode/atis-latch 成束追加）都把**缓存里的旧标题**重写进 JSONL——单个转录里同款旧值 custom-title 重写了 **97 次**；两次手机改名（L1943→L1945、L18515→L18516）都在 1-2 行之内被回冲。解析器文件序 last-writer-wins → 改名被旧值覆盖。修复 = **改名钉 write-fence**：rename 路由追加后调 `adapter.pinRename(id, title)` 记 {title, prev=改名前标题}（持久化 `bridge/data/renames.json`，Desktop 的缓存跨 bridge 重启存活，钉也必须跨）；`fenceTitle()`（parsers-cc 纯函数）：custom-title 值===prev → 判 stale 吞掉（patch.title/事件 title 都回写为钉值）；值是**新**标题 → 判 disarm（真·桌面端改名，桌面接管，钉解除）；值===钉值/无钉/空白 → 不动。顺带加固：custom-title 空白值不再清空当前标题（旧代码 `|| ''` 会清）。生命周期：会话删除时清钉；e2e sessops 验证全链路（flush 行数计数注意 rename 本身也追加一行——3 fixture+1 rename+2 flush=6 行，断言先写 5 行等空转）。组头缩进：padding-left 9px 使文件夹图标外凸 6px、标题文字仍与会话行标题 35px 精确对齐（嵌套暗示）。**后端改动，需重启 bridge 加载。**

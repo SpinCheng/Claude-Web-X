@@ -16,17 +16,24 @@ import path from 'node:path';
 import os from 'node:os';
 import { EventEmitter } from 'node:events';
 import { Tailer } from './tailer.js';
-import { applyLine } from './parsers-cc.js';
+import { applyLine, fenceTitle } from './parsers-cc.js';
 
 const ACTIVE_WINDOW_MS = 120_000;
 // terminal-ish system subtypes => idle + a last run outcome the PWA can show
 
 export class CcAdapter extends EventEmitter {
-  constructor(store, rootOverride, trashDir) {
+  constructor(store, rootOverride, trashDir, renamesPath) {
     super();
     this.store = store;
     this.root = rootOverride || path.join(os.homedir(), '.claude', 'projects');
     this.trashDir = trashDir || path.join(this.root, '..', 'claude-remote-trash');
+    this.renamesPath = renamesPath || ''; // pins persist across boots (Desktop caches titles across boots too)
+    this.renames = new Map(); // sessionId -> { title, prev } while a phone rename must be fenced
+    try {
+      if (this.renamesPath && fs.existsSync(this.renamesPath)) {
+        this.renames = new Map(Object.entries(JSON.parse(fs.readFileSync(this.renamesPath, 'utf8'))));
+      }
+    } catch { /* corrupt file -> start empty */ }
     this.tailers = new Map(); // transcriptPath -> { tailer, id }
     this.archived = new Set(); // transcriptPaths deleted via archiveSession (tombstones)
     this._pending = new Set();
@@ -160,7 +167,34 @@ export class CcAdapter extends EventEmitter {
   }
 
   _applyLine(id, obj, patch, events) {
-    return applyLine(id, obj, patch, events, this.store.get(id));
+    const ev = applyLine(id, obj, patch, events, this.store.get(id));
+    // write-fence (v39): Desktop re-emits its cached pre-rename title in
+    // metadata flushes; swallow exactly that stale value, disarm on real news
+    const pin = this.renames.get(id);
+    const act = fenceTitle(pin, obj.customTitle);
+    if (act === 'stale') {
+      patch.title = pin.title;
+      if (ev) ev.title = pin.title;
+    } else if (act === 'disarm') {
+      this.renames.delete(id);
+      this._saveRenames();
+    }
+    return ev;
+  }
+
+  // called by the rename route right after the transcript append: pin the new
+  // title + the value it replaces so Desktop's cached-title re-emits can't
+  // revert it. prev='' when the record had no usable title yet.
+  pinRename(id, title) {
+    const rec = this.store.get(id) || {};
+    const prev = rec.title && rec.title !== '(loading)' ? rec.title : '';
+    this.renames.set(id, { title, prev });
+    this._saveRenames();
+  }
+
+  _saveRenames() {
+    if (!this.renamesPath) return; // in-memory only (tests)
+    try { fs.writeFileSync(this.renamesPath, JSON.stringify(Object.fromEntries(this.renames))); } catch { /* best effort */ }
   }
 
   // Reversible delete: move the transcript into the trash dir (bridge data),
@@ -182,6 +216,7 @@ export class CcAdapter extends EventEmitter {
     this.archived.add(rec.transcriptPath);
     this.tailers.delete(rec.transcriptPath);
     this.store.drop(id);
+    if (this.renames.delete(id)) this._saveRenames();
     return { ok: true, trashedTo: dest };
   }
 

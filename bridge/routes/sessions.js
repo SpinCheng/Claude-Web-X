@@ -123,6 +123,9 @@ export function register(router, ctx) {
       json(res, 500, { error: 'fs: ' + (e && e.code || e) });
       return;
     }
+    // v39: pin the rename - Desktop flushes its cached pre-rename title back
+    // into the transcript and would revert us within seconds otherwise
+    adapter.pinRename(r.params.id, title);
     json(res, 200, { ok: true });
   });
 }
