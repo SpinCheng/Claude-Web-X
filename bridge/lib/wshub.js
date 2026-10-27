@@ -42,10 +42,25 @@ export function createHub({ cfg, store, runner }) {
   }
 
   // remote permission approvals (phone approval cards): the headless CLI's
+  // v44 session-level always-allow: the approval card's "本会话始终允许" tick
+  // records (sessionId, tool) here; later asks for the SAME tool in the SAME
+  // session resolve immediately without a phone card. Memory-only by design -
+  // a bridge restart re-arms the prompts (session-scoped trust, not global).
+  const sessionAllows = new Map();
+
+  function allowSessionTool(sessionId, tool) {
+    if (!sessionId || !tool) return;
+    let s = sessionAllows.get(sessionId);
+    if (!s) { s = new Set(); sessionAllows.set(sessionId, s); }
+    s.add(tool);
+  }
+
   // approve-mcp server POSTs /internal/approval; we hold that response open
   // until the phone answers (WS 'approval' frame -> POST /api/approvals/:id)
   // or deny after a timeout.
   function askApproval(runId, sessionId, tool, input) {
+    const allow = sessionAllows.get(sessionId);
+    if (allow && allow.has(tool)) return Promise.resolve({ behavior: 'allow', updatedInput: {}, auto: true });
     return new Promise((resolve) => {
       const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const rec = { runId, sessionId, tool, input, resolve, createdAt: Date.now() };
@@ -113,5 +128,5 @@ export function createHub({ cfg, store, runner }) {
   }
 
   return { broadcast, broadcastSessionsSoon, mergedSessions, waitings, approvals,
-    askApproval, finishApproval, denyAllForRun, waitSet, waitClear, attach, kickAll };
+    askApproval, finishApproval, denyAllForRun, allowSessionTool, waitSet, waitClear, attach, kickAll };
 }

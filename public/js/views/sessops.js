@@ -13,7 +13,7 @@
 
 import { $ } from '../util.js';
 import { state } from '../state.js';
-import { api } from '../api.js';
+import { auth, api } from '../api.js';
 import { toast } from './toast.js';
 import { openBubble, closeBubble } from './overlays.js';
 import { renderList } from './list.js';
@@ -22,6 +22,9 @@ const I = {
   stop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
   pencil: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
   trash: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
+  down: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  doc: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>',
+  back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
 };
 
 let renameId = '';
@@ -64,6 +67,7 @@ function openRowActions(id) {
   const running = (state.runs[id] || {}).state === 'running' || !!s.running;
   if (running) list.appendChild(actRow(I.stop, '停止运行', '中断这台手机发起的运行', 'warn', () => stopFromList(id)));
   list.appendChild(actRow(I.pencil, '重命名', '修改会话显示名', '', () => openRename(id)));
+  list.appendChild(actRow(I.down, '导出 Markdown', '下载完整记录或结论摘要', '', () => openExportScope(id)));
   list.appendChild(actRow(I.trash, '删除会话', '转录移入电脑回收站，可找回', 'danger', () => deleteFromList(id)));
   openBubble('row-actions');
 }
@@ -122,6 +126,43 @@ function saveRename() {
       if (s) { s.title = v; renderList(); }
     })
     .catch(() => { $('rename-err').textContent = '网络错误'; });
+}
+
+/* ---------------- export (v44) ---------------- */
+// scope swap INSIDE the same bubble (openRowActions restores title/sub from
+// the session record on return). The blob + a[download] click is the relay:
+// Content-Disposition alone is unreliable inside PWA webviews.
+function openExportScope(id) {
+  const s = state.sessions.find((x) => x.id === id);
+  if (!s) return;
+  const sheet = document.querySelector('#row-actions .act-bubble');
+  sheet.querySelector('.act-title').textContent = '导出 Markdown';
+  sheet.querySelector('.act-sub').textContent = s.title || s.id.slice(0, 8);
+  const list = sheet.querySelector('.act-list');
+  list.innerHTML = '';
+  list.appendChild(actRow(I.doc, '完整会话', '全部往来消息 + 工具调用清单', '', () => doExport(id, 'full')));
+  list.appendChild(actRow(I.pencil, '仅结论摘要', '每轮提问 + 最终结论文本', '', () => doExport(id, 'summary')));
+  list.appendChild(actRow(I.back, '返回', '回到会话操作', '', () => openRowActions(id)));
+}
+function doExport(id, scope) {
+  closeBubble('row-actions');
+  const s = state.sessions.find((x) => x.id === id) || {};
+  const name = ((s.title && s.title !== '(loading)' ? s.title : id.slice(0, 8))
+    .replace(/[\\/:*?"<>|#]+/g, '').trim().slice(0, 60)) || id.slice(0, 8);
+  fetch('/api/sessions/' + encodeURIComponent(id) + '/export?scope=' + scope, { headers: auth() })
+    .then(async (r) => {
+      if (!r.ok) { toast('导出失败（' + r.status + '）'); return; }
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name + (scope === 'summary' ? '-摘要' : '') + '.md';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast(scope === 'summary' ? '已导出结论摘要' : '已导出完整会话');
+    })
+    .catch(() => toast('网络错误'));
 }
 
 /* ---------------- delete ---------------- */

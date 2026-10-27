@@ -33,6 +33,12 @@ export function register(router, ctx) {
     if (!authOk(req, r.url, cfg)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return; }
     const body = await readBody(req, 4096);
     let json = {}; try { json = body ? JSON.parse(body) : {}; } catch { json = {}; }
+    // v44 session-level always-allow: record (session, tool) BEFORE finishing,
+    // then the current ask resolves as a normal allow
+    if (json.decision === 'allow' && json.allowSession) {
+      const rec = hub.approvals.get(r.params.id);
+      if (rec) hub.allowSessionTool(rec.sessionId, rec.tool);
+    }
     const decision = json.decision === 'allow'
       ? { behavior: 'allow', updatedInput: {} }
       : { behavior: 'deny', message: json.reason || '手机端拒绝' };

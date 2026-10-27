@@ -11,7 +11,7 @@ import { $, shortPath } from '../util.js';
 import { state } from '../state.js';
 import { auth, api } from '../api.js';
 import { sendWs } from '../ws.js';
-import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab } from './transcript.js';
+import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns } from './transcript.js';
 import { ensureModels, renderModelChip, updateTokenRing } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
 
@@ -20,6 +20,8 @@ function openDetail(id) {
   state.currentId = id;
   state.atBottom = true;
   state.userCollapsedLive = false;
+  state.histBefore = 0; state.histTotal = 0; state.histLoading = false;
+  updateHistoryPill(); // hidden until the first page lands
   state.attach = [];
   renderAttachChips();
   disarmFork(); // branch arming never crosses a session switch
@@ -37,6 +39,10 @@ function openDetail(id) {
       if (state.currentId !== id) return;
       buildTurns(d.events || []);
       renderAllTurns();
+      // v44 pagination bookkeeping (both counted in events from the tail)
+      state.histTotal = d.total || 0;
+      state.histBefore = (d.events || []).length;
+      updateHistoryPill();
       state.atBottom = true;          // entering a session always lands on the latest
       scrollBottom(true);
       updateJumpFab();
@@ -53,9 +59,56 @@ function closeDetail() { // via the ← button only
   disarmFork();
   state.currentId = null;
   state.turns = [];
+  state.histBefore = 0; state.histTotal = 0; state.histLoading = false;
+  const hm = $('hist-more'); if (hm) hm.classList.add('hidden');
   $('detail').classList.add('hidden');
   $('list').classList.remove('hidden');
 }
+
+/* ---------------- history pagination (v44): pill + pull gesture ---------------- */
+// The pill lives OUTSIDE #chat on purpose: a leading chat child would break
+// renderTail's 1:1 children/turns invariant. Two triggers per the decision:
+// tapping the pill, OR pulling down past 70px while pinned at the very top.
+function updateHistoryPill() {
+  const el = $('hist-more');
+  if (!el) return;
+  const exhausted = state.histBefore >= state.histTotal;
+  if (!state.currentId || (exhausted && !state.histLoading)) { el.classList.add('hidden'); return; }
+  el.textContent = state.histLoading ? '加载中…'
+    : '加载更早 · 还有 ' + (state.histTotal - state.histBefore) + ' 条';
+  el.classList.toggle('busy', state.histLoading);
+  el.classList.remove('hidden');
+}
+function loadOlder() {
+  if (!state.currentId || state.histLoading || state.histBefore >= state.histTotal) return;
+  const id = state.currentId;
+  state.histLoading = true;
+  updateHistoryPill();
+  api('/api/sessions/' + encodeURIComponent(id) + '/messages?before=' + state.histBefore)
+    .then((r) => r.json())
+    .then((d) => {
+      state.histLoading = false;
+      if (state.currentId !== id) return;
+      prependTurns(parseOlderTurns(d.events || []));
+      state.histBefore += (d.events || []).length;
+      updateHistoryPill();
+    })
+    .catch(() => { state.histLoading = false; updateHistoryPill(); });
+}
+// pull-to-older: armed only when genuinely pinned at the top with history
+// left; fires once per touch, never blocks the native scroll (passive)
+let pullY = 0, pullOn = false, pullFired = false;
+$('chat').addEventListener('touchstart', (e) => {
+  pullY = e.touches[0].clientY;
+  pullOn = $('chat').scrollTop <= 0 && state.histBefore < state.histTotal;
+  pullFired = false;
+}, { passive: true });
+$('chat').addEventListener('touchmove', (e) => {
+  if (!pullOn || pullFired) return;
+  if (e.touches[0].clientY - pullY > 70) { pullFired = true; loadOlder(); }
+}, { passive: true });
+$('chat').addEventListener('touchend', () => { pullOn = false; }, { passive: true });
+$('hist-more').onclick = loadOlder;
 
 /* ---------------- meta / driver chip ---------------- */
 function renderMeta() {
@@ -128,4 +181,4 @@ function renderWaitBanner() {
     : '等待权限确认' + (w.tool ? ' · ' + w.tool : '') + '——在电脑端批准后自动继续';
 }
 
-export { openDetail, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner };
+export { openDetail, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner, loadOlder, updateHistoryPill };

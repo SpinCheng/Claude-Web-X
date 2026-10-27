@@ -219,3 +219,12 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## 2026-10-27 · v41/v42/v43 组头 ➕、输入区微调、列表搜索+批量管理
 
 三批 UI 迭代。**v41**：项目组头右侧 ➕（span role=button——组头是真 `<button>`，嵌套 button 会被 fragment 解析器拆掉；stopPropagation 防误触折叠；Enter/Space 键盘可达）→ `openNewModal(presetCwd)` 预选项目目录（onclick= 直接赋值会传入 event 对象——新参数必须做 `typeof !== 'string'` 守卫）。**v42**：模型 chip 色阶 `--faint`→`--dim`（与附件图标一致）；队列插队 ▶ 13→18px（CSS 覆盖 svg 属性）。**v43**：列表搜索（`visibleSessions()` 本地过滤：标题/cwd/slug/id，命中平铺+最新序，无命中空态；输入行与批量共用同一过滤函数——先搜索缩小范围再全选）+ 批量管理（header 管理钮 → `state.batchMode/batchSel` → 行首圆圈勾选、点行=切换（不开会话、不渲染 ⋯）、底部栏 全选/清空 + 计数 + 删除 + 完成；删除逐个走 DELETE API，409 busy 跳过并 toast 报数）。e2e list 场景累计新增 14 条断言。全部纯前端 + pairing BUILD bump；组头 ➕ 与批量删除均无需后端改动（复用既有接口）。
+
+## v44（2026-10-27）审批 diff / 会话白名单 / 历史分页 / 导出 MD
+
+- P0/P1 评审定案：1 锁屏通知不做、3 /compact 不做；2B（审批 diff 统计+点击展开）、4A（历史分页 pill+顶部下拉双触发）、5A（会话级白名单审批卡勾选）、7A（导出范围确认层）落地；6（改动文件总览）改落点到任务完成总结卡片，三案新稿待拍板（design-drafts.html P1-6R）。
+- 审批 diff 全程 createElement/textContent，innerHTML 仅用于清空容器——卡片展示的是模型生成的文件内容，字符串拼 HTML 是自带 XSS 的路。
+- 分页 pill 挂 #detail 直下而非 #chat 首子：renderTail 不变量（chat 子节点与 turns 一一对应）会把多出来的节点数进去，尾部渲染错位；前插后 scrollTop += scrollHeight 差值保视口锚定（#chat 本就 overflow-anchor:none）。
+- parseOlderTurns 刻意不复用 applyEventToTurns：活流路径带乐观折叠和 expectQueuedUser/userCollapsedLive 旗标写入，历史重放碰旗标会污染活流状态；两路共用抽出的 newBotTurn/addAssistantPart/pairToolResults/sysMarkerTurn 纯构造器。
+- 白名单放 wshub 内存 Map、不落盘：会话级信任应随 bridge 生命周期过期，落盘会退化成永久放行。
+- 导出走 blob + a[download]，Content-Disposition 只作 hint：PWA webview 对 attachment 头处理不可靠。

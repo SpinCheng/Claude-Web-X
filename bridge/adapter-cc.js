@@ -277,7 +277,9 @@ export class CcAdapter extends EventEmitter {
   }
 
   // Full message list for detail view (fresh ephemeral tailer, live offsets untouched).
-  readTranscript(id, limit = 400) {
+  // before = how many TRAILING events to skip: ?before=N returns the window
+  // just older than what the client already has (v44 history pagination).
+  readTranscript(id, limit = 400, before = 0) {
     const rec = this.store.get(id);
     if (!rec || !rec.transcriptPath) return null;
     const t = new Tailer(rec.transcriptPath);
@@ -288,7 +290,8 @@ export class CcAdapter extends EventEmitter {
       const ev = this._applyLine(id, obj, {}, events);
       if (ev) events.push(ev);
     }
-    return events.slice(-limit);
+    const end = Math.max(0, events.length - Math.max(0, before | 0));
+    return { events: events.slice(Math.max(0, end - limit), end), total: events.length };
   }
 }
 

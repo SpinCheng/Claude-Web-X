@@ -63,50 +63,54 @@ function applyEventToTurns(ev) {
     T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
     T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '' });
   } else if (ev.k === 'assistant') {
-    if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: ev.ts });
+    if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push(newBotTurn(ev.ts));
     const turn = T[T.length - 1];
     turn.ts = turn.ts || ev.ts;
-    for (const p of ev.parts || []) {
-      if (p.t === 'think') { turn.think.push(p.v); turn.steps.push({ t: 'think', v: p.v }); }
-      else if (p.t === 'tool') {
-        const tool = { name: p.name, id: p.id || '', v: p.v, out: null };
-        turn.tools.push(tool);
-        turn.steps.push({ t: 'tool', tool });
-      }
-      else if (p.t === 'text' && p.v && p.v.trim()) { turn.texts.push(p.v); turn.steps.push({ t: 'text', v: p.v }); }
-    }
+    for (const p of ev.parts || []) addAssistantPart(turn, p);
   } else if (ev.k === 'toolres') {
     // tool results arrive as later user lines; pair each back to its tool_use
     // step by id (search recent bot turns from the tail)
-    let touched = null;
-    for (let ti = T.length - 1; ti >= Math.max(0, T.length - 3) && touched === null; ti--) {
-      const turn = T[ti];
-      if (turn.role !== 'bot' || !turn.steps) continue;
-      let allFound = true;
-      for (const it of ev.items || []) {
-        const step = turn.steps.find((s) => s.t === 'tool' && s.tool.id === it.id);
-        if (!step || step.tool.out) { allFound = false; continue; }
-        step.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
-        const bkt = turn.tools.find((x) => x === step.tool);
-        if (bkt) bkt.out = step.tool.out;
-        touched = ti;
-      }
-      if (touched === null) allFound = false; // nothing here; keep searching older turns
-    }
-    return touched; // re-render from this turn so the output shows up
-  } else if (ev.k === 'stats') {
-    T.push({ role: 'sys', text: '成本 $' + (ev.stats.usd != null ? Number(ev.stats.usd).toFixed(2) : '?') +
-      ' · in ' + (ev.stats.inTok ?? '?') + ' / out ' + (ev.stats.outTok ?? '?') + ' tok' });
-  } else if (ev.k === 'compact') {
-    // compaction continuation summary folded by the adapter (isCompactSummary
-    // flag) - one marker line instead of a giant machine-generated bubble
-    const n = ev.n || 0;
-    T.push({ role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
-  } else if (ev.k === 'skill') {
-    // skill body injected by the CLI on invocation - folded to a marker too
-    const n = ev.n || 0;
-    T.push({ role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字') + '，已折叠）' });
+    return pairToolResults(T, ev); // re-render from this turn so the output shows up
+  } else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') {
+    T.push(sysMarkerTurn(ev));
   } else if (ev.k === 'title') { /* meta only */ }
+}
+// shared turn-shape builders (v44): the history paginator replays older
+// events into a SEPARATE array - same shapes, but no optimistic fold and no
+// live-state flag writes, which is why it cannot call applyEventToTurns.
+function newBotTurn(ts) { return { role: 'bot', think: [], tools: [], texts: [], steps: [], ts: ts || '' }; }
+function addAssistantPart(turn, p) {
+  if (p.t === 'think') { turn.think.push(p.v); turn.steps.push({ t: 'think', v: p.v }); }
+  else if (p.t === 'tool') {
+    const tool = { name: p.name, id: p.id || '', v: p.v, out: null };
+    turn.tools.push(tool);
+    turn.steps.push({ t: 'tool', tool });
+  }
+  else if (p.t === 'text' && p.v && p.v.trim()) { turn.texts.push(p.v); turn.steps.push({ t: 'text', v: p.v }); }
+}
+function pairToolResults(T, ev) {
+  let touched = null;
+  for (let ti = T.length - 1; ti >= Math.max(0, T.length - 3) && touched === null; ti--) {
+    const turn = T[ti];
+    if (turn.role !== 'bot' || !turn.steps) continue;
+    for (const it of ev.items || []) {
+      const step = turn.steps.find((s) => s.t === 'tool' && s.tool.id === it.id);
+      if (!step || step.tool.out) continue;
+      step.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
+      const bkt = turn.tools.find((x) => x === step.tool);
+      if (bkt) bkt.out = step.tool.out;
+      touched = ti;
+    }
+  }
+  return touched;
+}
+// folded marker lines (cost snapshot / compaction summary / skill injection)
+function sysMarkerTurn(ev) {
+  const wan = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字');
+  if (ev.k === 'stats') return { role: 'sys', text: '成本 $' + (ev.stats.usd != null ? Number(ev.stats.usd).toFixed(2) : '?') +
+    ' · in ' + (ev.stats.inTok ?? '?') + ' / out ' + (ev.stats.outTok ?? '?') + ' tok' };
+  if (ev.k === 'compact') return { role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + wan(ev.n || 0) + '，已折叠）' };
+  return { role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + wan(ev.n || 0) + '，已折叠）' };
 }
 function markLiveTurn() {
   // the trailing bot turn is "live" when its session is streaming
@@ -548,6 +552,43 @@ function retractOptimisticUser(t) {
   updateJumpFab();
 }
 
+/* ---------------- history pagination (v44) ---------------- */
+// build turns from an OLDER page of /messages events: identical shapes via
+// the shared builders, but plain replay - every event is confirmed history,
+// so no optimistic folding and no state-flag writes.
+function parseOlderTurns(events) {
+  const T = [];
+  for (const ev of events) {
+    if (ev.k === 'user') {
+      T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
+      T.push(newBotTurn(''));
+    } else if (ev.k === 'assistant') {
+      if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push(newBotTurn(ev.ts));
+      const turn = T[T.length - 1];
+      turn.ts = turn.ts || ev.ts;
+      for (const p of ev.parts || []) addAssistantPart(turn, p);
+    } else if (ev.k === 'toolres') pairToolResults(T, ev);
+    else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') T.push(sysMarkerTurn(ev));
+  }
+  return T;
+}
+// prepend an older page: unshift turns AND insert children in equal measure,
+// then shift scrollTop by the height delta so the viewport stays anchored on
+// the same content (#chat runs overflow-anchor:none per the scroll laws).
+// Never touches the trailing children renderTail owns - the 1:1 mapping holds.
+function prependTurns(older) {
+  if (!older || !older.length) return;
+  const chat = $('chat');
+  const frag = document.createDocumentFragment();
+  for (const t of older) frag.appendChild(renderTurn(t));
+  const beforeH = chat.scrollHeight;
+  chat.insertBefore(frag, chat.firstChild);
+  state.turns.unshift(...older);
+  chat.scrollTop += chat.scrollHeight - beforeH;
+  markCapped();
+  armCodeCopy();
+}
+
 /* ---------------- wiring ---------------- */
 $('jump').onclick = () => { state.atBottom = true; scrollBottom(true); updateJumpFab(); };
 $('chat').addEventListener('scroll', () => {
@@ -559,4 +600,4 @@ window.addEventListener('resize', updateJumpFab);
 
 export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderAllTurns, renderTurn, renderTail, updateJumpFab, scrollBottom,
-  pushOptimisticUser, retractOptimisticUser };
+  pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns };

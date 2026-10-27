@@ -14,6 +14,16 @@ await withEnv(async (h) => {
   assert(msgs.events.some((e) => e.k === 'toolres'), 'messages toolres events');
   assert(msgs.events.some((e) => e.k === 'stop'), 'messages stop marker');
 
+  // v44: pagination surface + markdown export
+  assert(Number.isInteger(msgs.total) && msgs.total >= msgs.events.length, 'messages total present');
+  const older = await (await api('/api/sessions/api1/messages?before=1')).json();
+  assert(older.total === msgs.total && older.events.length === msgs.total - 1, 'messages ?before slices');
+  const ex = await api('/api/sessions/api1/export?scope=full');
+  const md = await ex.text();
+  assert(ex.status === 200 && (ex.headers.get('content-type') || '').includes('text/markdown'), 'export full 200 markdown');
+  assert(md.startsWith('# ') && md.includes('## 用户'), 'export markdown shape');
+  assert((await api('/api/sessions/api1/export?scope=summary')).status === 200, 'export summary 200');
+
   const q = await (await api('/api/sessions/api1/queue')).json();
   assert(q.ok && Array.isArray(q.queue) && q.queue.length === 0, 'queue snapshot empty');
   assert((await api('/api/sessions/api1/queue/nope', { method: 'DELETE' })).status === 404, 'queue delete unknown 404');

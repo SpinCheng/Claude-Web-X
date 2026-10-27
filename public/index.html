@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=43">
+  <link rel="stylesheet" href="/style.css?v=44">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
-        <span id="build" class="build-badge">v43</span>
+        <span id="build" class="build-badge">v44</span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -166,13 +166,18 @@
         <div class="ap-session dim" id="ap-session"></div>
         <div class="ap-tool mono" id="ap-tool"></div>
         <pre class="ap-input mono" id="ap-input"></pre>
+        <div id="ap-diff" class="ap-diff hidden"></div>
+        <label id="ap-allow-row" class="ap-allow"><span class="ckb"></span><span id="ap-allow-txt"></span></label>
         <div class="sheet-actions">
           <button id="ap-deny" class="btn deny">拒绝</button>
-          <button id="ap-allow" class="btn primary">允许一次</button>
+          <button id="ap-allow" class="btn primary">允许</button>
         </div>
         <p class="sheet-note">3 分钟无响应自动拒绝</p>
       </div>
     </div>
+    <!-- v44 history pagination: floating pill, NOT a chat child (renderTail's
+         1:1 children/turns invariant must not see extra nodes) -->
+    <button id="hist-more" class="hist-more hidden"></button>
 
     <!-- context detail bubble -->
     <div id="ctx-sheet" class="overlay bub hidden">
@@ -234,6 +239,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=43"></script>
+  <script type="module" src="/app.js?v=44"></script>
 </body>
 </html>

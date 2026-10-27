@@ -23,9 +23,31 @@ export function register(router, ctx) {
 
   router.get('/api/sessions/:id/messages', (req, res, r) => {
     if (!guard(req, res, r)) return;
-    const events = adapter.readTranscript(r.params.id);
-    if (!events) { json(res, 404, { error: 'not found' }); return; }
-    json(res, 200, { events });
+    const before = parseInt(r.url.searchParams.get('before') || '0', 10) || 0;
+    const out = adapter.readTranscript(r.params.id, 400, before);
+    if (!out) { json(res, 404, { error: 'not found' }); return; }
+    json(res, 200, out);
+  });
+
+  // v44: export the transcript as Markdown (scope=full|summary). Built from
+  // the same parsed events the detail view uses; thinking is omitted (noise),
+  // tool calls render as one-line quotes. Attachment disposition so phones
+  // hit the download/share path directly.
+  router.get('/api/sessions/:id/export', (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    const rec = store.get(r.params.id);
+    const out = adapter.readTranscript(r.params.id, 1e9, 0);
+    if (!rec || !out) { json(res, 404, { error: 'not found' }); return; }
+    const scope = r.url.searchParams.get('scope') === 'summary' ? 'summary' : 'full';
+    const md = buildMarkdown(rec, out.events, scope);
+    const base = (rec.title && rec.title !== '(loading)' ? rec.title : rec.id.slice(0, 8))
+      .replace(/[\\/:*?"<>|#\[\]]+/g, '').trim().slice(0, 60) || rec.id.slice(0, 8);
+    res.writeHead(200, {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="export.md"; filename*=UTF-8\'\'' + encodeURIComponent(base) + '.md',
+      'Cache-Control': 'no-cache',
+    });
+    res.end(md);
   });
 
   // mid-run artifact preview (v23): files a run touched, locked inside the
@@ -117,4 +139,53 @@ export function register(router, ctx) {
     adapter.pinRename(r.params.id, title);
     json(res, 200, { ok: true });
   });
+}
+
+// v44 markdown export. Conclusions (scope=summary): each user prompt with the
+// LAST text of its assistant run - the same "final card" the PWA shows. Full:
+// every text + one-line tool quotes; thinking is omitted (model noise).
+function buildMarkdown(rec, events, scope) {
+  const clean = (t) => String(t == null ? '' : t).replace(/\r\n/g, '\n').trim();
+  const L = ['# ' + (rec.title && rec.title !== '(loading)' ? rec.title : rec.id.slice(0, 8))];
+  const meta = [];
+  if (rec.cwd) meta.push(rec.cwd);
+  if (rec.model) meta.push(rec.model);
+  if (rec.cost && rec.cost.usd != null) meta.push('$' + Number(rec.cost.usd).toFixed(2));
+  meta.push(new Date().toISOString().slice(0, 10));
+  L.push('', '> ' + meta.join(' · '), '');
+
+  if (scope === 'summary') {
+    let user = '', lastText = '';
+    const flush = () => {
+      if (user) L.push('## 用户', '', clean(user), '');
+      if (lastText) L.push('## 助手', '', clean(lastText), '');
+      user = ''; lastText = '';
+    };
+    for (const ev of events) {
+      if (ev.k === 'user') { flush(); user = ev.text || (ev.images && ev.images.length ? '[图片]' : ''); }
+      else if (ev.k === 'assistant') {
+        for (const p of ev.parts || []) if (p.t === 'text' && p.v && p.v.trim()) lastText = p.v;
+      }
+    }
+    flush();
+    return L.join('\n');
+  }
+  for (const ev of events) {
+    if (ev.k === 'user') {
+      L.push('## 用户', '', clean(ev.text || (ev.images && ev.images.length ? '[图片附件]' : '')), '');
+      if (ev.images && ev.images.length) L.push('> [附件图片 ×' + ev.images.length + ']', '');
+    } else if (ev.k === 'assistant') {
+      let opened = false;
+      for (const p of ev.parts || []) {
+        if (p.t === 'text' && p.v && p.v.trim()) { L.push('**助手**', '', clean(p.v), ''); opened = false; }
+        else if (p.t === 'tool') {
+          if (!opened) { L.push('> 工具调用：'); opened = true; }
+          const one = clean(p.v).split('\n')[0].slice(0, 120);
+          L.push('> - `' + (p.name || '?') + '` ' + one);
+        }
+      }
+      if (opened) L.push('');
+    }
+  }
+  return L.join('\n');
 }
