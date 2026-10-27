@@ -36,6 +36,13 @@ function applyEventToTurns(ev) {
   const T = state.turns;
   if (ev.k === 'user') {
     state.userCollapsedLive = false; // a new question re-opens the next live turn
+    // queued-dispatch marker (v37): queued sends stay OFF screen until the
+    // dispatch really writes them, so their user event has no optimistic
+    // twin - a same-text elder must not swallow it as a "replay". Consumed
+    // on the first user event; a double-fired second copy then hits the
+    // normal no-op below (the fresh bubble matches), so dedup survives.
+    const queuedDispatch = state.expectQueuedUser === true;
+    state.expectQueuedUser = false;
     // fold into a matching recent user turn: an unconfirmed optimistic one
     // (sent this session, transcript not written yet) gets confirmed in place;
     // an already-confirmed match is a replayed/duplicate event -> no-op.
@@ -44,7 +51,10 @@ function applyEventToTurns(ev) {
       const t = T[i];
       if (t.role !== 'user') continue;
       if (t.text !== ev.text) continue;
-      if (!t.optimistic) return i; // replay: already on screen, nothing to do
+      if (!t.optimistic) {
+        if (queuedDispatch) continue; // the elder is NOT this event - keep it, push fresh
+        return i; // replay: already on screen, nothing to do
+      }
       t.optimistic = false;
       t.ts = ev.ts || t.ts;
       if (ev.images && ev.images.length) t.images = ev.images;

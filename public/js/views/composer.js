@@ -313,7 +313,15 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
       }
       if (!r.ok) { toast('发送失败（' + r.status + '）'); fail(); return; }
       const j = await r.json().catch(() => ({}));
-      if (j.queued) toast('已排队（第 ' + j.position + ' 条）· 本轮结束后自动发出');
+      if (j.queued) {
+        // v37: queued = not on the transcript yet - pull the optimistic
+        // bubble back out; it goes on screen when the dispatch really
+        // writes it (expectQueuedUser arms the fold for that moment).
+        // Retract is race-safe: if the dispatch somehow already folded the
+        // turn, optimistic=false makes it a no-op.
+        retractOptimisticUser(shownTurn);
+        toast('已排队（第 ' + j.position + ' 条）· 本轮结束后自动发出');
+      }
       state.atBottom = true;
     })
     .catch(() => { toast('网络错误'); fail(); });

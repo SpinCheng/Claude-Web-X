@@ -5,7 +5,7 @@
 - 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·行尾 ⋯ 气泡 / ctxring 圆环·明细·模型·等级弹窗 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
 - 版本演进与调试史（症状→根因）：`docs/history.md`
-- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（14 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，8 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
+- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（parsers 14 + turns 5 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，8 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
 - 功能缺口 Backlog：README「路线图/Backlog」节
 
 ## 快速开始
@@ -55,7 +55,7 @@ npm start          # node bridge/index.js，端口 3742
 - 折叠 CSS 必须是 `.node:not(.open):not(.plain) .node-body{display:none}`——输出/结论文本是 plain 节点（不可折叠），漏 `:not(.plain)` 会藏掉全部输出。
 - 限高只作用于 `.think/.tool-chip`（结论/输出不限高），且必须由 `markCapped()` 动态加 `.capped`——固定挂 overflow 会造手势死区。display:none 元素 scrollHeight=0：**胶囊与节点头点击里必须局部重跑 markCapped**。
 - 滚动三律：`.page` 必须 `height:100dvh`；`#chat` 必须 `overflow-anchor:none`；**renderTail 只从 `prevLen-1` 重渲染**（chat 子节点与 state.turns 一一对应，多删即错位→全量重建→滚动跳顶）。
-- 乐观上屏（v20）：发送 202 即 push `optimistic` user turn（pending 半透明）；转录 user 事件按文本匹配**原地折叠**（匹配必须是幂等的——已确认的同文要 no-op，否则 fs.watch+轮询双触发会推出重复气泡）；fold 改的是尾部**之前**的 turn，handleAppend 用 `editStart`（本批最早被改索引）调 renderTail，默认仍是尾帧。
+- 乐观上屏（v20）：发送 202 即 push `optimistic` user turn（pending 半透明）；转录 user 事件按文本匹配**原地折叠**（匹配必须是幂等的——已确认的同文要 no-op，否则 fs.watch+轮询双触发会推出重复气泡）；fold 改的是尾部**之前**的 turn，handleAppend 用 `editStart`（本批最早被改索引）调 renderTail，默认仍是尾帧。**排队消息不上屏（v37）**：202 `queued:true` 时立即 retract 乐观气泡——消息没进转录，要等派发真正落盘；`queue-dispatched` 帧置 `state.expectQueuedUser`，折叠器见到它就跳过同文 no-op 推新泡（否则连发两条"继续"时后一条会被误判成重放吞掉），旗标首条 user 事件即消费，双发 dedupe 依旧成立。turn-model 判定有单测（test/unit/turns.test.mjs，stub 掉 matchMedia/localStorage/document/window 供 import 期接线）。
 - 轮次形状：**渲染源是 `steps[]`（v22 起按真实发生顺序交错：think/tool/text 任意排列）**，`think[]/tools[]/texts[]` 桶仍在但只作兼容（markLiveTurn/lastLiveToolName 用），两者必须同步 push。结论=最后一个 text step，其余 text step=输出节点。**tool_result 事件（`{k:'toolres',items:[{id,text,err,images}]}`）按 tool_use_id 配对回填 `tool.out`**（文本 ≤4KB 截断、图片 ≤4 张内联+灯箱，`.tool-out` 纳入 markCapped 限高体系）；配对改动的是尾部之前的内容，handleAppend 的 editStart 机制复用。done 与 live 轮都要有折叠规则；`state.userCollapsedLive` 尊重手动收起；完成信号双路：run 帧 + stop 标记事件（后者覆盖桌面/CLI 驱动），sessions 帧做活跃度翻转兜底。
 - 触屏 Enter=换行（`IS_TOUCH`=pointer:coarse）。
 

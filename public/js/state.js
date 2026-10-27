@@ -23,6 +23,9 @@ export const state = {
   perm: localStorage.getItem('cr_perm') || 'auto', // 'auto' | 'ask'
   approvals: [],   // pending permission requests (queue)
   userCollapsedLive: false, // user folded the live turn manually - respect it
+  expectQueuedUser: false,  // a queued message just dispatched: its user event
+                            // must render even if same-text elders would read
+                            // as a replayed duplicate (v37)
   modelCatalog: null, // /api/models cache: [{id,label,ctx}]
   ctxProbe: null,    // last /context probe result {key,window,fixed,buffer}
   queue: {},         // sessionId -> [{id,text}] pending queue (WS 'queue' frames)

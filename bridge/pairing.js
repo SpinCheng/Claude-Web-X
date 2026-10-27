@@ -1,4 +1,4 @@
-﻿// pairing.js - PC-side pairing panel logic: live token rotation (no bridge
+// pairing.js - PC-side pairing panel logic: live token rotation (no bridge
 // restart) and autostart installation. Reaches into the SAME cfg object the
 // server closure holds, so mutating cfg.token takes effect on the next
 // request without a process bounce.
@@ -74,7 +74,7 @@ export function autostartInstalled() {
 // LAN pairing URLs, best first (home LAN beats virtual adapters/Tailscale).
 // The &_b busts HTML navigation caches: scanning the QR always loads a fresh
 // shell (which then pulls versioned assets), ending stale-asset mixes.
-const BUILD = '36';
+const BUILD = '37';
 export function lanUrls(port) {
   const ips = [];
   for (const list of Object.values(os.networkInterfaces())) {

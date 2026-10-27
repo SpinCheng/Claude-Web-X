@@ -196,7 +196,11 @@ initWs({
     }
   },
   append: handleAppend,
-  'queue-dispatched': (d) => { if (d.sessionId === state.currentId) toast('排队消息已自动发出'); },
+  'queue-dispatched': (d) => {
+    // v37: the dispatched message's user line must SHOW when it lands - arm
+    // the fold so a same-text elder isn't mistaken for a replayed duplicate
+    if (d.sessionId === state.currentId) { state.expectQueuedUser = true; toast('排队消息已自动发出'); }
+  },
   queue: (d) => {
     // authoritative queue snapshot after any mutation (enqueue/remove/
     // reorder/clear/drain): refresh cache + the open session's panel

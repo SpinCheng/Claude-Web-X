@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node bridge/index.js",
-    "test": "node --test test/unit/parsers.test.mjs && node test/e2e/run-all.mjs"
+    "test": "node --test test/unit/parsers.test.mjs test/unit/turns.test.mjs && node test/e2e/run-all.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

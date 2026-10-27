@@ -1,5 +1,11 @@
 # 版本演进与调试史（症状 → 根因）
 
+## 2026-10-27 · 排队消息不再立即上屏（v37）
+
+用户报：运行中排队发送的消息点完立即出现在时间轴，应该等上一任务完成、排队任务真正执行时再上屏。根因：`_send` 的乐观路径（v21）不区分 queued——202 `queued:true` 后半透明气泡一直挂到派发折叠。修法：202 queued 时 `retractOptimisticUser`（race-safe：若派发已抢先折叠则 optimistic=false 变 no-op）。
+
+连带修一个折叠判定坑：气泡收回后，派发落盘的 user 事件没有乐观孪生，靠"最近 12 轮同文本"判重放会把**同文本的旧回合**误判成重放而吞掉新泡（连发两条"继续"必踩）。加 `state.expectQueuedUser` 旗标（`queue-dispatched` 帧置位、折叠器遇首条 user 事件消费）：置位期间跳过同文 no-op 推新泡；旗标即耗尽，双发去重依旧成立（第二份走普通 no-op）。turn-model 判定新增单测 turns.test.mjs（5 条：重放 no-op / 排队推新 / 双发去重 / 旗标消费 / 乐观孪生仍折叠）——node 跑 DOM 前端模块的取经：transcript.js 拉 overlays.js（模块顶层接线 scrim 点击），须 stub `document`/`window`/`matchMedia`/`localStorage` 四件套再动态 import；`node --test` 目录参数在此 Node 不奏效，package.json 显式列两个文件。
+
 ## 2026-10-27 · 工具栏 overflow 修复 + 推理等级并入模型弹窗（v36）
 
 用户报：模型名稍长，工具栏右侧元素被挤出屏。根因：`.cbtn` 全员 `flex:none`，attach+4×tdot+perm+ring+model+effort 六个固定宽度件在 375px 屏已超宽（模型名 cap 96px 也救不回来）。修法：**模型 chip 成为唯一可收缩元素**（`flex:0 1 auto; min-width:0`，名字 span 同链 `min-width:0 + ellipsis`，按钮 `max-width:50vw` 兜底）——flex 收缩要求从按钮到 span 全程允许缩，断一处即失效。
