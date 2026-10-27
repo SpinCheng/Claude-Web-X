@@ -258,3 +258,10 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 体积构成条与次数行纯前端现算（compOfTurns：工具=tool_use 输入 JSON+输出文本字符，思考=think 字符，对话=user+text 字符；口径=字符占比非 token，UI 有标注）。
 - detail↔ctxring 新增一条函数级循环 import（refreshCostUI→renderMeta vs renderMeta→openCostPanel/costDisplay），同 composer↔detail 安全模式（求值期零交叉）。cost.test.mjs 入库：stub 元素必须带 dataset——ctxring→detail→composer 链会让 composer 在模块评估期跑 setPerm 写 dataset。
 - README Backlog 大扫除：审批 diff/历史分页（v44）、always-allow（v44）、改动文件总览（v45）、导出 MD（v44）、费用面板（v48）勾掉；锁屏通知与手动 /compact 标记已裁定不做（2026-10-28）。
+
+## v51（2026-10-28）window.confirm 全量替换为应用内确认弹窗
+
+- 用户裁定：系统 alert/confirm 弹窗不符合 app UI 规范。清点=7 处 window.confirm（队列清空/▶插队、handoff 409 双问、批量删除、列表删除、详情删除），无原生 alert。skill 数据核对：破坏性操作前确认=正确模式（保留确认、只换皮）、成功反馈勿静默（已有 toast）。
+- 组件 `showConfirm({title,body,ok,danger,onOk,onCancel})`（overlays.js）：沿用底部 sheet 模态语言（rename/new-modal 同款 grammar——弹层=气泡、模态=全宽 sheet 的既有分工不动）；危险确认=红实底主钮（`.btn.danger`，--err）、普通确认（仍然发送/切换驱动）=珊瑚主钮；**焦点落安全侧**（danger 时 focus 取消钮，Enter=取消；非 danger focus 确认钮）；Escape/scrim/取消三路关闭；aria dialog/labelled。markup 挂 body 级（列表页与详情页都要用，同 new-modal 先例）。
+- 调用点改回调式：list.batchDelete/app.deleteSession 拆两函数（confirm→runBatchDelete/doDeleteSession）；composer handoff 双问的取消路径接 onCancel:fail()（原先 else fail() 语义不变）。
+- e2e：sessops/list 删除段改为断言 confirm-modal 出现+点 #cf-ok（原先靠 harness 代答原生 dialog）；harness 的 javascriptDialogOpening 处理保留作兜底。**教训：bash heredoc 里嵌 JS 模板字面量（反引号+${}）会被吃——补丁走临时 .py 文件执行后删除。**

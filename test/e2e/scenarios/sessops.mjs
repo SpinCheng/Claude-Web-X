@@ -2,7 +2,7 @@
 // via the trailing ⋯ button (touch primary) and via contextmenu (desktop,
 // with the selection guard), rename round-trips through the custom-title
 // append and SURVIVES a reload (replayed from the transcript), stop row
-// appears only for phone-driven runs, delete removes the row (window.confirm
+// appears only for phone-driven runs, delete removes the row (confirm modal
 // auto-accepted by the harness CDP driver).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -63,10 +63,12 @@ await withEnv(async (h, page) => {
   await page.ev(`${findAct('停止运行')}.click()`);
   assert(await page.waitFor(`(document.querySelector('#toast') || {}).textContent === '已发送停止信号'`, 6000), 'stop acknowledged');
 
-  // delete round-trip (the harness accepts the window.confirm)
+  // delete round-trip (in-app confirm modal, #cf-ok)
   await page.ev(ctxmenu('.srow'));
   assert(await page.waitFor(`!document.getElementById('row-actions').classList.contains('hidden')`), 'bubble re-open');
   await page.ev(`${findAct('删除会话')}.click()`);
+  assert(await page.waitFor(`!document.getElementById('confirm-modal').classList.contains('hidden')`), 'confirm modal opens');
+  await page.ev(`document.getElementById('cf-ok').click()`);
   assert(await page.waitFor(`document.querySelectorAll('.srow').length === 0`), 'row gone after delete');
   assert(await page.waitFor(`(document.querySelector('#toast') || {}).textContent === '已移入回收站'`, 6000), 'delete acknowledged');
 });

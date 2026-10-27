@@ -15,7 +15,7 @@ import { $ } from '../util.js';
 import { state } from '../state.js';
 import { auth, api } from '../api.js';
 import { toast } from './toast.js';
-import { openBubble, closeBubble } from './overlays.js';
+import { openBubble, closeBubble, showConfirm } from './overlays.js';
 import { renderList } from './list.js';
 
 const I = {
@@ -169,14 +169,14 @@ function doExport(id, scope) {
 function deleteFromList(id) {
   closeBubble('row-actions');
   const s = state.sessions.find((x) => x.id === id);
-  if (!window.confirm('删除「' + (s && s.title || id.slice(0, 8)) + '」？转录移入电脑回收站，可找回。')) return;
-  api('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' })
-    .then(async (r) => {
-      if (r.status === 409) { toast('会话正在运行，先停止再删除'); return; }
-      if (!r.ok) { toast('删除失败（' + r.status + '）'); return; }
-      toast('已移入回收站'); // list refreshes via the store.drop sessions frame
-    })
-    .catch(() => toast('网络错误'));
+  showConfirm({ title: '删除「' + (s && s.title || id.slice(0, 8)) + '」', body: '转录移入电脑回收站，可找回。', ok: '删除', danger: true,
+    onOk: () => api('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(async (r) => {
+        if (r.status === 409) { toast('会话正在运行，先停止再删除'); return; }
+        if (!r.ok) { toast('删除失败（' + r.status + '）'); return; }
+        toast('已移入回收站'); // list refreshes via the store.drop sessions frame
+      })
+      .catch(() => toast('网络错误')) });
 }
 
 /* ---------------- wiring ---------------- */

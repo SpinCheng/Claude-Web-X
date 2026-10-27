@@ -427,6 +427,10 @@ button { font-family: inherit; }
 .btn:active { background: var(--acc-strong); transform: scale(.97); }
 .btn.ghost { flex: 0 0 auto; background: none; color: var(--dim); }
 .btn.deny { background: none; border: 1.5px solid var(--err); color: var(--err); }
+/* ---------- v51：确认弹窗（window.confirm 替身，沿用底部 sheet 模态语言） ---------- */
+.cf-body { color: var(--dim); font-size: 13px; line-height: 1.65; margin: -6px 0 16px; word-break: break-word; }
+.btn.danger { background: var(--err); color: #fff; }
+.btn.danger:active { background: color-mix(in srgb, var(--err) 80%, #fff); }
 
 /* ---------- 权限模式 & 审批卡 ---------- */
 .seg { display: flex; gap: 8px; margin-bottom: 10px; }

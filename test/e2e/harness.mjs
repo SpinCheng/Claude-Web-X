@@ -85,7 +85,8 @@ export async function bootPage(profileDir) {
     const m = JSON.parse(d);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result); pending.delete(m.id); return; }
     // headless auto-DISMISSES window.confirm (returns false); the delete-flow
-    // scenarios need the confirm accepted, so answer dialogs as OK
+    // legacy fallback: v51 replaced window.confirm with the in-app #cf-ok
+    // modal; native-dialog handling stays as a net in case one slips back
     if (m.method === 'Page.javascriptDialogOpening') send('Page.handleJavaScriptDialog', { accept: true });
   });
   const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });

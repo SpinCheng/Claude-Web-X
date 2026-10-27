@@ -8,7 +8,7 @@ import { auth, api, tryToken, setUnauthorized } from './js/api.js';
 import { initWs, connectWs, sendWs } from './js/ws.js';
 import { $ } from './js/util.js';
 import { toast } from './js/views/toast.js';
-import { BUBBLES, queueApproval, showApproval, fetchPendingApprovals } from './js/views/overlays.js';
+import { BUBBLES, queueApproval, showApproval, fetchPendingApprovals, showConfirm } from './js/views/overlays.js';
 import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab } from './js/views/transcript.js';
 import { renderList } from './js/views/list.js';
@@ -85,7 +85,11 @@ window.addEventListener('popstate', (e) => {
 function deleteSession() {
   const id = state.currentId;
   if (!id) return;
-  if (!window.confirm('删除该会话？转录移入电脑回收站，可找回。')) return;
+  showConfirm({ title: '删除该会话', body: '转录移入电脑回收站，可找回。', ok: '删除', danger: true, onOk: doDeleteSession });
+}
+function doDeleteSession() {
+  const id = state.currentId;
+  if (!id) return;
   fetch('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE', headers: auth() })
     .then((r) => r.json())
     .then((j) => {

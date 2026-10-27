@@ -6,6 +6,7 @@ import { $, shortPath, relTime } from '../util.js';
 import { state, CLOSED_KEY } from '../state.js';
 import { api } from '../api.js';
 import { toast } from './toast.js';
+import { showConfirm } from './overlays.js';
 import { openDetail } from './detail.js';
 import { openNewModal } from './composer.js';
 import { wireRowOps } from './sessops.js';
@@ -212,7 +213,10 @@ function setBatch(on) {
 async function batchDelete() {
   const ids = [...state.batchSel];
   if (!ids.length) return;
-  if (!window.confirm('删除选中的 ' + ids.length + ' 个会话？（可从回收站找回）')) return;
+  showConfirm({ title: '删除选中会话', body: '将删除 ' + ids.length + ' 个会话，转录移入电脑回收站，可找回。', ok: '删除', danger: true,
+    onOk: () => runBatchDelete(ids) });
+}
+async function runBatchDelete(ids) {
   let ok = 0, busy = 0, fail = 0;
   for (const id of ids) {
     try {

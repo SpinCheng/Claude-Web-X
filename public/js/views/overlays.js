@@ -228,5 +228,35 @@ $('ap-allow-row').onclick = () => {
   row.querySelector('.ckb').classList.toggle('on', on);
 };
 
-export { BUBBLES, openBubble, closeBubble, openLightbox, openFilePreview, previewArtifact,
+/* ---------- confirm modal (v51) ---------- */
+// window.confirm replacement: the OS dialog froze rendering, looked foreign
+// next to the sheet language, and headless e2e had to fake-answer it. Same
+// bottom-sheet grammar as rename/new; destructive confirms get a red primary
+// (danger), handoff asks keep coral. Focus lands on the SAFE action for
+// danger (Enter cancels), on OK otherwise. Escape / scrim / 取消 all dismiss.
+let cfDone = null;
+const cfKey = (e) => { if (e.key === 'Escape' && cfDone) cfDone(false); };
+document.addEventListener('keydown', cfKey, true);
+function showConfirm(o) {
+  $('cf-title').textContent = o.title || '确认操作';
+  const body = $('cf-body');
+  body.textContent = o.body || '';
+  body.hidden = !o.body;
+  const ok = $('cf-ok');
+  ok.textContent = o.ok || '确定';
+  ok.className = 'btn' + (o.danger ? ' danger' : '');
+  cfDone = (yes) => {
+    $('confirm-modal').classList.add('hidden');
+    cfDone = null;
+    if (yes) { if (o.onOk) o.onOk(); }
+    else if (o.onCancel) o.onCancel();
+  };
+  $('cf-cancel').onclick = () => cfDone(false);
+  ok.onclick = () => cfDone(true);
+  $('confirm-modal').onclick = (e) => { if (e.target === $('confirm-modal')) cfDone(false); };
+  $('confirm-modal').classList.remove('hidden');
+  (o.danger ? $('cf-cancel') : ok).focus({ preventScroll: true });
+}
+
+export { BUBBLES, openBubble, closeBubble, showConfirm, openLightbox, openFilePreview, previewArtifact,
   queueApproval, showApproval, fetchPendingApprovals };

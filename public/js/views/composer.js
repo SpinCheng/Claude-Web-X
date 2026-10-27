@@ -11,7 +11,7 @@ import { $, shortPath } from '../util.js';
 import { state, IS_TOUCH, currentModel, currentEffort } from '../state.js';
 import { auth, api } from '../api.js';
 import { toast } from './toast.js';
-import { openBubble, closeBubble, openLightbox, openFilePreview } from './overlays.js';
+import { openBubble, closeBubble, openLightbox, openFilePreview, showConfirm } from './overlays.js';
 import { pushOptimisticUser, retractOptimisticUser } from './transcript.js';
 import { renderDriverChip } from './detail.js';
 
@@ -85,7 +85,8 @@ function renderQueuePanel() {
   const clr = document.createElement('button');
   clr.className = 'clr'; clr.textContent = '清空';
   clr.onclick = () => {
-    if (window.confirm('清空所有排队的消息？')) qApi('', { method: 'DELETE' }).catch(() => {});
+    showConfirm({ title: '清空队列', body: '移除全部 ' + cnt + ' 条排队中的消息？', ok: '清空', danger: true,
+      onOk: () => qApi('', { method: 'DELETE' }).catch(() => {}) });
   };
   head.append(info, clr);
   area.appendChild(head);
@@ -106,7 +107,8 @@ function qRowEl(e, area) {
   const run = document.createElement('button');
   run.className = 'q-ico run'; run.title = '立即运行：中断当前任务并发送此条'; run.innerHTML = QI.play;
   run.onclick = () => {
-    if (window.confirm('中断当前任务，立即发送这条？')) qApi('/' + encodeURIComponent(e.id) + '/runnow', { method: 'POST' }).catch(() => {});
+    showConfirm({ title: '立即发送', body: '中断当前正在运行的任务，改为立即发送这条排队消息？', ok: '中断并发送', danger: true,
+      onOk: () => qApi('/' + encodeURIComponent(e.id) + '/runnow', { method: 'POST' }).catch(() => {}) });
   };
   // ✏ 编辑：取回输入框（出队），改完重新发送会重新排队
   const edit = document.createElement('button');
@@ -362,13 +364,13 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
         const j = await r.json().catch(() => ({}));
         if (j.error === 'recent-local-write') {
           const ago = j.sinceMs != null ? Math.round(j.sinceMs / 1000) + ' 秒' : '刚刚';
-          if (window.confirm('电脑端 ' + ago + '前刚在写这个会话，可能正在使用（电脑窗口需重开才能看到手机的新消息）。仍然发送？')) _send(text, rawInput, force, atts, shownTurn);
-          else fail();
+          showConfirm({ title: '电脑端可能正在使用', body: '电脑端 ' + ago + '前刚在写这个会话（电脑窗口需重开才能看到手机的新消息）。仍然发送？', ok: '仍然发送',
+            onOk: () => _send(text, rawInput, force, atts, shownTurn), onCancel: fail });
           return;
         }
         if (j.error === 'pc-claim') {
-          if (window.confirm('电脑端已接管此会话（cr attach）。切换为手机驱动并发送？')) _send(text, rawInput, force, atts, shownTurn);
-          else fail();
+          showConfirm({ title: '电脑端已接管', body: '电脑端正通过 cr attach 持有此会话。切换为手机驱动并发送？', ok: '切换并发送',
+            onOk: () => _send(text, rawInput, force, atts, shownTurn), onCancel: fail });
           return;
         }
         if (j.error === 'busy') { toast('本会话已有消息在运行，等它结束或点停止'); fail(); return; }

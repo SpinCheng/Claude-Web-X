@@ -74,7 +74,7 @@ export function autostartInstalled() {
 // LAN pairing URLs, best first (home LAN beats virtual adapters/Tailscale).
 // The &_b busts HTML navigation caches: scanning the QR always loads a fresh
 // shell (which then pulls versioned assets), ending stale-asset mixes.
-const BUILD = '50';
+const BUILD = '51';
 export function lanUrls(port) {
   const ips = [];
   for (const list of Object.values(os.networkInterfaces())) {
