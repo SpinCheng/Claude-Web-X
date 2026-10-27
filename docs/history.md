@@ -236,3 +236,10 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 路径身份按 lower() 合并（Windows 大小写不敏感），显示名取最后一次拼写；Write 全记增（旧内容行数从输入不可知）。
 - 展开体 >12 文件截断报「还有 N 个」——刻意不进 markCapped 体系：限高纪律只认 .think/.tool-chip/.tool-out，新元素硬挂 overflow:max-height 会造手势死区，平铺截断行永不长出滚动器。
 - timeline fixture 追加 Edit 第二轮，e2e 断言 fsum 汇总行与文件名（badges 串相应扩为五节）。
+
+## v46（2026-10-27）历史加载行改版 + 分页切轮缝合
+
+- 用户反馈三连：①悬浮 pill 存在感太强 → 改 header 下加载行，滚到顶（≤48px）才 height/opacity 过渡展开、离开收起；show/hide 只改变 #chat 高度，scrollTop 数值不动，阈值判定单调不振荡。②确认 400 条展示切片自初始提交 e009630 就有（v44 未改）——以前超出部分不可见，分页入口让它第一次可见。③分页切在轮中间会把同一段对话拆成两个「过程」胶囊。
+- 缝合：older 尾 bot 与当前首 bot 相邻 ⟺ 切点落在一轮 assistant 流中间（user 会以 role:'user' 出现在任一侧，stop/sys 都不建 turn）→ mergeBotTurns 拼接（桶+steps concat，ts 取早）；frag 末尾携带合并节点，insertBefore 后删除右移一位的旧首子节点——DOM/turns 仍 1:1，renderTail 无感。
+- 跨页配对：切点恰在 tool_use 与 tool_result 之间时 res 先到，进 state.orphanToolRes（上限 1000 防御），prepend 后 drainOrphanRes 按 id 回填；pairToolResults 顺势改 per-item 独立搜索——原「配到即停」语义会遗弃同批后续 item。
+- e2e 新增 paged 场景（140 轮 fixture）：首屏 266 turns、滚顶出加载行（带剩余计数）、点击后 280、排空收起、最老轮在顶。

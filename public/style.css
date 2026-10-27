@@ -466,8 +466,10 @@ button { font-family: inherit; }
 .ap-allow.on { color: var(--fg); }
 .ap-allow.on .ckb { background: var(--acc); border-color: var(--acc); }
 .ap-allow.on .ckb::after { content: ""; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(42deg); }
-.hist-more { position: fixed; top: calc(env(safe-area-inset-top) + 56px); left: 50%; transform: translateX(-50%); z-index: 8; border: 0; border-radius: 999px; background: var(--raise); color: var(--dim); font: 600 12px/1 var(--sans); padding: 10px 16px; box-shadow: var(--sh-2); cursor: pointer; }
-.hist-more:active { color: var(--fg); transform: translateX(-50%) scale(.96); }
+/* ---------- v46：历史加载行（header 下、到顶展开过渡；悬浮 pill 废弃） ---------- */
+.hist-more { flex: none; height: 0; opacity: 0; overflow: hidden; margin: 0 12px; border: 0; border-radius: 12px; background: var(--panel2); color: var(--dim); font: 600 12.5px/40px var(--sans); text-align: center; cursor: pointer; pointer-events: none; transition: height .22s ease, opacity .18s ease, margin .22s ease; }
+.hist-more.show { height: 40px; opacity: 1; margin-bottom: 6px; pointer-events: auto; }
+.hist-more:active { background: var(--raise); color: var(--fg); }
 .hist-more.busy { color: var(--faint); pointer-events: none; }
 
 /* ---------- v45：总结卡内改动文件汇总（6C 折叠行，展开=6B 每文件明细） ---------- */

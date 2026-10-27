@@ -70,7 +70,7 @@ function applyEventToTurns(ev) {
   } else if (ev.k === 'toolres') {
     // tool results arrive as later user lines; pair each back to its tool_use
     // step by id (search recent bot turns from the tail)
-    return pairToolResults(T, ev); // re-render from this turn so the output shows up
+    return pairToolResults(T, ev, state.orphanToolRes); // re-render from this turn so the output shows up
   } else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') {
     T.push(sysMarkerTurn(ev));
   } else if (ev.k === 'title') { /* meta only */ }
@@ -88,21 +88,51 @@ function addAssistantPart(turn, p) {
   }
   else if (p.t === 'text' && p.v && p.v.trim()) { turn.texts.push(p.v); turn.steps.push({ t: 'text', v: p.v }); }
 }
-function pairToolResults(T, ev) {
+// v46: per-item pairing + an optional sink for orphans - a toolres whose
+// tool_use lives in an OLDER page (the pagination split fell between a
+// tool_use and its result) is parked in state.orphanToolRes and drained when
+// that page is prepended. Per-item search also fixes the old semantics where
+// one paired item stopped the loop and stranded its siblings.
+function pairToolResults(T, ev, sink) {
   let touched = null;
-  for (let ti = T.length - 1; ti >= Math.max(0, T.length - 3) && touched === null; ti--) {
-    const turn = T[ti];
-    if (turn.role !== 'bot' || !turn.steps) continue;
-    for (const it of ev.items || []) {
-      const step = turn.steps.find((s) => s.t === 'tool' && s.tool.id === it.id);
-      if (!step || step.tool.out) continue;
-      step.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
-      const bkt = turn.tools.find((x) => x === step.tool);
-      if (bkt) bkt.out = step.tool.out;
-      touched = ti;
+  const find = (id) => {
+    for (let ti = T.length - 1; ti >= Math.max(0, T.length - 3); ti--) {
+      const turn = T[ti];
+      if (turn.role !== 'bot' || !turn.steps) continue;
+      const step = turn.steps.find((s) => s.t === 'tool' && s.tool.id === id && !s.tool.out);
+      if (step) return { turn, step, ti };
     }
+    return null;
+  };
+  for (const it of ev.items || []) {
+    const hit = find(it.id);
+    if (!hit) {
+      if (sink && sink.size < 1000) sink.set(it.id, it);
+      continue;
+    }
+    hit.step.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
+    const bkt = hit.turn.tools.find((x) => x === hit.step.tool);
+    if (bkt) bkt.out = hit.step.tool.out;
+    touched = hit.ti;
   }
   return touched;
+}
+// pair parked tool_results into freshly loaded turns (call after prepend)
+function drainOrphanRes(turns) {
+  const sink = state.orphanToolRes;
+  if (!sink || !sink.size) return;
+  for (const t of turns) {
+    if (t.role !== 'bot') continue;
+    for (const s of t.steps || []) {
+      if (s.t !== 'tool' || s.tool.out || !s.tool.id) continue;
+      const it = sink.get(s.tool.id);
+      if (!it) continue;
+      s.tool.out = { text: it.text || '', err: !!it.err, images: it.images || [] };
+      const bkt = t.tools.find((x) => x === s.tool);
+      if (bkt) bkt.out = s.tool.out;
+      sink.delete(s.tool.id);
+    }
+  }
 }
 // folded marker lines (cost snapshot / compaction summary / skill injection)
 function sysMarkerTurn(ev) {
@@ -645,10 +675,19 @@ function parseOlderTurns(events) {
       const turn = T[T.length - 1];
       turn.ts = turn.ts || ev.ts;
       for (const p of ev.parts || []) addAssistantPart(turn, p);
-    } else if (ev.k === 'toolres') pairToolResults(T, ev);
+    } else if (ev.k === 'toolres') pairToolResults(T, ev, state.orphanToolRes);
     else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') T.push(sysMarkerTurn(ev));
   }
   return T;
+}
+// v46: a pagination split mid-turn leaves the same conversation as TWO bot
+// turns (older page tail + current page head). The neighbors are both bot
+// exactly when the cut fell between assistant events of ONE turn - a user
+// turn in between would surface as role 'user' on either side - so splice
+// them into a single turn and re-render it: one process capsule per talk.
+function mergeBotTurns(a, b) {
+  return { role: 'bot', think: a.think.concat(b.think), tools: a.tools.concat(b.tools),
+    texts: a.texts.concat(b.texts), steps: a.steps.concat(b.steps), ts: a.ts || b.ts };
 }
 // prepend an older page: unshift turns AND insert children in equal measure,
 // then shift scrollTop by the height delta so the viewport stays anchored on
@@ -657,11 +696,21 @@ function parseOlderTurns(events) {
 function prependTurns(older) {
   if (!older || !older.length) return;
   const chat = $('chat');
+  const join = state.turns.length > 0 && older[older.length - 1].role === 'bot' && state.turns[0].role === 'bot';
+  let mergedEl = null;
+  if (join) {
+    const tail = older.pop();
+    state.turns[0] = mergeBotTurns(tail, state.turns[0]);
+    mergedEl = renderTurn(state.turns[0]);
+  }
   const frag = document.createDocumentFragment();
   for (const t of older) frag.appendChild(renderTurn(t));
+  if (mergedEl) frag.appendChild(mergedEl);
   const beforeH = chat.scrollHeight;
   chat.insertBefore(frag, chat.firstChild);
   state.turns.unshift(...older);
+  if (mergedEl) chat.removeChild(chat.childNodes[older.length + 1]); // old head turn, shifted right by the fragment
+  drainOrphanRes(state.turns.slice(0, older.length + (mergedEl ? 1 : 0)));
   chat.scrollTop += chat.scrollHeight - beforeH;
   markCapped();
   armCodeCopy();
@@ -678,4 +727,5 @@ window.addEventListener('resize', updateJumpFab);
 
 export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderAllTurns, renderTurn, renderTail, updateJumpFab, scrollBottom,
-  pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns, fileChanges };
+  pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns, fileChanges,
+  pairToolResults, drainOrphanRes, mergeBotTurns };

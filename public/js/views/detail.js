@@ -60,24 +60,31 @@ function closeDetail() { // via the ← button only
   state.currentId = null;
   state.turns = [];
   state.histBefore = 0; state.histTotal = 0; state.histLoading = false;
-  const hm = $('hist-more'); if (hm) hm.classList.add('hidden');
+  state.orphanToolRes.clear();
+  const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
   $('detail').classList.add('hidden');
   $('list').classList.remove('hidden');
 }
 
-/* ---------------- history pagination (v44): pill + pull gesture ---------------- */
-// The pill lives OUTSIDE #chat on purpose: a leading chat child would break
-// renderTail's 1:1 children/turns invariant. Two triggers per the decision:
-// tapping the pill, OR pulling down past 70px while pinned at the very top.
+/* ---------------- history pagination (v44/v46): header row + pull gesture ---------------- */
+// The loader is a ROW UNDER THE HEADER (v46 用户裁定:悬浮 pill 存在感太强),
+// revealed with a height/opacity transition only while pinned at the top; it
+// lives OUTSIDE #chat on purpose - a leading chat child would break
+// renderTail's 1:1 children/turns invariant. Two triggers: tap the row, OR
+// pull down past 70px while pinned at the very top.
 function updateHistoryPill() {
   const el = $('hist-more');
   if (!el) return;
-  const exhausted = state.histBefore >= state.histTotal;
-  if (!state.currentId || (exhausted && !state.histLoading)) { el.classList.add('hidden'); return; }
+  if (!state.currentId) { el.classList.remove('show', 'busy'); return; }
+  el.classList.toggle('busy', state.histLoading);
   el.textContent = state.histLoading ? '加载中…'
     : '加载更早 · 还有 ' + (state.histTotal - state.histBefore) + ' 条';
-  el.classList.toggle('busy', state.histLoading);
-  el.classList.remove('hidden');
+  const hasMore = state.histBefore < state.histTotal;
+  // reveal rule: anything to load AND (pinned at the top OR a load in flight
+  // for feedback). The height change shifts #chat monotonically (scrollTop
+  // stays numerically put, so the threshold verdict cannot oscillate).
+  const atTop = $('chat').scrollTop <= 48;
+  el.classList.toggle('show', (hasMore || state.histLoading) && (atTop || state.histLoading));
 }
 function loadOlder() {
   if (!state.currentId || state.histLoading || state.histBefore >= state.histTotal) return;
@@ -109,6 +116,8 @@ $('chat').addEventListener('touchmove', (e) => {
 }, { passive: true });
 $('chat').addEventListener('touchend', () => { pullOn = false; }, { passive: true });
 $('hist-more').onclick = loadOlder;
+// reveal/hide the loader row as the user crosses the top threshold
+$('chat').addEventListener('scroll', updateHistoryPill, { passive: true });
 
 /* ---------------- meta / driver chip ---------------- */
 function renderMeta() {

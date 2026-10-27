@@ -51,6 +51,20 @@ export function timelineLines() {
   ];
 }
 
+// scenario: history pagination (v46) - 140 turns = 420 events; the first
+// screen shows only the LAST 400 (events 21..420 = turns 7..139, 266 turns);
+// "load older" brings the first 20 events (turns 0..6, 14 turns) => 280.
+export function pagedLines(turns = 140) {
+  const L = [];
+  let i = 1;
+  for (let n = 0; n < turns; n++) {
+    L.push(user(i++, '第' + n + '轮提问'));
+    L.push(assistant(i++, [text('第' + n + '轮回答')]));
+    L.push(stop(i++));
+  }
+  return L;
+}
+
 // scenario: markdown-rich conclusion
 export function mdLines() {
   const md = [

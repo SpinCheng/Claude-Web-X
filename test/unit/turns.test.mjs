@@ -24,7 +24,8 @@ globalThis.document = globalThis.document || {
 };
 globalThis.window = globalThis.window || { addEventListener: () => {} };
 
-const { applyEventToTurns, fileChanges } = await import('../../public/js/views/transcript.js');
+const { applyEventToTurns, fileChanges, mergeBotTurns, pairToolResults, drainOrphanRes } =
+  await import('../../public/js/views/transcript.js');
 const { state } = await import('../../public/js/state.js');
 
 const userTurns = () => state.turns.filter((t) => t.role === 'user');
@@ -99,4 +100,27 @@ test('fileChanges merges edits per file (case-insensitive) with ± lines', () =>
   assert.deepEqual([a.add, a.del], [6, 5], 'edit + multiedit hunks merged (+3-2 then +3-3)');
   const b = files.find((f) => /b\.md$/i.test(f.path));
   assert.deepEqual([b.add, b.del], [2, 0], 'write counts every line as an addition');
+});
+
+test('mergeBotTurns splices the two halves of a page-split turn', () => {
+  const a = { role: 'bot', think: ['t1'], tools: [], texts: ['前半'],
+    steps: [{ t: 'think', v: 't1' }, { t: 'text', v: '前半' }], ts: '1' };
+  const b = { role: 'bot', think: [], tools: [], texts: ['后半'], steps: [{ t: 'text', v: '后半' }], ts: '' };
+  const m = mergeBotTurns(a, b);
+  assert.equal(m.texts.join('|'), '前半|后半', 'texts in order');
+  assert.equal(m.steps.length, 3, 'steps concatenated');
+  assert.equal(m.ts, '1', 'earlier ts wins');
+});
+
+test('orphan toolres parks, then drains into the later-loaded tool_use', () => {
+  state.orphanToolRes = new Map();
+  const T = [{ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '' }];
+  // result arrives while the tool_use lives on an older page: parked
+  assert.equal(pairToolResults(T, { k: 'toolres', items: [{ id: 'x9', text: '结果' }] }, state.orphanToolRes), null);
+  assert.equal(state.orphanToolRes.get('x9').text, '结果', 'orphan parked');
+  // the older page loads afterwards: drain pairs by id
+  T[0].steps.push({ t: 'tool', tool: { name: 'Bash', id: 'x9', v: '{}', out: null } });
+  drainOrphanRes(T);
+  assert.equal(T[0].steps[0].tool.out.text, '结果', 'paired after prepend');
+  assert.equal(state.orphanToolRes.size, 0, 'sink consumed');
 });

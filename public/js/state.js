@@ -40,6 +40,8 @@ export const state = {
   histBefore: 0,      // v44 history pagination: trailing events already loaded
   histTotal: 0,       // v44: total parsed events in the transcript
   histLoading: false, // v44: an older-page fetch is in flight
+  orphanToolRes: new Map(), // v46: toolres whose tool_use is on an older page
+                            // (pagination split) - parked here until it loads
 };
 
 export { CLOSED_KEY };
