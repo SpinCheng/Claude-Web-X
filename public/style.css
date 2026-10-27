@@ -470,14 +470,15 @@ button { font-family: inherit; }
 .ap-allow.on { color: var(--fg); }
 .ap-allow.on .ckb { background: var(--acc); border-color: var(--acc); }
 .ap-allow.on .ckb::after { content: ""; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(42deg); }
-/* ---------- v47：历史加载行方案A（无底色纯文字；进场 ease-out 滑落、离场加速的不对称时序；height 只做槽位塌缩不做动画主角） ---------- */
-.hist-more { flex: none; height: 0; opacity: 0; overflow: hidden; margin: 0 12px; border: 0; background: transparent; color: var(--dim); font: 500 12.5px/38px var(--sans); text-align: center; cursor: pointer; pointer-events: none; transition: height .18s ease-in, opacity .13s ease, margin .18s ease-in; }
-.hist-more .in { display: inline-block; transform: translateY(-9px); transition: transform .34s cubic-bezier(.22,1,.36,1); }
-.hist-more.show { height: 38px; opacity: 1; margin-bottom: 4px; pointer-events: auto; transition: height .3s cubic-bezier(.22,1,.36,1), opacity .24s ease .05s, margin .3s cubic-bezier(.22,1,.36,1); }
-.hist-more.show .in { transform: none; }
+/* ---------- v54：历史加载行跟手渐显（1:1 直操作） ----------
+   JS 每个 scroll 事件按 scrollTop 线性映射行高/透明度/内字位移（RAMP=64px，detail.js）。
+   刻意不用 CSS transition：过渡会让行高滞后手指一个时长，跟随感即失效。
+   行在 #chat 外：行高变化只缩 #chat 盒高、永不改其 scrollTop——单调无振荡。 */
+.hist-more { flex: none; height: 0; opacity: 0; overflow: hidden; margin: 0 14px; border: 0; background: transparent; color: var(--dim); font: 500 12.5px/38px var(--sans); text-align: center; cursor: pointer; pointer-events: none; }
+.hist-more .in { display: inline-block; }
+.hist-more.show { pointer-events: auto; }
 .hist-more:active { color: var(--fg); }
 .hist-more.busy { color: var(--faint); pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .hist-more, .hist-more.show, .hist-more .in { transition-duration: 1ms !important; transition-delay: 0s !important; } }
 
 /* ---------- v48：费用面板（header 费用文本入口 → 从 header 下落下的面板） ---------- */
 .cost-entry { display: inline-block; text-decoration: underline dotted rgba(232, 146, 111, .55); text-underline-offset: 3px; cursor: pointer; }

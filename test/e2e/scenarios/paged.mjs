@@ -16,6 +16,10 @@ await withEnv(async (h, page) => {
   // pinned at the top: the row reveals (v46 transition row under the header)
   await page.ev('var c=document.getElementById("chat"); c.scrollTop=0; c.dispatchEvent(new Event("scroll"))');
   assert(await page.waitFor('document.getElementById("hist-more").classList.contains("show")'), 'loader reveals at top');
+  await page.ev('var c=document.getElementById("chat"); c.scrollTop=32; c.dispatchEvent(new Event("scroll"))');
+  const midH = await page.ev('parseFloat(getComputedStyle(document.getElementById("hist-more")).height)');
+  assert(midH > 1 && midH < 37, 'row height follows the scroll 1:1 (mid-ramp ' + midH + 'px)');
+  await page.ev('var c=document.getElementById("chat"); c.scrollTop=0; c.dispatchEvent(new Event("scroll"))');
   const label = await page.ev('document.getElementById("hist-more").textContent');
   assert(label.indexOf('还有 20 条') >= 0, 'remaining count (got "' + label + '")');
 

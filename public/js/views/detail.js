@@ -72,19 +72,32 @@ function closeDetail() { // via the ← button only
 // lives OUTSIDE #chat on purpose - a leading chat child would break
 // renderTail's 1:1 children/turns invariant. Two triggers: tap the row, OR
 // pull down past 70px while pinned at the very top.
+// v54: the loader row follows the scroll gesture 1:1 - height/opacity/text
+// offset ramp linearly over the last HIST_RAMP px of upward scroll (direct
+// manipulation; NO CSS transition - it would lag the finger). Monotonic by
+// construction: the row lives outside #chat, so its height only shrinks
+// #chat's box and never feeds back into scrollTop. A load in flight pins it
+// fully open (feedback), exhaustion collapses it to zero.
+const HIST_RAMP = 64;
+function setHistRow(el, f) {
+  el.style.height = f > 0 ? Math.round(38 * f) + 'px' : '0';
+  el.style.opacity = f.toFixed(3);
+  el.style.marginBottom = (4 * f).toFixed(2) + 'px';
+  const inner = el.firstElementChild;
+  if (inner) inner.style.transform = 'translateY(' + (-9 * (1 - f)).toFixed(2) + 'px)';
+}
 function updateHistoryPill() {
   const el = $('hist-more');
   if (!el) return;
-  if (!state.currentId) { el.classList.remove('show', 'busy'); return; }
+  if (!state.currentId) { el.classList.remove('show', 'busy'); setHistRow(el, 0); return; }
   el.classList.toggle('busy', state.histLoading);
   el.firstElementChild.textContent = state.histLoading ? '加载中…'
     : '加载更早 · 还有 ' + (state.histTotal - state.histBefore) + ' 条';
   const hasMore = state.histBefore < state.histTotal;
-  // reveal rule: anything to load AND (pinned at the top OR a load in flight
-  // for feedback). The height change shifts #chat monotonically (scrollTop
-  // stays numerically put, so the threshold verdict cannot oscillate).
-  const atTop = $('chat').scrollTop <= 48;
-  el.classList.toggle('show', (hasMore || state.histLoading) && (atTop || state.histLoading));
+  const f = state.histLoading ? 1
+    : hasMore ? Math.max(0, Math.min(1, (HIST_RAMP - $('chat').scrollTop) / HIST_RAMP)) : 0;
+  setHistRow(el, f);
+  el.classList.toggle('show', f > 0.1); // interactive once it is really there
 }
 function loadOlder() {
   if (!state.currentId || state.histLoading || state.histBefore >= state.histTotal) return;

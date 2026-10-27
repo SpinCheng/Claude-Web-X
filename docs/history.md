@@ -265,3 +265,10 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 组件 `showConfirm({title,body,ok,danger,onOk,onCancel})`（overlays.js）：沿用底部 sheet 模态语言（rename/new-modal 同款 grammar——弹层=气泡、模态=全宽 sheet 的既有分工不动）；危险确认=红实底主钮（`.btn.danger`，--err）、普通确认（仍然发送/切换驱动）=珊瑚主钮；**焦点落安全侧**（danger 时 focus 取消钮，Enter=取消；非 danger focus 确认钮）；Escape/scrim/取消三路关闭；aria dialog/labelled。markup 挂 body 级（列表页与详情页都要用，同 new-modal 先例）。
 - 调用点改回调式：list.batchDelete/app.deleteSession 拆两函数（confirm→runBatchDelete/doDeleteSession）；composer handoff 双问的取消路径接 onCancel:fail()（原先 else fail() 语义不变）。
 - e2e：sessops/list 删除段改为断言 confirm-modal 出现+点 #cf-ok（原先靠 harness 代答原生 dialog）；harness 的 javascriptDialogOpening 处理保留作兜底。**教训：bash heredoc 里嵌 JS 模板字面量（反引号+${}）会被吃——补丁走临时 .py 文件执行后删除。**
+
+## v54（2026-10-28）历史加载行改跟手渐显
+
+- 用户提出：显示/隐藏能否跟随滚动手势渐变。原 v46/v47 为「≤48px 阈值 + CSS 过渡」二值切换。
+- 实现：updateHistoryPill 每 scroll 事件按 f=clamp((64−scrollTop)/64) 直接写行高/opacity/margin/内字位移（setHistRow；.in 的 translateY(-9px) 滑落保留为 f 驱动）；**CSS transition 全删**——过渡会让行高滞后手指一个时长，1:1 跟随感即失效。RAMP 48→64（连续映射下可放宽，手感更顺）。
+- 无振荡论证升级：行在 #chat 外，行高只缩 #chat 盒高、永不改其 scrollTop——连续映射单调性由构造保证（原阈值法的论证是它的特例）。
+- 加载中钉满 38px（反馈不变）；排空即 0；.show 语义收窄为 f>0.1 时开 pointer-events。行左右 margin 12→14 对齐 v53 页面网格。paged e2e 加中段断言（scrollTop=32 → 计算高 1~37px 之间，证 1:1）。
