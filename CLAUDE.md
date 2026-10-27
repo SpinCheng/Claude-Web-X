@@ -2,10 +2,10 @@
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话的插件工程（LAN bridge + 免构建 PWA）。
 
-- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / ctxring 圆环·明细·模型目录 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 是唯一函数级循环 import，求值期零交叉）。
+- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·长按气泡 / ctxring 圆环·明细·模型目录 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
 - 版本演进与调试史（症状→根因）：`docs/history.md`
-- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（14 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，7 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换）
+- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（14 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，8 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
 - 功能缺口 Backlog：README「路线图/Backlog」节
 
 ## 快速开始
@@ -29,6 +29,7 @@ npm start          # node bridge/index.js，端口 3742
 - **等待横幅（v21）**：PC 交互会话卡在权限确认时 CLI 不写转录、手机无从得知——Notification hook（message 含 "permission to use X"/"needs your approval"；**只认权限类**——空闲提示 "waiting for your input" 每轮跑完必发且清除时机都已过去，认了横幅就常驻，勿加回）→ `waitings` Map → WS `wait` 帧 + `/api/sessions` 的 `waiting` 字段 + 详情页横幅 + 列表「待确认」灯。清除双路：该会话任何转录 append、Stop hook。**所有 sessions 帧（WS 初始/broadcast/HTTP）必须走 `mergedSessions()`**——曾因 broadcast 发未合并的 `store.list()` 导致 WS 侧永远看不到 running/queued/waiting。
 - **上下文探针（ctxprobe.js）**：`GET /api/sessions/:id/context` → 按 (cwd, modelId) 缓存（内存 + `bridge/data/ctx-probe.json`）跑一次性 `-p /context`，解析后 `adapter.archiveSession` 回收丢弃会话（首次 ~6s，缓存后毫秒级）。固定开销只取决于 (cwd, model)。
 - **会话删除**：转录移入 `bridge/data/trash/`（可找回）+ 墓碑防 fs.watch 复活；运行中 409。
+- **会话操作（v34）**：列表行长按（触屏 480ms）/右键 → 操作气泡（sessops.js：停止/重命名/删除，停止单只在手机驱动的 run 存在时出现）。**重命名 = `POST /api/sessions/:id/rename` 往转录 JSONL 追加原生 `custom-title` 行**（桌面端改名同款记录）：落盘即持久、每次 boot/drain 重放生效；行尾无 `\n` 先补边界（防坏行拼接）；行不带时间戳 → 不 bump lastActive/status。**mergedSessions 携带 `runId`**——重载后没见过 run 帧也能 cancel（列表停止与 composer 停止共用）。长按的尾随 click 吞噬挂 **document 捕获段**（at-target 按注册序，行上拦不住先注册的 el.onclick）+ 700ms 过期。headless confirm 自动 dismiss——harness 代答 accept。
 
 ## 已实测确认的数据事实（勿再调研）
 
@@ -91,4 +92,4 @@ npm start          # node bridge/index.js，端口 3742
 
 ## 路线图（候选下一批 = PWA·P0，详见 README Backlog）
 
-P0 核心闭环：锁屏通知（ntfy 就绪）/ 手动 /compact / 审批 diff 视图 / 历史回看分页 / 手机发图（勘测中转多模态）。P1：always-allow 白名单、改动文件总览、重命名、队列单条管理、搜索、导出 MD。之后 Phase 3（Cowork 数据面，adapter-cowork.js + 轮询）、Phase 4（Cowork 控制面，UIA 主路线）。
+P0 核心闭环：锁屏通知（ntfy 就绪）/ 手动 /compact / 审批 diff 视图 / 历史回看分页 / 手机发图（勘测中转多模态）。P1：always-allow 白名单、改动文件总览、搜索、导出 MD（重命名、队列单条管理已落地）。之后 Phase 3（Cowork 数据面，adapter-cowork.js + 轮询）、Phase 4（Cowork 控制面，UIA 主路线）。

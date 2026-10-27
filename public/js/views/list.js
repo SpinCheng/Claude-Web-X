@@ -6,6 +6,7 @@ import { $, shortPath, relTime } from '../util.js';
 import { state, CLOSED_KEY } from '../state.js';
 import { openDetail } from './detail.js';
 import { openNewModal } from './composer.js';
+import { wireRowPress } from './sessops.js';
 
 function sessState(s) {
   if (s.running || state.runs[s.id]?.state === 'running') return 'running';
@@ -113,7 +114,9 @@ function renderRow(s) {
   const info = [relTime(s.lastActive), (s.lines || 0) + ' 行'];
   if (s.cost && s.cost.usd != null) info.push('$' + Number(s.cost.usd).toFixed(2));
   el.querySelector('.srow-info').textContent = info.join(' · ');
+  el.title = '点击打开 · 长按/右键更多操作';
   el.onclick = () => openDetail(s.id);
+  wireRowPress(el, s.id); // long-press / right-click -> action bubble (sessops.js)
   return el;
 }
 

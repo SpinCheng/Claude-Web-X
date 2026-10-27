@@ -24,7 +24,10 @@ export function createHub({ cfg, store, runner }) {
     return store.list().map((s) => {
       const live = runner.activeRunFor(s.id);
       const out = runner.recallOutcome(s.id);
-      return { ...s, running: !!live, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
+      // runId rides along so a client that loads mid-run (no run frame seen)
+      // can still cancel it - the list-page stop action and the composer
+      // stop button both need it
+      return { ...s, running: !!live, runId: live ? live.runId : null, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
     });
   }
 

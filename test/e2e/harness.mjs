@@ -81,7 +81,13 @@ export async function bootPage(profileDir) {
   const ws = new WebSocket(wsUrl);
   await new Promise((r) => ws.on('open', r));
   let seq = 0; const pending = new Map();
-  ws.on('message', (d) => { const m = JSON.parse(d); if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result); pending.delete(m.id); } });
+  ws.on('message', (d) => {
+    const m = JSON.parse(d);
+    if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result); pending.delete(m.id); return; }
+    // headless auto-DISMISSES window.confirm (returns false); the delete-flow
+    // scenarios need the confirm accepted, so answer dialogs as OK
+    if (m.method === 'Page.javascriptDialogOpening') send('Page.handleJavaScriptDialog', { accept: true });
+  });
   const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
   await send('Page.enable'); await send('Runtime.enable');
   const ev = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;

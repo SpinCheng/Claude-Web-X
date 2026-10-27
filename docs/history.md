@@ -1,5 +1,15 @@
 # 版本演进与调试史（症状 → 根因）
 
+## 2026-10-27 · 列表页会话操作（v34：长按/右键 → 操作气泡）
+
+会话操作成套补齐——**停止运行 / 重命名 / 删除**在列表行长按（触屏）或右键（桌面）呼出的操作气泡直达，不必先进会话。功能清单梳理：列表语境下有意义的操作就这三个（复制 ID 小众、置顶无后端、导出属 P1，均不进本批）；打开=单击不变。
+
+形态选**锚定气泡**而非滑动操作或行内按钮，三重依据：① UX 规则「主内容横向 swipe 与垂直滚动手势冲突」（ui-ux-pro-max Touch/Gesture Conflicts，vertical scroll primary）；② 工程事实 renderList() 每次 sessions 帧全量重建 DOM——swipe 展开态会被秒关，气泡是覆盖层不受重建影响；③ 触屏无 hover，「悬停显隐按钮」路线天然出局（High severity 规则）。破坏性删除保持 window.confirm 双确认（沿用既有惯例）。气泡/重命名弹层进 BUBBLES 数组——scrim 点击、系统返回吞噬、Esc 全部白得。
+
+实现要点：**重命名 = 原生 custom-title 行**——`POST /api/sessions/:id/rename` 往转录 JSONL 追加 `{type:'custom-title'}`（桌面端改名写的同一记录类型）：落盘即持久、每次 boot/drain 重放即生效；行尾无 `\n`（写崩残留）时先补边界再追加，防拼接出坏行；行不带时间戳 → 解析器不 bump lastActive/status。**mergedSessions 补 runId**——顺手修掉「页面重载后停止按钮失灵」老缺口（没见过 run 帧就无从 cancel），列表停止与 composer 停止共用此回退。**长按的尾随 click 吞噬必须挂 document 捕获段**——at-target 监听按注册序执行，renderRow 先赋 el.onclick，行上拦截来不及（长按会连开详情）；arm 于手势结束 + 700ms 过期，防无尾点击的手势（iOS 长按不出 click）误吞下一次主动点击。
+
+测试坑：headless 对 window.confirm 自动 **dismiss（返回 false）**——harness CDP 客户端补 `Page.javascriptDialogOpening` → `handleJavaScriptDialog{accept:true}`，删除链路才可 E2E（sessops 场景第 8 个：气泡条件行 idle 无停止/运行有停止、重命名乐观上屏 + **重载后仍在**（转录重放验证）、停止 toast、删除后行消失）。
+
 ## 2026-10-27 · 会话列表重排（v33，ui-ux-pro-max 技能驱动）
 
 主动重设计（非修 bug）。布局决策：①状态词右置成独立着色槽位（idle 不渲染减噪；色彩+文字双通道）；②行改语义 `<button>`（键盘可达+focus-visible 弱珊瑚环），min-height 52px/组头 48px/touch-action:manipulation；③去掉每行 go 箭头（全行可点+按压反馈已表达）；④组头 tally 补 waiting 计数（acc 色排最前，折叠时仍可见——待确认是手机端唯一可行动状态）+ aria-expanded；⑤空态=图标+文案+全屏唯一珊瑚 CTA 直开新会话弹窗。刻意不做入场 stagger：renderList 每次 sessions 帧全量重建，动画=闪烁+费帧。视觉纪律未破（沿用既有 token，珊瑚只给唯一 CTA）。

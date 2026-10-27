@@ -10,7 +10,9 @@ import { ART_IMG } from '../md.js';
 import { toast } from './toast.js';
 
 /* ---------- bubble popups (v15 E): anchored above the dock ---------- */
-const BUBBLES = ['ctx-sheet', 'model-sheet', 'perm-sheet', 'effort-sheet'];
+// row-actions/rename-modal (v34) live on the LIST page but share the same
+// machinery: open hides siblings, scrim click + system back close
+const BUBBLES = ['ctx-sheet', 'model-sheet', 'perm-sheet', 'effort-sheet', 'row-actions', 'rename-modal'];
 function openBubble(id) {
   // switching bubbles reuses the open state; no history churn
   for (const b of BUBBLES) {
@@ -114,7 +116,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const t = e.target;
   if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) return;
-  for (const id of ['lightbox', 'file-prev']) {
+  for (const id of ['lightbox', 'file-prev', 'row-actions', 'rename-modal']) {
     const el = $(id);
     if (el && !el.classList.contains('hidden')) { el.classList.add('hidden'); if (id === 'lightbox') $('lightbox-img').src = ''; return; }
   }

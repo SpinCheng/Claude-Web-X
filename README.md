@@ -115,7 +115,7 @@ claude-remote/
 
 - [ ] always-allow 工具白名单（审批疲劳：ask 模式下按 tool_name 自动放行，存 config）
 - [ ] 会话改动文件总览（聚合转录 Edit/Write，或 bridge 跑 `git status --porcelain`）
-- [ ] 会话重命名（本地覆盖标题）
+- [x] ~~会话重命名~~（v34 已实现：列表长按/右键 → 操作气泡；写原生 `custom-title` 行入转录，落盘即持久、桌面端同款机制，非本地覆盖）
 - [x] ~~队列单条管理~~（v17 已实现：队列面板 + 删单条/拖动重排/▶插队/清空）
 - [ ] 会话搜索（标题 + 最近事件）
 - [ ] 导出 Markdown

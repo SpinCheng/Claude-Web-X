@@ -1,7 +1,7 @@
-// routes/sessions.js - read-side session APIs + reversible delete
+// routes/sessions.js - read-side session APIs + reversible delete + rename
 import fs from 'node:fs';
 import path from 'node:path';
-import { authOk } from '../lib/auth.js';
+import { authOk, readBody } from '../lib/auth.js';
 import { PREVIEW_MIME } from '../lib/mime.js';
 import { readModelCatalog } from '../lib/models.js';
 
@@ -89,5 +89,40 @@ export function register(router, ctx) {
     if (!result.ok) { json(res, 404, { error: result.error }); return; }
     try { fs.rmSync(path.join(ctx.UPLOADS_DIR, r.params.id), { recursive: true, force: true }); } catch { /* nothing stored */ }
     json(res, 200, result);
+  });
+
+  // rename (v34): append a native custom-title line - the same record the
+  // Desktop CLI writes on rename - so the change lives IN the transcript
+  // (persists across boots, replays on every drain). No timestamp on the
+  // line => the parser never bumps lastActive/status. Safe mid-run: both
+  // sides write whole lines appends-only.
+  router.post('/api/sessions/:id/rename', async (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    const rec = store.get(r.params.id);
+    if (!rec || !rec.transcriptPath) { json(res, 404, { error: 'not found' }); return; }
+    let jsonIn = {};
+    try { jsonIn = JSON.parse(await readBody(req) || '{}'); } catch { /* empty */ }
+    const title = String(jsonIn.title || '').trim().slice(0, 120);
+    if (!title) { json(res, 400, { error: 'title required' }); return; }
+    try {
+      // if the last line lacks its newline (crash mid-write), our line would
+      // CONCATENATE onto it and corrupt both - repair the boundary first
+      let pre = '';
+      try {
+        const st2 = fs.statSync(rec.transcriptPath);
+        if (st2.size > 0) {
+          const fd = fs.openSync(rec.transcriptPath, 'r');
+          try {
+            const buf = Buffer.alloc(1);
+            if (fs.readSync(fd, buf, 0, 1, st2.size - 1) === 1 && buf[0] !== 0x0A) pre = '\n';
+          } finally { fs.closeSync(fd); }
+        }
+      } catch { /* unreadable tail -> append as-is */ }
+      fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({ type: 'custom-title', customTitle: title }) + '\n');
+    } catch (e) {
+      json(res, 500, { error: 'fs: ' + (e && e.code || e) });
+      return;
+    }
+    json(res, 200, { ok: true });
   });
 }

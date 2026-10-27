@@ -370,9 +370,12 @@ function restoreComposer(text, atts) {
   }
 }
 function stopRun() {
-  const run = state.currentId && state.runs[state.currentId];
-  if (!run || !run.runId) return;
-  fetch('/api/runs/' + encodeURIComponent(run.runId) + '/cancel', { method: 'POST', headers: auth() })
+  // runId from the run frame, or from the sessions frame (v34: mergedSessions
+  // exposes it) - covers loading the page mid-run, when no frame was ever seen
+  const rec = state.currentId && state.sessions.find((x) => x.id === state.currentId);
+  const runId = (state.runs[state.currentId] || {}).runId || (rec && rec.runId) || '';
+  if (!runId) return;
+  fetch('/api/runs/' + encodeURIComponent(runId) + '/cancel', { method: 'POST', headers: auth() })
     .then(() => toast('已发送停止信号'))
     .catch(() => {});
 }
