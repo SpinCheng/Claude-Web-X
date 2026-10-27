@@ -414,7 +414,7 @@ function drawCostEditor() {
   const pane = $('cost-pane'); pane.textContent = '';
   const note = (txt) => { const p = document.createElement('p'); p.className = 'sheet-note'; p.textContent = txt; pane.append(p); };
   if (mode === 'off') {
-    note('显示 CC 按官方价表算好的原值（cost-state），无需任何配置。三方中转计费不同时请换用另两档。');
+    note('CC 内置官方价表，每轮算完随转录传回（cost-state）——这里只是显示这个结果，无需任何配置。三方中转计费不同时请换用另两档。');
     return;
   }
   if (mode === 'mult') {

@@ -92,9 +92,16 @@ function showApproval() {
     dfEl.classList.remove('hidden');
     inEl.classList.add('hidden');
   } else {
+    // v58: Bash commands read as text, not JSON - stringify escapes the
+    // command's real newlines into literal \n soup (unreadable for heredocs)
     let detail = '';
-    try { detail = typeof a.input === 'string' ? a.input : JSON.stringify(a.input, null, 2); } catch { detail = String(a.input); }
-    if (detail.length > 800) detail = detail.slice(0, 800) + '…';
+    if (a.input && typeof a.input.command === 'string') {
+      detail = a.input.command.replace(/\n$/, '');
+      if (detail.length > 2000) detail = detail.slice(0, 2000) + '…';
+    } else {
+      try { detail = typeof a.input === 'string' ? a.input : JSON.stringify(a.input, null, 2); } catch { detail = String(a.input); }
+      if (detail.length > 800) detail = detail.slice(0, 800) + '…';
+    }
     inEl.textContent = detail || '(无参数)';
     inEl.classList.remove('hidden');
     dfEl.classList.add('hidden');
