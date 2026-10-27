@@ -121,14 +121,16 @@ export class CtxProbe {
             } catch { /* not json */ }
           }
           const report = parseContextReport(out);
+          // trash the throwaway transcript so it never shows up anywhere -
+          // BEFORE the parse verdict: a failed probe that skips the archive
+          // leaks the sidecar as a cwd-less ghost session in the list
+          if (sessionId) { try { this.adapter.archiveSession(sessionId); } catch { /* benign */ } }
           if (!report.window || report.fixed.total === 0) {
             throw new Error('unparseable /context output');
           }
           report.at = Date.now();
           const key = (cwd || this.defaultCwd) + '|' + (modelId || '');
           this.cache.set(key, report);
-          // trash the throwaway transcript so it never shows up anywhere
-          if (sessionId) { try { this.adapter.archiveSession(sessionId); } catch { /* benign */ } }
           resolve(report);
         } catch (e) {
           reject(new Error('ctxprobe: ' + (e && e.message || e) + ' (exit ' + code + ')'));

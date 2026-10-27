@@ -134,3 +134,15 @@ test('fenceTitle: stale prev is swallowed, real news disarms, matches pass', () 
   assert.equal(fenceTitle(pin, undefined), null);  // not a title record
   assert.equal(fenceTitle(pin, ''), null);         // malformed blank
 });
+
+// v41c: cwd rides on ANY line type (system/local_command sidecars carry it
+// too) - a transcript without user lines must still group by its project
+test('cwd is harvested from non-user lines (ctxprobe sidecar shape)', () => {
+  const { patch } = run([
+    { type: 'mode', sessionId: 's' },
+    { type: 'permission-mode', sessionId: 's', permissionMode: 'default' },
+    { type: 'system', subtype: 'local_command', isSidechain: true, cwd: 'D:\\x\\y', timestamp: 't' },
+    { type: 'cost-state', modelUsage: {} },
+  ]);
+  assert.equal(patch.cwd, 'D:\\x\\y');
+});

@@ -35,6 +35,11 @@ const OUTCOME_SUBTYPES = {
 };
 
 export function applyLine(id, obj, patch, events, rec) {
+    // cwd rides on several line types (user, system/local_command, ...):
+    // harvest from ANY of them - a transcript that only ever carries cwd on
+    // system lines (e.g. a leaked ctxprobe sidecar) must still group by its
+    // real project instead of falling back to the workspace slug
+    if (obj.cwd) patch.cwd = obj.cwd;
     switch (obj.type) {
       case 'user': {
         // compaction continuation (2.1.308): the CLI injects the resume
@@ -148,7 +153,6 @@ export function applyLine(id, obj, patch, events, rec) {
         }
         const haveTitle = patch.title || (rec && rec0.title && rec0.title !== '(loading)');
         if (!haveTitle && text) { patch.title = text.slice(0, 48); patch.titleFallback = true; }
-        if (obj.cwd) patch.cwd = obj.cwd;
         const ev = { k: 'user', ts: obj.timestamp || '', text };
         if (images.length) ev.images = images;
         return ev;
