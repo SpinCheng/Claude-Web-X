@@ -114,6 +114,7 @@ function qRowEl(e, area) {
   edit.onclick = () => {
     const input = $('msg-input');
     input.value = e.text;
+    saveDraft(); // taken back into the box = it IS the draft now
     autoGrow();
     qApi('/' + encodeURIComponent(e.id), { method: 'DELETE' }).catch(() => {});
     input.focus();
@@ -246,6 +247,24 @@ async function downscaleImage(bytes, type) {
 }
 
 /* ---------------- composer ---------------- */
+// per-session draft persistence (v40): unsent input survives leaving the
+// session (localStorage cr_draft_<sid>, re-filled by openDetail -> setDraft)
+const draftKey = (id) => 'cr_draft_' + id;
+let _draftTimer = null;
+function saveDraft() {
+  const id = state.currentId;
+  if (!id) return;
+  const v = $('msg-input').value.slice(0, 20000);
+  try { if (v) localStorage.setItem(draftKey(id), v); else localStorage.removeItem(draftKey(id)); } catch { /* quota */ }
+}
+function setDraft(id) {
+  let v = '';
+  try { v = localStorage.getItem(draftKey(id)) || ''; } catch { /* */ }
+  const input = $('msg-input');
+  input.value = v;
+  autoGrow();
+  updateComposer();
+}
 function autoGrow() {
   const t = $('msg-input');
   t.style.height = 'auto';
@@ -270,7 +289,50 @@ function sendMessage(force) {
   const input = $('msg-input');
   const text = input.value.trim();
   if (!text || !state.currentId) return;
+  if (state.armedBranch === state.currentId) { sendFork(text, input.value); return; }
   _send(text, input.value, force);
+}
+// v40 branch send: this message forks into a NEW session that inherits the
+// source thread's context (runner: --resume <src> --fork-session). No
+// optimistic bubble - the message belongs to the thread we're about to
+// navigate AWAY from. The fork's real session id rides the init line
+// (runner adoption, same as new sessions); app.js opens it via the
+// pendingBranch flags. The fork does not queue: a busy source refuses.
+function sendFork(text, rawInput) {
+  const src = state.currentId;
+  const atts = state.attach.splice(0);
+  renderAttachChips();
+  clearComposer();
+  state.pendingBranch = true;
+  state.pendingBranchRun = null;
+  api('/api/sessions/' + encodeURIComponent(src) + '/message', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text, force: false, perm: state.perm, model: currentModel(), effort: currentEffort(),
+      branchFrom: src, attachments: atts.map((a) => ({ file: a.file, name: a.name, type: a.type })),
+    }),
+  })
+    .then(async (r) => {
+      if (!r.ok) {
+        disarmFork();
+        restoreComposer(rawInput, atts);
+        const j = await r.json().catch(() => ({}));
+        toast(j.error === 'busy' ? '源会话正在运行，结束后再分支' : '分支启动失败（' + r.status + '）');
+        return;
+      }
+      const j = await r.json().catch(() => ({}));
+      state.pendingBranchRun = j.runId || null;
+      toast('分支线程启动中…');
+    })
+    .catch(() => { disarmFork(); restoreComposer(rawInput, atts); toast('网络错误'); });
+}
+function disarmFork() {
+  state.armedBranch = null;
+  state.pendingBranch = false;
+  state.pendingBranchRun = null;
+  const chip = $('fork-chip');
+  if (chip) chip.classList.add('hidden');
 }
 // optimistic path (v18→v21): the box empties, its height collapses, the
 // three-state button flips and the message bubble appears THE MOMENT the send
@@ -329,6 +391,7 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
 function clearComposer() {
   const input = $('msg-input');
   input.value = '';
+  try { if (state.currentId) localStorage.removeItem(draftKey(state.currentId)); } catch { /* */ }
   autoGrow();       // collapse the grown height back to one line
   updateComposer(); // re-evaluate the button: running+empty => stop, not amber queue-send
 }
@@ -336,6 +399,7 @@ function restoreComposer(text, atts) {
   const input = $('msg-input');
   if (!input.value) {
     input.value = text;
+    saveDraft(); // programmatic set doesn't fire input - persist it here
     autoGrow();
     updateComposer();
   }
@@ -419,7 +483,13 @@ $('perm').onclick = openPermSheet;
 $('msg-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !IS_TOUCH) { e.preventDefault(); sendMessage(false); }
 });
-$('msg-input').addEventListener('input', () => { autoGrow(); updateComposer(); });
+$('msg-input').addEventListener('input', () => {
+  autoGrow();
+  updateComposer();
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(saveDraft, 250);
+});
+$('fork-x').onclick = disarmFork;
 $('new-session').onclick = openNewModal;
 $('new-go').onclick = submitNewSession;
 $('new-cancel').onclick = () => $('new-modal').classList.add('hidden');
@@ -452,4 +522,4 @@ if (window.ResizeObserver && composerEl) {
   }).observe(composerEl);
 }
 
-export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal };
+export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setDraft, disarmFork };

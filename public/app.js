@@ -129,6 +129,11 @@ function handleRunFrame(d) {
       state.pendingNew = null;
       toast('任务没启动起来：' + (d.stderrTail || d.error || '查看工作目录是否正确').slice(0, 80));
     }
+    if (state.pendingBranchRun === d.runId && (d.state === 'error' || d.state === 'end')) {
+      state.pendingBranch = false;
+      state.pendingBranchRun = null;
+      toast('分支线程没启动起来：' + (d.stderrTail || d.error || '未知原因').slice(0, 80));
+    }
     return;
   }
   state.runs[d.sessionId] = { runId: d.runId, state: d.state, startedAt: d.startedAt };
@@ -162,6 +167,15 @@ function handleRunFrame(d) {
   if (state.pendingNew === d.runId && d.state === 'running') {
     state.pendingNew = null;
     if (state.currentId !== d.sessionId) openDetail(d.sessionId);
+  }
+  // v40 branch adoption: the fork's real session id arrived (init line).
+  // pendingBranchRun may still be null (WS beat the 202) - then accept any
+  // running frame for a different session within this tiny arming window.
+  if (state.pendingBranch && d.state === 'running' && d.sessionId !== state.currentId &&
+      (!state.pendingBranchRun || state.pendingBranchRun === d.runId)) {
+    state.pendingBranch = false;
+    state.pendingBranchRun = null;
+    openDetail(d.sessionId);
   }
 }
 

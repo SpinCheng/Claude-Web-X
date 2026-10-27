@@ -30,7 +30,10 @@ export function register(router, ctx) {
       json(res, 409, { error: arb.reason, lastWriteMs: arb.lastWriteMs, sinceMs: arb.sinceMs, claimedAt: arb.claimedAt });
       return;
     }
-    const out = runner.send(id, text, { perm: jsonIn.perm === 'ask' ? 'ask' : 'auto', model: String(jsonIn.model || ''), effort: String(jsonIn.effort || ''), attachments: normAttachments(id, jsonIn.attachments, ctx) });
+    // v40 branch: branchFrom must be THIS session (the thread being forked);
+    // the CLI forks it into a new session id via --fork-session
+    const forkFrom = jsonIn.branchFrom === id ? id : '';
+    const out = runner.send(id, text, { perm: jsonIn.perm === 'ask' ? 'ask' : 'auto', model: String(jsonIn.model || ''), effort: String(jsonIn.effort || ''), forkFrom, attachments: normAttachments(id, jsonIn.attachments, ctx) });
     if (out.queued) { json(res, 202, { ok: true, queued: true, position: out.position }); return; }
     if (out.error === 'queue-full') { res.writeHead(503); res.end('{"error":"queue-full"}'); return; }
     if (out.error === 'busy') { res.writeHead(409); res.end('{"error":"busy"}'); return; }

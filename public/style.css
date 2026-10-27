@@ -160,6 +160,17 @@ button { font-family: inherit; }
 
 /* 用户消息：暖石色块，无描边 */
 .bubble.user { max-width: 80%; background: #3A342C; border-radius: 18px 18px 5px 18px; margin-left: auto; padding: 11px 14px; font-size: 15px; white-space: pre-wrap; word-break: break-word; box-shadow: var(--sh-1); position: relative; }
+/* v40: meta row under user bubbles / final cards - time label extracted OUT
+   of the bubble, next to the copy (and branch) action icons */
+.turn.user { display: flex; flex-direction: column; align-items: flex-end; }
+.bmeta { display: flex; align-items: center; gap: 4px; margin-top: 4px; padding-right: 4px; }
+.final-meta { padding-right: 2px; }
+.bmeta .ts { font-family: var(--mono); font-size: 9.5px; color: var(--faint); opacity: .8; }
+.bicon { width: 27px; height: 27px; border: 0; border-radius: 50%; background: none; color: var(--faint); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; touch-action: manipulation; transition: background .12s, color .12s; }
+.bicon:active { background: var(--panel2); color: var(--dim); }
+.bicon.ok { background: rgba(143, 185, 141, .18); color: var(--ok); }
+.fork-chip { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; padding: 7px 12px; border-radius: 12px; background: rgba(217, 119, 87, .13); color: var(--acc-strong); font-size: 12px; }
+.fork-chip #fork-x { margin-left: auto; cursor: pointer; padding: 2px 8px; font-size: 15px; opacity: .75; touch-action: manipulation; }
 .bubble.user .ts { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 6px; text-align: right; opacity: .8; }
 
 /* 触发胶囊：暖提亮底 + 品牌图标 */

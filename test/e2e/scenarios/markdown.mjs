@@ -16,4 +16,19 @@ await withEnv(async (h, page) => {
   const rel = await page.ev('(function(){var a=document.querySelector(".final-card a"); return a?a.rel:""})()');
   assert(rel === 'noopener noreferrer', 'link rel');
   assert(!(await page.ev('document.querySelector(".final-card").textContent.indexOf("**")>=0')), 'no raw ** residue');
+
+  // v40: meta rows - time labels extracted OUT of the bubbles, copy icons
+  // below user bubble + final card, branch icon on the final card
+  assert(await page.ev('!document.querySelector(".bubble.user .ts")'), 'time no longer inside the user bubble');
+  assert(await page.ev('!!document.querySelector(".turn.user .bmeta .ts")'), 'time under the user bubble');
+  assert(await page.ev('!!document.querySelector(".turn.user .bmeta .bicon")'), 'copy icon under the user bubble');
+  assert(await page.ev('!!document.querySelector(".final-meta .ts")'), 'time under the final card');
+  assert(await page.ev('document.querySelectorAll(".final-meta .bicon").length === 2'), 'copy + branch icons on final card');
+  assert(!(await page.ev('!!document.querySelector(".final-card .ts")')), 'final card itself carries no time');
+
+  // branch arming: tap the fork icon -> chip in the composer; X disarms
+  await page.ev('document.querySelector(".final-meta .bicon:last-child").click()');
+  assert(await page.waitFor(`!document.getElementById("fork-chip").classList.contains("hidden")`), 'fork chip armed');
+  await page.ev('document.getElementById("fork-x").click()');
+  assert(await page.waitFor(`document.getElementById("fork-chip").classList.contains("hidden")`), 'fork chip disarmed');
 });

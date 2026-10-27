@@ -99,6 +99,14 @@ export class Runner extends EventEmitter {
   send(sessionId, text, opts = {}) {
     if (!sessionId || !text) return { error: 'bad-request' };
     const cwd = (this.store.get(sessionId) || {}).cwd || os.homedir();
+    // v40 branch: fork instead of resume-in-place (--fork-session = the CLI
+    // creates a NEW session id). run.sessionId stays null so the init-line
+    // adoption kicks in, exactly like `start`. Busy => refuse without
+    // queueing: a queued fork would fork once per queue drain.
+    if (opts.forkFrom) {
+      if (this.activeRunFor(sessionId)) return { error: 'busy', sessionId };
+      return this._spawnRun(['--resume', opts.forkFrom, '--fork-session'], text, cwd, null, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || []);
+    }
     const r = this._spawnRun(['--resume', sessionId], text, cwd, sessionId, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || []);
     if (r.error === 'busy') {
       // queue instead of rejecting: phone users type follow-ups while a turn

@@ -17,4 +17,12 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!!document.querySelector(".pgroup-head .pgroup-ico")'), 'folder icon on group head');
   assert(await page.waitFor('(function(){var p=document.querySelector(".pgroup-path");' +
     'return !!p && p.textContent.indexOf("D:") === 0 && /e2e$/.test(p.textContent)})()'), 'path sub-line under title');
+
+  // v40 fix: "+" must open the new-session modal RIGHT on the list page.
+  // The modal used to live INSIDE the hidden #detail page, so the tap looked
+  // dead and the modal only popped up after entering a session.
+  await page.ev('document.getElementById("new-session").click()');
+  assert(await page.waitFor(`!document.getElementById("new-modal").classList.contains("hidden")`), 'new modal opens on list');
+  await page.ev('document.getElementById("new-cancel").click()');
+  assert(await page.waitFor(`document.getElementById("new-modal").classList.contains("hidden")`), 'new modal closes');
 });

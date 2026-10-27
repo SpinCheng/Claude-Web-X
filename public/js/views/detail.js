@@ -13,7 +13,7 @@ import { auth, api } from '../api.js';
 import { sendWs } from '../ws.js';
 import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab } from './transcript.js';
 import { ensureModels, renderModelChip, updateTokenRing } from './ctxring.js';
-import { updateComposer, renderAttachChips, fetchQueue } from './composer.js';
+import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
 
 /* ---------------- history (system back = leave detail) ---------------- */
 function openDetail(id) {
@@ -22,6 +22,8 @@ function openDetail(id) {
   state.userCollapsedLive = false;
   state.attach = [];
   renderAttachChips();
+  disarmFork(); // branch arming never crosses a session switch
+  setDraft(id); // v40: refill this session's unsent draft
   $('list').classList.add('hidden');
   $('detail').classList.remove('hidden');
   $('chat').innerHTML = '';
@@ -48,6 +50,7 @@ function openDetail(id) {
 }
 function closeDetail() { // via the ← button only
   sendWs({ type: 'unsubscribe' });
+  disarmFork();
   state.currentId = null;
   state.turns = [];
   $('detail').classList.add('hidden');

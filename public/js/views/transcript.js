@@ -152,6 +152,9 @@ const CHEV_S = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stro
 const CHEV_B = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 const ICO_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg>';
 const ICO_CLOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+const ICO_COPY = '<svg class="i-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const ICO_OK = '<svg class="i-ok" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="m5 12.5 4.5 4.5L19 7"/></svg>';
+const ICO_FORK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>';
 const DOTS = {
   think: '<span class="dot-hollow"></span>',
   tool: '<span class="dot-tool"></span>',
@@ -163,6 +166,33 @@ function appendCaret(el) {
   const c = document.createElement('span');
   c.className = 'caret';
   el.appendChild(c);
+}
+// v40 bubble-meta action icon: copy/ok svg pair, animated by copyText's
+// .ok class toggle (same mechanism as the code-fence copy buttons)
+function metaBtn(title, onGo) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'bicon';
+  btn.title = title;
+  btn.innerHTML = ICO_COPY + ICO_OK;
+  btn.onclick = () => onGo(btn);
+  return btn;
+}
+// v40 branch: arm the composer so the NEXT message forks into a NEW session
+// inheriting this one's context (runner passes --resume <src> --fork-session;
+// the fork's real id is adopted from the init line, app.js navigates). The
+// chip lives in index.html; transcript.js (arm/toggle) and composer.js
+// (disarm on send/leave) both poke it directly - no import between them.
+function armFork() {
+  if (!state.currentId) return;
+  const chip = $('fork-chip');
+  if (state.armedBranch === state.currentId) {
+    state.armedBranch = null;
+    if (chip) chip.classList.add('hidden');
+    return;
+  }
+  state.armedBranch = state.currentId;
+  if (chip) chip.classList.remove('hidden');
 }
 function addTs(el, iso) {
   const t = fmtTs(iso);
@@ -241,6 +271,10 @@ function renderTurn(t) {
     return d;
   }
   if (t.role === 'user') {
+    // v40: wrapper keeps renderTail's 1:1 child/turn invariant while adding
+    // the meta row (time extracted OUT of the bubble + copy) BELOW it
+    const row = document.createElement('div');
+    row.className = 'turn user';
     const d = document.createElement('div');
     d.className = 'bubble user' + (t.optimistic ? ' pending' : '');
     d.textContent = t.text;
@@ -252,8 +286,13 @@ function renderTurn(t) {
       img.onclick = () => openLightbox(img.src);
       d.appendChild(img);
     }
-    if (t.ts) addTs(d, t.ts);
-    return d;
+    row.appendChild(d);
+    const meta = document.createElement('div');
+    meta.className = 'bmeta';
+    if (t.ts) addTs(meta, t.ts);
+    meta.appendChild(metaBtn('复制原文', (b) => copyText(t.text, b)));
+    row.appendChild(meta);
+    return row;
   }
   // bot turn: trigger pill + timeline(思考/工具/修改/输出/结论) + final card.
   // final conclusion is NEVER folded away: expanded turns end with a 结论
@@ -366,8 +405,23 @@ function renderTurn(t) {
     b.className = 'final-card';
     if (concl) b.innerHTML = miniMd(concl);
     if (live) appendCaret(b);
-    if (t.ts) addTs(b, t.ts);
     wrap.appendChild(b);
+    // v40: meta row under the card - time extracted out of it + copy + branch
+    // (branch only for finished turns: forking mid-stream makes no sense)
+    if (!live && concl) {
+      const meta = document.createElement('div');
+      meta.className = 'bmeta final-meta';
+      if (t.ts) addTs(meta, t.ts);
+      meta.appendChild(metaBtn('复制结论', (btn) => copyText(concl, btn)));
+      const br = document.createElement('button');
+      br.type = 'button';
+      br.className = 'bicon';
+      br.title = '分支：下一条消息将开启新线程（继承本会话上下文）';
+      br.innerHTML = ICO_FORK;
+      br.onclick = armFork;
+      meta.appendChild(br);
+      wrap.appendChild(meta);
+    }
   }
   return wrap;
 }

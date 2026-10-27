@@ -31,6 +31,9 @@ export const state = {
   queue: {},         // sessionId -> [{id,text}] pending queue (WS 'queue' frames)
   attach: [],        // pending attachments for the open session (uploaded)
   waits: {},         // sessionId -> {kind,tool,msg,at} PC stuck on a prompt (v21)
+  armedBranch: null,      // v40: session id whose NEXT message forks a new thread
+  pendingBranch: false,   // a fork send is in flight; adopt its real session id
+  pendingBranchRun: null, // that fork's runId (known once the 202 lands)
 };
 
 export { CLOSED_KEY };
