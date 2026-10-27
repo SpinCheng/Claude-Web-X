@@ -327,7 +327,7 @@ button { font-family: inherit; }
 .cbtn:active { background: var(--panel2); }
 .cbtn.mode { color: var(--acc-strong); font-weight: 600; }
 .cbtn.mode[data-v="ask"] { color: var(--warn); }
-.cbtn.model { color: var(--faint); font-size: 11.5px; }
+.cbtn.model { color: var(--dim); font-size: 11.5px; }
 /* v36: the model chip is the ONLY shrinkable toolbar element (flex 0 1) so a
    long model label ellipsifies instead of pushing the send button off-screen;
    every other chip stays flex:none */
@@ -363,6 +363,9 @@ button { font-family: inherit; }
 .q-ico:active { color: var(--fg); }
 .q-ico.del:active { color: var(--err); }
 .q-ico.run { color: var(--warn); }
+/* v41: the run-now triangle is the primary queue action - bigger than the
+   13px markup size (CSS wins over the svg width/height attrs) */
+.q-ico.run svg { width: 18px; height: 18px; }
 .q-ico.run:active { color: var(--acc-strong); }
 /* 三态发送钮：运行中+有字 = 琥珀排队态（只此一个按钮，停止不显示） */
 .send.queue { background: var(--warn); box-shadow: 0 2px 10px rgba(217, 162, 98, .35); }
