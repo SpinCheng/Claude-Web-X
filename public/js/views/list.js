@@ -6,7 +6,7 @@ import { $, shortPath, relTime } from '../util.js';
 import { state, CLOSED_KEY } from '../state.js';
 import { openDetail } from './detail.js';
 import { openNewModal } from './composer.js';
-import { wireRowPress } from './sessops.js';
+import { wireRowOps } from './sessops.js';
 
 function sessState(s) {
   if (s.running || state.runs[s.id]?.state === 'running') return 'running';
@@ -98,8 +98,8 @@ function renderGroup(g) {
 function renderRow(s) {
   const st = sessState(s);
   // real <button>: keyboard reachable + free focus semantics; the whole row
-  // is the target so no per-row go-arrow is needed - the right slot is the
-  // status word (color + text, never color alone)
+  // is the target, the right slot holds the status word (color + text,
+  // never color alone) and the trailing ⋯ (v35 session ops)
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'srow';
@@ -114,9 +114,19 @@ function renderRow(s) {
   const info = [relTime(s.lastActive), (s.lines || 0) + ' 行'];
   if (s.cost && s.cost.usd != null) info.push('$' + Number(s.cost.usd).toFixed(2));
   el.querySelector('.srow-info').textContent = info.join(' · ');
-  el.title = '点击打开 · 长按/右键更多操作';
+  el.title = '点击打开 · 右键更多操作';
   el.onclick = () => openDetail(s.id);
-  wireRowPress(el, s.id); // long-press / right-click -> action bubble (sessops.js)
+  // trailing ⋯: the touch path to the action bubble. A span with role=button,
+  // NOT a <button> - nested buttons get hoisted out by the HTML fragment
+  // parser and would tear the row apart
+  const more = document.createElement('span');
+  more.className = 'srow-more';
+  more.setAttribute('role', 'button');
+  more.setAttribute('tabindex', '0');
+  more.setAttribute('aria-label', '更多操作');
+  more.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
+  el.appendChild(more);
+  wireRowOps(el, s.id); // ⋯ click / right-click -> action bubble (sessops.js)
   return el;
 }
 

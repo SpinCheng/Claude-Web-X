@@ -1,9 +1,9 @@
-// sessops: list-level session operations (v34) - the action bubble opens via
-// contextmenu (desktop path; touch long-press funnels into the same
-// openRowActions), rename round-trips through the custom-title append and
-// SURVIVES a reload (replayed from the transcript), stop row appears only for
-// phone-driven runs, delete removes the row (window.confirm auto-accepted by
-// the harness CDP driver).
+// sessops: list-level session operations (v34/v35) - the action bubble opens
+// via the trailing ⋯ button (touch primary) and via contextmenu (desktop,
+// with the selection guard), rename round-trips through the custom-title
+// append and SURVIVES a reload (replayed from the transcript), stop row
+// appears only for phone-driven runs, delete removes the row (window.confirm
+// auto-accepted by the harness CDP driver).
 import { withEnv, writeSession, fakeRun, assert } from '../harness.mjs';
 import { user, assistant, text, stop } from '../fixtures.mjs';
 
@@ -14,10 +14,12 @@ await withEnv(async (h, page) => {
   writeSession(h, 'D--e2e', 'sid-ops', [user(1, 'ops 测试'), assistant(2, [text('完成')]), stop(3)]);
   await page.navigate(`http://127.0.0.1:3799/?token=e2etok`);
   assert(await page.waitFor(`document.querySelectorAll('.srow').length === 1`), 'row rendered');
+  assert(await page.waitFor(`!!document.querySelector('.srow .srow-more')`), 'trailing more button present');
 
-  // idle session: no stop row (nothing phone-driven to interrupt)
-  await page.ev(ctxmenu('.srow'));
-  assert(await page.waitFor(`!document.getElementById('row-actions').classList.contains('hidden')`), 'bubble open');
+  // idle session: no stop row (nothing phone-driven to interrupt);
+  // open the bubble via the ⋯ button (the touch primary path)
+  await page.ev(`document.querySelector('.srow .srow-more').click()`);
+  assert(await page.waitFor(`!document.getElementById('row-actions').classList.contains('hidden')`), 'bubble open via more');
   assert(await page.ev(`!!${findAct('重命名')}`), 'rename row present');
   assert(await page.ev(`!!${findAct('删除会话')}`), 'delete row present');
   assert(await page.ev(`!${findAct('停止运行')}`), 'no stop row while idle');

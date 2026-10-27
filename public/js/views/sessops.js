@@ -1,11 +1,13 @@
-// js/views/sessops.js - list-level session operations (v34): long-press /
-// right-click a row -> the action bubble (停止运行 / 重命名 / 删除).
+// js/views/sessops.js - list-level session operations (v34): the trailing ⋯
+// button (touch primary) or right-click (desktop) opens the action bubble
+// (停止运行 / 重命名 / 删除). v35: long-press was REPLACED by the explicit ⋯
+// button - it conflicted with text selection (both want the same gesture).
 // A bubble, NOT swipe or inline buttons: renderList() rebuilds the whole list
 // on every sessions frame (a swiped-open row would snap shut; touch has no
 // hover for reveal-buttons), an overlay-level sheet survives rebuilds and
 // keeps the rows clean. Rename appends a native custom-title line server-side
 // - the change lives in the transcript, optimistic update here is cosmetic.
-// NOTE: function-level import cycle with list.js (wireRowPress -> openRowActions
+// NOTE: function-level import cycle with list.js (wireRowOps -> openRowActions
 // vs optimistic rename -> renderList) - safe because no cross-module call
 // happens at module-evaluation time (ESM live bindings).
 
@@ -16,9 +18,6 @@ import { toast } from './toast.js';
 import { openBubble, closeBubble } from './overlays.js';
 import { renderList } from './list.js';
 
-const PRESS_MS = 480;      // long-press threshold (iOS ≈500ms, Android ≈400ms)
-const MOVE_PX = 9;         // anything beyond this is a scroll, not a press
-
 const I = {
   stop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
   pencil: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
@@ -27,51 +26,29 @@ const I = {
 
 let renameId = '';
 
-/* ---------------- press detection on a row ---------------- */
-// 480ms hold within 9px fires the bubble; scroll/pointercancel kills the
-// timer. Desktop right-click opens via contextmenu - which is also the
-// Android long-press path (open is idempotent).
-export function wireRowPress(el, id) {
-  let timer = null, pressed = false, x0 = 0, y0 = 0;
-  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
-  el.addEventListener('pointerdown', (e) => {
-    if (e.button && e.button !== 0) return;
-    pressed = false; x0 = e.clientX; y0 = e.clientY;
-    cancel();
-    timer = setTimeout(() => {
-      timer = null;
-      pressed = true;
-      try { if (navigator.vibrate) navigator.vibrate(10); } catch { /* no haptics */ }
+/* ---------------- row action triggers ---------------- */
+// ⋯ tap = bubble (stopPropagation keeps the row's open-detail click quiet);
+// keyboard gets Enter/Space (span has no native activation). Right-click
+// opens too, UNLESS text is selected - the native copy menu wins. The row's
+// long-press stays with the browser: it now selects text again (v35).
+export function wireRowOps(el, id) {
+  const more = el.querySelector('.srow-more');
+  if (more) {
+    more.addEventListener('click', (e) => { e.stopPropagation(); openRowActions(id); });
+    more.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      e.stopPropagation();
       openRowActions(id);
-    }, PRESS_MS);
+    });
+  }
+  el.addEventListener('contextmenu', (e) => {
+    const sel = window.getSelection ? window.getSelection() : null;
+    if (sel && sel.toString()) return; // selection copy menu beats the bubble
+    e.preventDefault();
+    openRowActions(id);
   });
-  el.addEventListener('pointermove', (e) => {
-    if (timer && (Math.abs(e.clientX - x0) > MOVE_PX || Math.abs(e.clientY - y0) > MOVE_PX)) cancel();
-  });
-  el.addEventListener('pointerup', () => {
-    cancel();
-    if (pressed) { pressed = false; armRowSwallow(el); }
-  });
-  el.addEventListener('pointercancel', () => { cancel(); pressed = false; });
-  el.addEventListener('contextmenu', (e) => { e.preventDefault(); armRowSwallow(el); openRowActions(id); });
 }
-
-// The click that trails a fired long-press must not ALSO open the detail
-// view. Swallowing on the row is too late: at-target listeners run in
-// registration order and renderRow assigned el.onclick first. A document-
-// level capture listener runs before every target handler. Arming happens at
-// gesture end and self-expires (trailing clicks are synthesized right at
-// lift) so a gesture without one can't eat a later intentional tap.
-const SWALLOW_MS = 700;
-let armedRow = null, armedAt = 0;
-function armRowSwallow(el) { armedRow = el; armedAt = Date.now(); }
-document.addEventListener('click', (e) => {
-  if (!armedRow) return;
-  const hit = e.target === armedRow || armedRow.contains(e.target);
-  const fresh = Date.now() - armedAt < SWALLOW_MS;
-  armedRow = null; // any click disarms; the next gesture is intentional
-  if (hit && fresh) { e.preventDefault(); e.stopImmediatePropagation(); }
-}, true);
 
 /* ---------------- the action bubble ---------------- */
 function openRowActions(id) {

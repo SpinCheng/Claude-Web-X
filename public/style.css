@@ -123,9 +123,13 @@ button { font-family: inherit; }
 .le-btn { margin-top: 16px; border: 0; background: var(--acc); color: #fff; font: 600 14px/1 var(--sans); padding: 13px 28px; border-radius: 999px; box-shadow: 0 2px 10px rgba(217, 119, 87, .3); cursor: pointer; transition: transform .12s, background .12s; }
 .le-btn:active { background: var(--acc-strong); transform: scale(.96); }
 
-/* ---------- 会话操作（v34）：长按/右键行 → 操作气泡 + 重命名弹层 ---------- */
-/* kill the iOS long-press callout / text selection on rows (press = menu) */
-.srow { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* ---------- 会话操作（v34/v35）：行尾 ⋯ / 右键 → 操作气泡 + 重命名弹层 ---------- */
+/* v35: no user-select suppression - long-press belongs to text selection;
+   actions live behind the explicit trailing ⋯ (span role=button, touch
+   target inside the 52px row) */
+.srow-more { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; margin: 0 -8px 0 0; border-radius: 50%; color: var(--faint); cursor: pointer; transition: background .12s, color .12s; touch-action: manipulation; }
+.srow-more:active { background: var(--panel2); color: var(--dim); }
+.srow-more:focus-visible { outline: 2px solid rgba(217, 119, 87, .55); outline-offset: -2px; }
 /* list page has no dock: the bubble floats low instead of clearing 104px;
    tail hidden - it was cut to point at the detail dock */
 #row-actions .sheet.bubble { margin-bottom: calc(26px + env(safe-area-inset-bottom)); }
