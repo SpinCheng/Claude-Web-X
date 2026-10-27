@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=35">
+  <link rel="stylesheet" href="/style.css?v=36">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-remote</span></span>
-        <span id="build" class="build-badge">v35</span>
+        <span id="build" class="build-badge">v36</span>
       </div>
       <button id="new-session" class="icon-btn" title="新建任务" aria-label="新建任务">
         <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
@@ -116,14 +116,10 @@
             <span id="ring-val" class="pv mono">—</span>
           </span>
           <span class="tdot"></span>
-          <button id="c-model" class="cbtn model" title="模型（点击选择）">
+          <button id="c-model" class="cbtn model" title="模型与推理等级（点击选择）">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>
             <span class="ellipsis" id="c-model-name"></span>
-          </button>
-          <span class="tdot"></span>
-          <button id="c-effort" class="cbtn effort" title="推理等级（点击选择）">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M4 19a9 9 0 0 1 16 0"/></svg>
-            <span id="c-effort-name">默认</span>
+            <span id="c-effort-tag" class="c-effort-tag" hidden></span>
           </button>
           <button id="stop" class="send stop hidden" title="停止" aria-label="停止">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
@@ -196,12 +192,14 @@
       </div>
     </div>
 
-    <!-- model picker bubble -->
+    <!-- model + effort picker bubble (v36: effort merged into the model sheet) -->
     <div id="model-sheet" class="overlay bub hidden">
       <div class="sheet bubble">
-        <div class="sheet-title">选择模型</div>
+        <div class="sheet-title">模型与推理</div>
         <div id="model-list"></div>
-        <p class="sheet-note">对之后发送的消息生效；再次点击已选项恢复默认</p>
+        <div class="ms-sub">推理等级</div>
+        <div class="seg effort-row" id="effort-row"></div>
+        <p class="sheet-note">选模型 = 确认并收起；选等级 = 就地生效，可继续调整。两项均对之后发送的消息生效，再次点击已选模型恢复默认</p>
       </div>
     </div>
 
@@ -214,17 +212,8 @@
       </div>
     </div>
 
-    <!-- effort picker bubble -->
-    <div id="effort-sheet" class="overlay bub hidden">
-      <div class="sheet bubble">
-        <div class="sheet-title">推理等级</div>
-        <div id="effort-list"></div>
-        <p class="sheet-note">等级越高思考越充分，耗时与用量也越大</p>
-      </div>
-    </div>
-
   </div>
 
-  <script type="module" src="/app.js?v=35"></script>
+  <script type="module" src="/app.js?v=36"></script>
 </body>
 </html>

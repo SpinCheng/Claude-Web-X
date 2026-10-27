@@ -1,5 +1,13 @@
 # 版本演进与调试史（症状 → 根因）
 
+## 2026-10-27 · 工具栏 overflow 修复 + 推理等级并入模型弹窗（v36）
+
+用户报：模型名稍长，工具栏右侧元素被挤出屏。根因：`.cbtn` 全员 `flex:none`，attach+4×tdot+perm+ring+model+effort 六个固定宽度件在 375px 屏已超宽（模型名 cap 96px 也救不回来）。修法：**模型 chip 成为唯一可收缩元素**（`flex:0 1 auto; min-width:0`，名字 span 同链 `min-width:0 + ellipsis`，按钮 `max-width:50vw` 兜底）——flex 收缩要求从按钮到 span 全程允许缩，断一处即失效。
+
+同时按用户裁定把**推理等级并入模型弹窗**：弹窗=「模型与推理」，上段模型 opt 行（点选=确认并收起），`ms-sub` 小节标题带分隔线，下段 `.seg.effort-row` 六粒等级 pill（点选=**就地生效不关弹窗**，可继续调模型；两项关系写进 sheet-note）。等级从工具栏摘除后，chip 内新增 `c-effort-tag` 静音小胶囊（`·高`，默认隐藏；用 `--dim` 不占珊瑚——注意力纪律）。effort-sheet 弹窗删除（overlays BUBBLES 同步），EFFORTS/openEffortSheet 从 composer.js 迁入 ctxring.js（模型归属地）。
+
+测试坑：headless Edge 默认 ~800px 宽**桌面视口**，几何断言永远不触发收缩——harness 补 `resize()`（CDP `Emulation.setDeviceMetricsOverride`），375px 移动视口下断言「send 在工具栏内 + 模型 chip 收缩 <200px + 六粒 pill + 等级就地生效/chip 小标签挂·摘」。
+
 ## 2026-10-27 · 实测修复：长按与选文本冲突 + 重命名 405（v35）
 
 v34 上真机用出来的两个缺陷：

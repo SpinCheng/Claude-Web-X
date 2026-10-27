@@ -305,8 +305,15 @@ button { font-family: inherit; }
 .cbtn:active { background: var(--panel2); }
 .cbtn.mode { color: var(--acc-strong); font-weight: 600; }
 .cbtn.mode[data-v="ask"] { color: var(--warn); }
-.cbtn.model, .cbtn.effort { color: var(--faint); font-size: 11.5px; }
-.cbtn.model .ellipsis, .cbtn.effort span { font-family: var(--mono); font-size: 11px; max-width: 96px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cbtn.model { color: var(--faint); font-size: 11.5px; }
+/* v36: the model chip is the ONLY shrinkable toolbar element (flex 0 1) so a
+   long model label ellipsifies instead of pushing the send button off-screen;
+   every other chip stays flex:none */
+.cbtn.model { flex: 0 1 auto; min-width: 0; max-width: 50vw; }
+.cbtn.model .ellipsis { font-family: var(--mono); font-size: 11px; min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* armed-effort tag inside the model chip: quiet pill (coral discipline - only
+   perm/send/live carry the loud colors), empty+hidden at 默认 */
+.c-effort-tag { flex: none; font-family: var(--mono); font-size: 10px; color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 2px 6px; line-height: 1; }
 .cbtn.ring { gap: 4px; }
 .cbtn.ring .pv { font-family: var(--mono); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .send { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: var(--acc); color: #fff; border: 0; display: flex; align-items: center; justify-content: center; flex: none; cursor: pointer; box-shadow: 0 2px 10px rgba(217, 119, 87, .35); transition: transform .12s, background .12s; }
@@ -381,6 +388,12 @@ button { font-family: inherit; }
 /* ---------- 权限模式 & 审批卡 ---------- */
 .seg { display: flex; gap: 8px; margin-bottom: 10px; }
 .seg-btn { flex: 1; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--dim); font-size: 13.5px; cursor: pointer; transition: border-color .15s, color .15s, box-shadow .15s; }
+
+/* model sheet effort section (v36): sub-heading breaks the model rows from
+   the level pills; pills tighten to fit six across the bubble width */
+.ms-sub { font-size: 11px; font-weight: 600; color: var(--faint); letter-spacing: .08em; border-top: 1px solid var(--line); padding-top: 12px; margin: 10px 0 8px; }
+.seg.effort-row { margin-bottom: 4px; flex-wrap: wrap; }
+.seg.effort-row .seg-btn { padding: 10px 4px; font-size: 12.5px; min-width: 0; }
 .seg-btn.active { border-color: var(--acc); color: var(--acc-strong); box-shadow: 0 0 0 3px var(--acc-tint); }
 .approval-card .ap-session { font-size: 12px; margin-bottom: 6px; }
 .approval-card .ap-tool { font-size: 15px; color: var(--acc-strong); margin-bottom: 8px; }

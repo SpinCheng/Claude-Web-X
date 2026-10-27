@@ -11,8 +11,9 @@ import { toast } from './toast.js';
 
 /* ---------- bubble popups (v15 E): anchored above the dock ---------- */
 // row-actions/rename-modal (v34) live on the LIST page but share the same
-// machinery: open hides siblings, scrim click + system back close
-const BUBBLES = ['ctx-sheet', 'model-sheet', 'perm-sheet', 'effort-sheet', 'row-actions', 'rename-modal'];
+// machinery: open hides siblings, scrim click + system back close.
+// effort-sheet is gone since v36 (levels merged into the model sheet)
+const BUBBLES = ['ctx-sheet', 'model-sheet', 'perm-sheet', 'row-actions', 'rename-modal'];
 function openBubble(id) {
   // switching bubbles reuses the open state; no history churn
   for (const b of BUBBLES) {

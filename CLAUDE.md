@@ -2,7 +2,7 @@
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话的插件工程（LAN bridge + 免构建 PWA）。
 
-- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·长按气泡 / ctxring 圆环·明细·模型目录 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
+- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·行尾 ⋯ 气泡 / ctxring 圆环·明细·模型·等级弹窗 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
 - 版本演进与调试史（症状→根因）：`docs/history.md`
 - E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（14 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，8 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
@@ -62,7 +62,7 @@ npm start          # node bridge/index.js，端口 3742
 **视觉纪律**
 
 - Claude 暗色（暖炭底/珊瑚橘 #D97757）。注意力纪律：**珊瑚橘只给发送钮/工具点/链接/活态**。阴影分层（--sh-1/2/3）不用边框盒子；tabular-nums。
-- 工具栏=无框胶囊（图标+值+.tdot 中点分隔）；弹层=锚定气泡（`.overlay.bub`+`.sheet.bubble`，悬于 dock 上方+小尾巴+弹簧）。**勿回退全宽底部 sheet；弹层行=.opt 平铺行（去拟物，用户裁定）**。
+- 工具栏=无框胶囊（图标+值+.tdot 中点分隔）；**模型 chip 是唯一可收缩元素**（`flex:0 1 auto; min-width:0` 链到名字 span，`max-width:50vw` 兜底）——防长模型名把发送钮挤出屏（v36）；已设推理等级显示为 chip 内静音小胶囊 `c-effort-tag`。弹层=锚定气泡（`.overlay.bub`+`.sheet.bubble`，悬于 dock 上方+小尾巴+弹簧）。**勿回退全宽底部 sheet；弹层行=.opt 平铺行（去拟物，用户裁定）**；模型弹窗含等级 pill 段（选模型=确认收起，选等级=就地生效，v36）。
 - 气泡历史：open/close 均不动 history；popstate 有气泡开着→只关气泡并 `pushState` 补回条目；**勿在 closeBubble 里 history.back()**（异步竞态误关新弹层）；气泡宽度用 `flex:1 1 auto`，**勿用 align-self:stretch**（竖向拉伸）。
 
 **缓存（改前端必读）**

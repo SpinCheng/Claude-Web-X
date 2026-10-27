@@ -1,9 +1,9 @@
 // js/views/ctxring.js - context window accounting: the token ring
 // (usage/window, formula identical to Desktop), the /context probe sheet
-// (per-category fixed parts) and the model catalog + picker bubble.
+// (per-category fixed parts) and the model + effort picker bubble (v36).
 
 import { $, fmtTokens } from '../util.js';
-import { state, currentModel } from '../state.js';
+import { state, currentModel, currentEffort } from '../state.js';
 import { api } from '../api.js';
 import { openBubble, closeBubble } from './overlays.js';
 
@@ -137,13 +137,42 @@ function fixedTotal(s, probe) {
   return Math.min(Number(s.fixedTok) || 0, 1e9);
 }
 
-/* ---------- model picker ---------- */
+/* ---------- model + effort picker (v36: effort merged into the model sheet;
+   relationship: picking a MODEL confirms and closes, picking an EFFORT level
+   applies in place so both can be tuned in one sitting) ---------- */
 function ensureModels() {
   if (state.modelCatalog) return;
   api('/api/models')
     .then((r) => r.json())
     .then((d) => { state.modelCatalog = d.models || []; updateTokenRing(); })
     .catch(() => { /* ring falls back to 200k */ });
+}
+const EFFORTS = [
+  { v: '', label: '默认' },
+  { v: 'low', label: '低' },
+  { v: 'medium', label: '中' },
+  { v: 'high', label: '高' },
+  { v: 'xhigh', label: '超高' },
+  { v: 'max', label: '最高' },
+];
+function setEffort(v) {
+  if (v) localStorage.setItem('cr_effort', v);
+  else localStorage.removeItem('cr_effort');
+  renderEffortTag();
+}
+function drawEffortRow() {
+  const row = $('effort-row');
+  if (!row) return;
+  const cur = currentEffort();
+  row.innerHTML = '';
+  for (const f of EFFORTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn' + (cur === f.v ? ' active' : '');
+    b.textContent = f.label;
+    b.onclick = () => { setEffort(f.v); drawEffortRow(); };
+    row.appendChild(b);
+  }
 }
 function openModelSheet() {
   const box = $('model-list');
@@ -181,8 +210,10 @@ function openModelSheet() {
       e.textContent = 'settings.json 里没有配置模型别名';
       box.appendChild(e);
     }
+    drawEffortRow();
   };
   openBubble('model-sheet');
+  drawEffortRow(); // level pills render even while the catalog is loading
   if (state.modelCatalog) draw(state.modelCatalog);
   else {
     box.innerHTML = '<div class="empty">加载中…</div>';
@@ -191,6 +222,13 @@ function openModelSheet() {
       .then((d) => draw(d.models || []))
       .catch(() => { box.innerHTML = '<div class="empty">读取失败</div>'; });
   }
+}
+function renderEffortTag() {
+  const el = $('c-effort-tag');
+  if (!el) return;
+  const v = currentEffort();
+  el.textContent = v ? '·' + ((EFFORTS.find((f) => f.v === v) || {}).label || v) : '';
+  el.hidden = !v;
 }
 function renderModelChip() {
   const el = $('c-model-name');
@@ -201,6 +239,7 @@ function renderModelChip() {
     const s = state.sessions.find((x) => x.id === state.currentId);
     el.textContent = (s && s.model) || '默认';
   }
+  renderEffortTag();
 }
 
 /* ---------- wiring ---------- */

@@ -1,6 +1,7 @@
 // js/views/composer.js - the dock: message input (three-state send/stop),
-// attachments (pick -> downscale -> upload -> chips), perm & effort pickers,
-// the queue panel (v17, rows above the input) and the new-session modal.
+// attachments (pick -> downscale -> upload -> chips), the perm picker
+// (model+effort picker lives in ctxring.js since v36), the queue panel
+// (v17, rows above the input) and the new-session modal.
 // Optimistic send (v18/v21) reaches into transcript.js for push/retract.
 // NOTE: function-level import cycle with detail.js (updateComposer ->
 // renderDriverChip / openDetail -> updateComposer) - safe because no
@@ -44,42 +45,8 @@ function openPermSheet() {
   openBubble('perm-sheet');
 }
 
-/* ---------- effort picker (--effort low|medium|high|xhigh|max) ---------- */
-const EFFORTS = [
-  { v: '', label: '默认', sub: '跟随会话 / CLI 配置' },
-  { v: 'low', label: '低', sub: 'low · 快速直接，几乎不深想' },
-  { v: 'medium', label: '中', sub: 'medium · 常规任务平衡之选' },
-  { v: 'high', label: '高', sub: 'high · 更彻底的推理' },
-  { v: 'xhigh', label: '超高', sub: 'xhigh · 复杂任务' },
-  { v: 'max', label: '最高', sub: 'max · 最难任务，可能显著变慢' },
-];
-function openEffortSheet() {
-  const box = $('effort-list');
-  const cur = currentEffort();
-  box.innerHTML = '';
-  for (const f of EFFORTS) {
-    const el = document.createElement('button');
-    el.className = 'opt' + (cur === f.v ? ' active' : '');
-    el.innerHTML = '<span class="o-main"><span class="o-label"></span><span class="o-sub"></span></span>'
-      + '<svg class="o-check" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
-    el.querySelector('.o-label').textContent = f.label;
-    el.querySelector('.o-sub').textContent = f.sub;
-    el.onclick = () => {
-      if (cur === f.v) localStorage.removeItem('cr_effort');
-      else localStorage.setItem('cr_effort', f.v);
-      renderEffortChip();
-      closeBubble('effort-sheet');
-    };
-    box.appendChild(el);
-  }
-  openBubble('effort-sheet');
-}
-function renderEffortChip() {
-  const el = $('c-effort-name');
-  if (!el) return;
-  const v = currentEffort();
-  el.textContent = v ? (EFFORTS.find((f) => f.v === v) || {}).label || v : '默认';
-}
+/* ---------- effort picker moved to ctxring.js (v36: merged into the model
+   sheet) - composer only READS currentEffort() when sending ---------- */
 
 /* ---------------- queue panel (v17): flat rows above the input ---------------- */
 const QI = {
@@ -441,7 +408,6 @@ $('attach-input').addEventListener('change', async (e) => {
   for (const f of files) await addAttachment(f);
 });
 $('perm').onclick = openPermSheet;
-$('c-effort').onclick = openEffortSheet;
 $('msg-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !IS_TOUCH) { e.preventDefault(); sendMessage(false); }
 });
@@ -460,7 +426,6 @@ $('new-text').addEventListener('input', function () {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, window.innerHeight * 0.3) + 'px';
 });
-renderEffortChip();
 setPerm(state.perm);
 // the composer grows (run-status line, queue badge, multi-line input): the
 // transcript's bottom padding and the FAB must track its live height or the

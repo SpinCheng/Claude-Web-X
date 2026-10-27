@@ -92,12 +92,17 @@ export async function bootPage(profileDir) {
   await send('Page.enable'); await send('Runtime.enable');
   const ev = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
   const navigate = async (url) => { await send('Page.navigate', { url }); };
+  // mobile viewport: layout/geometry assertions must run at phone width
+  // (headless defaults to a wide desktop window where nothing overflows)
+  const resize = async (w, h = 760) => {
+    await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: true });
+  };
   const waitFor = async (expression, timeoutMs = 15000) => {
     for (let i = 0; i < timeoutMs / 250; i++) { if (await ev(expression)) return true; await sleep(250); }
     return false;
   };
   return {
-    ev, navigate, waitFor,
+    ev, navigate, waitFor, resize,
     open: async (sid) => { await waitSession(sid); await navigate(`http://127.0.0.1:${PORT}/?token=${TOK}#open=${sid}`); },
     stop: async () => { try { ws.close(); } catch { /* already closed */ } edge.kill(); await sleep(400); },
   };

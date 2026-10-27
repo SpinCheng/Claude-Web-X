@@ -1,5 +1,7 @@
 // composer: three-state send button driven by fake run frames through the
-// REAL server wiring (runner 'update' event -> WS run frame)
+// REAL server wiring (runner 'update' event -> WS run frame); plus v36
+// toolbar geometry (long model label must not push the send button out) and
+// the merged model+effort sheet semantics
 import { withEnv, writeSession, assert, fakeRun } from '../harness.mjs';
 import { timelineLines } from '../fixtures.mjs';
 
@@ -14,6 +16,31 @@ await withEnv(async (h, page) => {
 
   let s = await st();
   assert(s.send && !s.queue && !s.stop, 'idle: send visible');
+
+  // v36: absurdly long model label - the chip shrinks, the send button stays
+  // on screen (text injected straight into the span: CSS geometry is the
+  // thing under test; renderModelChip never re-runs mid-scenario)
+  await page.ev(`document.getElementById('c-model-name').textContent = 'claude超长模型名-opus-4-5-20251101-abcdefghijklmnopqrstuvwxyz'`);
+  await page.ev(`document.getElementById('c-model').click()`);
+  assert(await page.waitFor(`!document.getElementById('model-sheet').classList.contains('hidden')`), 'model sheet open');
+  assert(await page.waitFor(`document.querySelectorAll('#effort-row .seg-btn').length === 6`), 'six effort pills in sheet');
+  await page.ev(`[...document.querySelectorAll('#effort-row .seg-btn')].find(b => b.textContent === '高').click()`);
+  assert(await page.waitFor(`!document.getElementById('model-sheet').classList.contains('hidden')`), 'effort tap keeps sheet open');
+  assert(await page.waitFor(`localStorage.getItem('cr_effort') === 'high'`), 'effort persisted');
+  assert(await page.waitFor(`!document.getElementById('c-effort-tag').hidden && document.getElementById('c-effort-tag').textContent === '·高'`), 'chip tag armed');
+  await page.ev(`[...document.querySelectorAll('#effort-row .seg-btn')].find(b => b.textContent === '默认').click()`);
+  assert(await page.waitFor(`document.getElementById('c-effort-tag').hidden`), 'default disarms tag');
+  // close via scrim (the close handler requires the click target to be the overlay itself)
+  await page.ev(`document.getElementById('model-sheet').click()`);
+  assert(await page.waitFor(`document.getElementById('model-sheet').classList.contains('hidden')`), 'sheet closed');
+
+  // geometry at PHONE width (headless desktop viewport never overflows)
+  await page.resize(375);
+  const geo = await page.ev('(function(){var t=document.getElementById("toolbar"),s=document.getElementById("send"),m=document.getElementById("c-model");' +
+    'var tr=t.getBoundingClientRect(),sr=s.getBoundingClientRect(),mr=m.getBoundingClientRect();' +
+    'return {tw:tr.width, sendIn: sr.right <= tr.right + 1 && sr.left >= tr.left - 1, mShrunk: mr.width < 200}})()');
+  assert(geo.sendIn, `send button inside toolbar (geo=${JSON.stringify(geo)})`);
+  assert(geo.mShrunk, `model chip shrank under the long label (geo=${JSON.stringify(geo)})`);
 
   fakeRun(h, 'cp1', 'running');
   await page.waitFor('(function(){var t=document.getElementById("stop");return !t.classList.contains("hidden")})()');
