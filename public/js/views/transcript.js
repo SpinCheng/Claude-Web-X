@@ -360,14 +360,13 @@ function renderTurn(t) {
     // it lives inside the turn element, so renderTail's 1:1 chat/turns
     // invariant is untouched. The confirm (fold) or v66 reconcile drops
     // the whole pending styling together with it.
-    // v67/v69: chrysanthemum spinner rendered INLINE right after the bubble
-    // (row is right-aligned flex, so DOM order bubble-then-spinner puts the
-    // bars hugging the bubble's left edge - a gap:8px line with justify-end
-    // would float the spinner to the far left). 8 bars, hand-drawn elements
-    // (zero-dep project - no icon lib); dropped from 12 by user ruling.
+    // v70: spinner LEFT of the bubble, hugging it - DOM order spinner-then-
+    // bubble inside the right-justified line puts the bars immediately left
+    // of the bubble; the bubble's legacy margin-left:auto (pre-u-line right
+    // alignment) is neutralized in CSS or it shoves the spinner to the far
+    // left (the v69 symptom). 8 bars, 8px, bottom-aligned with the bubble.
     const line = document.createElement('div');
     line.className = 'u-line';
-    line.appendChild(d);
     if (t.optimistic) {
       const sp = document.createElement('span');
       sp.className = 'uspin';
@@ -380,6 +379,7 @@ function renderTurn(t) {
       }
       line.appendChild(sp);
     }
+    line.appendChild(d);
     row.appendChild(line);
     const meta = document.createElement('div');
     meta.className = 'bmeta';

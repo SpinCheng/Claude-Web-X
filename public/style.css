@@ -402,13 +402,16 @@ button { font-family: inherit; }
 .cbtn.attach { padding: 0 6px; }
 .bubble.user .bubble-img { display: block; width: min(240px, 100%); border-radius: 10px; margin-top: 6px; cursor: zoom-in; }
 .bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
-/* ---------- v67/v69：乐观泡菊花 loading（8 棒渐隐扫动，非圆环；DOM 序=泡前贴边） ---------- */
+/* ---------- v70：乐观泡菊花（8 棒 / 8px / 泡左贴边 / 与泡底对齐） ---------- */
 /* width:100% is load-bearing: a shrink-to-fit line makes the bubble's
    max-width:80% resolve against the line's own content width (circular) and
    the bubble collapses to a character-wide column (v67 regression, v68 fix) */
-.turn.user .u-line { display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; }
-.uspin { position: relative; flex: none; width: 16px; height: 16px; margin-right: 2px; }
-.uspin i { position: absolute; left: 50%; top: 0; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: var(--dim); transform-origin: 50% 8px; opacity: .3; animation: uspinFade 1s linear infinite; }
+.turn.user .u-line { display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px; width: 100%; }
+/* the bubble's legacy margin-left:auto (pre-u-line right alignment) would
+   shove the left-side spinner to the far edge - dead weight inside the line */
+.turn.user .u-line .bubble.user { margin-left: 0; }
+.uspin { position: relative; flex: none; width: 8px; height: 8px; margin-bottom: 11px; }
+.uspin i { position: absolute; left: 50%; top: 0; width: 1.5px; height: 4px; margin-left: -0.75px; border-radius: 1px; background: var(--dim); transform-origin: 50% 4px; opacity: .3; animation: uspinFade 1s linear infinite; }
 @keyframes uspinFade { 0% { opacity: 1; } 100% { opacity: .15; } }
 @media (prefers-reduced-motion: reduce) { .uspin i { animation: none; opacity: .45; } }
 
