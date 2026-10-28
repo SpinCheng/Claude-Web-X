@@ -8,3 +8,5 @@
 # binaries
 *.png binary
 *.ico binary
+# POSIX shell scripts must keep LF everywhere (CRLF shebang breaks exec on Linux/macOS)
+*.sh text eol=lf
