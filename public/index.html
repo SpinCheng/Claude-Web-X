@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1F1E1D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>claude-web</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/style.css?v=89">
+</head>
+<body>
+
+  <!-- token gate -->
+  <div id="gate" class="page gate hidden">
+    <div class="gate-inner">
+      <div class="brand">
+        <span class="mk"><span class="mark coral"></span><span class="pb p2 p2s">P</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal</span>
+      </div>
+      <p class="gate-sub">连接你电脑上的 bridge</p>
+      <div class="gate-form">
+        <input id="token-input" type="password" placeholder="bridge 令牌" autocomplete="off" spellcheck="false">
+        <button id="token-save" class="icon-btn" title="连接" aria-label="连接">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3.4 20.4 20.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"/></svg>
+        </button>
+      </div>
+      <p id="gate-err" class="gate-err"></p>
+      <p class="gate-hint">令牌在电脑端 <span class="mono">bridge/data/config.json</span>，或访问配对面板扫码</p>
+    </div>
+  </div>
+
+  <!-- session list -->
+  <div id="list" class="page hidden">
+    <header class="bar">
+      <div class="brand small">
+        <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v89</span></span>
+      </div>
+      <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
+        <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
+      </button>
+      <button id="new-session" class="icon-btn" title="新建任务" aria-label="新建任务">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+      </button>
+    </header>
+    <div class="search-row">
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15zm5.8-1.7L21 21"/></svg>
+      <input id="list-search" type="search" placeholder="搜索会话 / 项目路径" autocomplete="off">
+    </div>
+    <main id="groups" class="groups"></main>
+    <div id="batch-bar" class="batch-bar hidden">
+      <button id="b-selall" class="bb-btn">全选</button>
+      <span id="b-count" class="bb-count">已选 0</span>
+      <button id="b-del" class="bb-btn danger">删除</button>
+      <button id="b-done" class="bb-btn">完成</button>
+    </div>
+
+    <!-- long-press / right-click row action bubble (v34) -->
+    <div id="row-actions" class="overlay bub hidden">
+      <div class="sheet bubble act-bubble">
+        <div class="act-head">
+          <div class="act-title"></div>
+          <div class="act-sub mono"></div>
+        </div>
+        <div class="act-list"></div>
+      </div>
+    </div>
+    <!-- rename modal (v34) -->
+    <div id="rename-modal" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-title">重命名会话</div>
+        <input id="rename-input" type="text" maxlength="120" placeholder="会话显示名" spellcheck="false" autocomplete="off">
+        <p class="sheet-note">只改显示名，随时可再改；不影响会话内容</p>
+        <div class="sheet-actions">
+          <button id="rename-cancel" class="btn ghost">取消</button>
+          <button id="rename-save" class="btn primary">保存</button>
+        </div>
+        <p id="rename-err" class="gate-err"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- transcript detail -->
+  <div id="detail" class="page hidden">
+    <header class="bar detail-bar">
+      <button id="back" class="icon-btn" title="返回列表" aria-label="返回列表">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+      </button>
+      <div class="d-title">
+        <b id="d-title"></b>
+        <span id="d-meta" class="mono dim"></span>
+      </div>
+      <span id="d-driver" class="chip">…</span>
+      <button id="del" class="icon-btn danger" title="删除会话" aria-label="删除会话">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>
+      </button>
+    </header>
+    <!-- v46 历史加载行：header 下、滚到顶才展开（勿挪为 #chat 子节点——renderTail 1:1 不变量；.in 内层 span 承载 transform，v47 方案A） -->
+    <button id="hist-more" class="hist-more"><span class="in"></span></button>
+    <div id="wait-banner" class="wait-banner hidden">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7zM9 21h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1z"/></svg>
+      <span id="wait-text"></span>
+    </div>
+    <main id="chat" class="chat"></main>
+    <button id="jump" class="fab hidden" title="跳到最新" aria-label="跳到最新">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 4h2v12l5.5-5.5 1.42 1.42L12 19.84l-7.92-7.92L5.5 10.5 11 16z"/></svg>
+    </button>
+    <div id="composer" class="composer">
+      <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
+      <div class="composer-dock">
+        <div id="queue-area"></div>
+        <div id="fork-chip" class="fork-chip hidden">
+          <span class="fc-t">⎇ 分支模式 — 发送后将开启新线程（继承本会话上下文）</span>
+          <span id="fork-x" role="button" aria-label="取消分支">×</span>
+        </div>
+        <div id="attach-chips" class="attach-chips hidden"></div>
+        <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
+        <div class="composer-toolbar" id="toolbar">
+          <button id="attach" class="cbtn attach" title="附件（图片/文本）" aria-label="附件（图片/文本）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <span class="tdot"></span>
+          <button id="perm" class="cbtn mode" title="权限模式：点击选择">
+            <svg class="shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/></svg>
+            <svg class="q" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span id="perm-label">自动</span>
+          </button>
+          <span class="tdot"></span>
+          <span id="token-ring" class="cbtn ring" title="上下文占用（点击看明细）">
+            <svg viewBox="0 0 24 24" class="ring-svg"><circle class="ring-bg" cx="12" cy="12" r="9"/><circle id="ring-fg" class="ring-fg" cx="12" cy="12" r="9"/></svg>
+            <span id="ring-val" class="pv mono">—</span>
+          </span>
+          <span class="tdot"></span>
+          <button id="c-model" class="cbtn model" title="模型与推理等级（点击选择）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>
+            <span class="ellipsis" id="c-model-name"></span>
+            <span id="c-effort-tag" class="c-effort-tag" hidden></span>
+          </button>
+          <button id="stop" class="send stop hidden" title="停止" aria-label="停止">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
+          </button>
+          <button id="send" class="send" title="发送" aria-label="发送">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- attachment lightbox + text preview (v19) -->
+    <div id="lightbox" class="overlay hidden"><img id="lightbox-img" class="lightbox-img" alt=""></div>
+    <div id="file-prev" class="overlay hidden">
+      <div class="sheet file-prev">
+        <div class="sheet-title" id="fp-name"></div>
+        <pre id="fp-body" class="fp-body"></pre>
+      </div>
+    </div>
+    <input id="attach-input" type="file" multiple class="hidden"
+      accept="image/*,.txt,.md,.log,.json,.csv,.js,.ts,.py,.ps1,.yml,.yaml,.xml,.html,.css">
+
+    <!-- remote permission approval card -->
+    <div id="approval" class="overlay hidden">
+      <div class="sheet approval-card">
+        <div class="sheet-title">⚠ 权限请求</div>
+        <div class="ap-session dim" id="ap-session"></div>
+        <div class="ap-tool mono" id="ap-tool"></div>
+        <pre class="ap-input mono" id="ap-input"></pre>
+        <div id="ap-diff" class="ap-diff hidden"></div>
+        <label id="ap-allow-row" class="ap-allow"><span class="ckb"></span><span id="ap-allow-txt"></span></label>
+        <div class="sheet-actions">
+          <button id="ap-deny" class="btn deny">拒绝</button>
+          <button id="ap-allow" class="btn primary">允许</button>
+        </div>
+        <p class="sheet-note">3 分钟无响应自动拒绝</p>
+      </div>
+    </div>
+
+    <!-- context detail bubble -->
+    <div id="ctx-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">上下文</div>
+        <div class="ctx-hero">
+          <span class="ctx-hero-num" id="ctx-used">—</span>
+          <span class="ctx-hero-cap" id="ctx-total">/ —</span>
+          <span class="ctx-hero-pct" id="ctx-pct">—</span>
+        </div>
+        <div class="ctx-bar" id="ctx-bar" role="img" aria-label="上下文构成"></div>
+        <div class="ctx-cats" id="ctx-cats"></div>
+        <p class="sheet-note" id="ctx-note">口径与桌面端一致：已用 = 最近一次请求的输入 tokens（含缓存）</p>
+      </div>
+    </div>
+
+    <!-- v48 cost panel: entry = header cost text; drops from under the header -->
+    <div id="cost-sheet" class="overlay top hidden">
+      <div class="sheet">
+        <div id="cost-main">
+          <div class="sheet-title">累计消耗</div>
+          <div class="cost-hero"><b id="cost-usd">—</b><span id="cost-cap" class="cost-cap"></span></div>
+          <div class="tok-grid" id="cost-grid"></div>
+          <div id="cost-models" hidden></div>
+          <p class="comp-cap">转录体积构成（字符占比，纯前端估算）</p>
+          <div class="comp-bar" id="comp-bar"></div>
+          <div class="comp-legend" id="comp-legend"></div>
+          <p class="mini-stats" id="cost-ministats"></p>
+          <button id="cost-price-row" class="cost-opt-row" type="button">
+            <span class="lbl">单价与口径</span><span class="val" id="cost-mode-sub"></span><span class="o-arr">›</span>
+          </button>
+        </div>
+        <div id="cost-editor" hidden>
+          <div class="ce-back"><span id="cost-back" class="lnk">‹ 返回</span><b>单价与口径</b></div>
+          <div class="seg" id="cost-modes"></div>
+          <div id="cost-pane"></div>
+          <p class="sheet-note">设置存本机 PWA（localStorage），不进 bridge、多设备各自独立。本项目不维护价目表：官方价格 = CC 算好传回的结果，倍率/自定义只用到 token 聚合与你的输入。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- model + effort picker bubble (v36: effort merged into the model sheet) -->
+    <div id="model-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">模型与推理</div>
+        <div id="model-list"></div>
+        <div class="ms-sub">推理等级</div>
+        <div class="seg effort-row" id="effort-row"></div>
+        <p class="sheet-note">选模型 = 确认并收起；选等级 = 就地生效，可继续调整。两项均对之后发送的消息生效，再次点击已选模型恢复默认</p>
+      </div>
+    </div>
+
+    <!-- permission mode bubble -->
+    <div id="perm-sheet" class="overlay bub hidden">
+      <div class="sheet bubble">
+        <div class="sheet-title">权限模式</div>
+        <div id="perm-list"></div>
+        <p class="sheet-note">仅对之后发送的消息生效</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- new-session modal: body-level ON PURPOSE - it opens from the LIST page
+       too; living inside #detail (v39 and earlier) made the "+" tap look dead
+       (parent .hidden) and the modal pop up later on entering a session -->
+  <div id="new-modal" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-title">新建任务</div>
+      <!-- v78 方案A：分节卡片 + 渐进披露（手动路径折叠为链接）+ 轨道式权限段。
+           从组头 ➕ 打开时 presetCwd 已知，整个目录节隐藏（用户裁定：默认就是该项目）。 -->
+      <div class="nsec">
+        <p class="nsec-l">任务内容</p>
+        <textarea id="new-text" rows="3" placeholder="要 claude 做什么"></textarea>
+      </div>
+      <div class="nsec" id="nsec-cwd">
+        <p class="nsec-l">工作目录</p>
+        <select id="new-cwd"></select>
+        <p class="nsec-h">决定任务归属的项目；桌面端只能看到它打开过的文件夹</p>
+        <span class="nsec-link" id="new-cwd-manual" role="button" tabindex="0">＋ 手动输入其他路径</span>
+        <div id="new-cwd-box" class="nsec-manual">
+          <div class="nsec-fbox">
+            <input id="new-cwd-custom" type="text" placeholder="例如 D:\projects\my-app" spellcheck="false">
+            <span id="new-cwd-x" role="button" tabindex="0" aria-label="收起手动路径">×</span>
+          </div>
+        </div>
+      </div>
+      <div class="nsec">
+        <p class="nsec-l">权限模式</p>
+        <div class="ptrack" id="new-perm">
+          <button type="button" data-v="auto">自动执行</button>
+          <button type="button" data-v="ask">需要时审批</button>
+        </div>
+      </div>
+      <p id="new-err" class="gate-err"></p>
+      <div class="sheet-actions">
+        <button id="new-cancel" class="btn ghost">取消</button>
+        <button id="new-go" class="btn primary">开始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- confirm modal (v51): in-app window.confirm replacement (delete /
+       interrupt / handoff asks). Body level like new-modal - both pages need it. -->
+  <div id="confirm-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cf-title">
+    <div class="sheet">
+      <div class="sheet-title" id="cf-title"></div>
+      <p class="cf-body" id="cf-body"></p>
+      <div class="sheet-actions">
+        <button id="cf-cancel" class="btn ghost" type="button">取消</button>
+        <button id="cf-ok" class="btn" type="button">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js?v=89"></script>
+</body>
+</html>

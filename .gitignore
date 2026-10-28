@@ -1,0 +1,38 @@
+# deps / build
+node_modules/
+dist/
+
+# runtime data (tokens, locks, trash, probe cache - never commit)
+bridge/data/
+
+# local secrets / env
+.env
+.env.*
+*.local.json
+
+# phase0 field-test artifacts (contains transcript excerpts; keep local)
+docs/phase0/PHASE0-REPORT.md
+docs/phase0/tmp/
+docs/phase0/uia-selectors.json
+
+# editor / OS / scratch
+.claude/
+LOCAL.md
+*.log
+*.bak
+*.bak-*
+.tmp*
+Thumbs.db
+.DS_Store
+
+# process docs stay local (not part of the open-source repo)
+docs/history.md
+docs/方案-v2.md
+docs/phase0/
+
+# design mockups stay local
+docs/design/
+
+# debug scratch (session dumps) - never commit
+sess.tmp.json
+*.tmp.json

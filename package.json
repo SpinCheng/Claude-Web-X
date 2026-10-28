@@ -1,0 +1,22 @@
+{
+  "name": "claude-web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": "github:SpinCheng/Claude-Web-X",
+  "bugs": "https://github.com/SpinCheng/Claude-Web-X/issues",
+  "homepage": "https://github.com/SpinCheng/Claude-Web-X#readme",
+  "keywords": ["claude", "claude-code", "pwa", "remote", "phone", "bridge"],
+  "type": "module",
+  "description": "Remote view & control for local Claude Code sessions from a phone (LAN bridge + zero-build PWA)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bridge/index.js",
+    "test": "node --test test/unit/parsers.test.mjs test/unit/turns.test.mjs test/unit/adapter.test.mjs test/unit/cost.test.mjs && node test/e2e/run-all.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
