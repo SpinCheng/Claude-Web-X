@@ -1,21 +1,100 @@
-MIT License
+claude-web Personal & Non-Commercial License
+=============================================
 
-Copyright (c) 2026 The claude-remote authors
+Copyright (c) 2026 the claude-web author(s)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+中文（原文）/ Chinese (original text)
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. 授权范围
+   在遵守本许可的前提下，任何人可免费获得本软件及其源代码的副本，并被授予：
+   a) 仅为个人学习、研究及非商业目的使用、运行、修改本软件的权利；
+   b) 以原文或修改后形式复制、再分发本软件的权利，但必须：
+      i.  保留本许可文件全文；
+      ii. 在显著位置注明原作者与出处（项目名称及仓库地址）；
+      iii.不得对本许可条款增加限制或削减他人依本许可享有的权利。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. 非商业限制
+   不得将本软件（含修改版、衍生版）或其任何部分用于商业目的，
+   包括但不限于：销售、出租、商业分发、付费服务、企业内部经营性使用、
+   或将其作为商业产品/服务的组成部分。"商业目的"指以营利为主要目的的
+   使用行为；个人日常使用与学习研究不在此列。
+
+3. 未授权即侵权
+   本许可未明示授予的权利均由作者保留。任何超出本许可范围的使用须事先
+   取得作者书面授权。
+
+4. 免责声明
+   本软件按"现状"提供，不附带任何明示或默示的担保，包括但不限于对适销
+   性、特定用途适用性及不侵权的担保。无论何种情形，作者对因使用或无法
+   使用本软件而产生的任何索赔、损害或其他责任不承担责任。
+
+5. 非官方声明
+   本项目为方便个人使用而开发的非官方作品，与 Anthropic PBC 及任何
+   Claude 品牌方无关联、未获其背书。Claude 及相关商标权利归其各自所有者。
+
+---------------------------------------------------------------
+
+English (translation; the Chinese text above is authoritative)
+
+1. Grant
+   Subject to the terms of this license, anyone may obtain a copy of this
+   software and its source code free of charge and is granted the right to:
+   a) use, run and modify the software solely for personal study, research
+      and non-commercial purposes;
+   b) redistribute the software, original or modified, provided that you:
+      i.  retain this license file in full;
+      ii. credit the original author(s) and source (project name and
+          repository URL) in a prominent place;
+      iii.add no additional restrictions and take none of the rights the
+          license grants to others.
+
+2. Non-commercial restriction
+   The software (including modified or derivative versions) or any part of
+   it may NOT be used for commercial purposes, including but not limited to
+   sale, rental, commercial distribution, paid services, revenue-bearing
+   internal business use, or inclusion in a commercial product or service.
+   "Commercial" means use primarily intended for commercial advantage or
+   monetary compensation; personal everyday use and study do not count.
+
+3. Unlicensed use
+   Rights not expressly granted by this license are reserved by the author(s).
+   Uses beyond its scope require prior written permission.
+
+4. Disclaimer of warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+5. Non-affiliation
+   This is an unofficial project built for personal convenience. It is not
+   affiliated with or endorsed by Anthropic PBC or any Claude brand owner.
+   Claude and related marks belong to their respective owners.
+
+---------------------------------------------------------------
+
+Third-party component notice
+
+public/vendor/qrcode-generator (https://github.com/kazuhikoarase/qrcode-generator),
+version 1.4.4, is vendored under its original MIT license, reproduced below.
+Its notice applies to that component only and is compatible with
+redistribution of this project under the license above.
+
+  The MIT License (MIT)
+  Copyright (c) 2012-2016 Kazuhiko Arase
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.

@@ -103,7 +103,7 @@ export async function bootPage(profileDir) {
     return false;
   };
   return {
-    ev, navigate, waitFor, resize,
+    ev, navigate, waitFor, resize, send,
     open: async (sid) => { await waitSession(sid); await navigate(`http://127.0.0.1:${PORT}/?token=${TOK}#open=${sid}`); },
     stop: async () => { try { ws.close(); } catch { /* already closed */ } edge.kill(); await sleep(400); },
   };

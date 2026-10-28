@@ -2,16 +2,16 @@
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话的插件工程（LAN bridge + 免构建 PWA）。
 
-- 架构基准：`docs/方案-v2.md`（第 4 节架构图、第 7 节接管模型）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·行尾 ⋯ 气泡 / ctxring 圆环·明细·模型·等级弹窗 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
+- 架构基准：README「架构与消息流」双 mermaid 图（会话即文件、无驻留接管）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·行尾 ⋯ 气泡 / ctxring 圆环·明细·模型·等级弹窗 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
-- 版本演进与调试史（症状→根因）：`docs/history.md`
-- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（parsers 14 + turns 5 判定单测）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，8 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
+- 版本演进与调试史（症状→根因）：`docs/history.md`（本地保留，不入库——开源仓库不含过程文档）
+- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（parsers/turns/adapter/cost 共 37 例）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，9 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
 - 功能缺口 Backlog：README「路线图/Backlog」节
 
 ## 快速开始
 
 ```powershell
-cd claude-remote
+cd claude-web
 npm install
 npm start          # node bridge/index.js，端口 3742
 ```
@@ -48,13 +48,13 @@ npm start          # node bridge/index.js，端口 3742
 - `claude://` deep link 被官方 Store 版接管，第三方客户端收不到（Phase 4 改走 UIA）。
 - Cowork 存储（`Claude-3p\local-agent-mode-sessions\local_*.json`）字段齐全（sessionId/cliSessionId/cwd/title/createdAt/lastActivityAt/ms/model/permissionMode/isArchived）——Phase 3 可开工。
 - CLI 的 `/context` 在 `-p` 模式可用（stream-json：init 带 session_id、result 带 markdown 表）；**statusline 方案勿用**（仅交互会话触发、配置不热加载，已实测排除）。手工跑 /context 会留垃圾 jsonl，用 DELETE API 回收。
-- **Linux 实测（2026-10-28 腾讯云 OpenCloudOS 9.4 + CLI 2.1.197，全链路通过）**：① CLI 拒绝 root/sudo 跑 `--dangerously-skip-permissions`（run 秒死、仅子进程 stderr 有字）——**Linux 部署必须普通用户**；② 2.1.197 与 2.1.308 转录格式兼容（tool_use/tool_result/usage/custom-title/hooks 全正常）；③ Node ≥20.13 递归 fs.watch 在 Linux 可用（libuv 递归 inotify），延迟与 Windows 同级——轮询降级仅老 Node/特殊 FS；④ `git archive` 在 Windows 会按 autocrlf 把 .sh 打成 CRLF（shebang 炸）——已由 .gitattributes `*.sh eol=lf` 钉死；⑤ 部署顺序红线：**先写 ~/.claude/settings.json 再起桥**（settingsEnv 空结果缓存锁死，backlog 修复）。详见 docs/history.md「Linux 实机验证」节。
+- **Linux 实测（2026-10-28 腾讯云 OpenCloudOS 9.4 + CLI 2.1.197，全链路通过）**：① CLI 拒绝 root/sudo 跑 `--dangerously-skip-permissions`（run 秒死、仅子进程 stderr 有字）——**Linux 部署必须普通用户**；② 2.1.197 与 2.1.308 转录格式兼容（tool_use/tool_result/usage/custom-title/hooks 全正常）；③ Node ≥20.13 递归 fs.watch 在 Linux 可用（libuv 递归 inotify），延迟与 Windows 同级——轮询降级仅老 Node/特殊 FS；④ `git archive` 在 Windows 会按 autocrlf 把 .sh 打成 CRLF（shebang 炸）——已由 .gitattributes `*.sh eol=lf` 钉死；⑤ 部署顺序红线：**先写 ~/.claude/settings.json 再起桥**（settingsEnv 空结果缓存锁死，backlog 修复）。（本地 history 有实录）。
 
 **转录格式**
 
 `%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.jsonl`（追加式）。adapter 消费：`user`（**人机判定按内容：2.1.308 本地工具的 tool_result 行 origin 为 null，只看 `origin.kind==='human'` 会漏配对——含 tool_result 块即机器回合**；**压缩续传摘要行 origin 缺失 + `isCompactSummary:true` → 折叠为 `{k:'compact',n}` 标记**；**技能注入行 origin 缺失 + 纯 text 数组 + 首段 "Base directory for this skill:" → 折叠为 `{k:'skill',name,n}` 标记**（name=路径末段）——勿按"origin 缺失"折叠：手机端 promptSource=sdk 的消息同样无 origin，必须保留气泡，只能认显式标记；`<command-*>` 信封归一成 `/名 参数`（勿再显示标签汤）；content 字符串或数组）、`assistant`（`message.content[]`：thinking/text/tool_use——**tool_use 的 `id` 是结果配对键**；`message.model` 是显示模型名的**唯一来源**；`message.usage` 是圆环**唯一数据源**：in/cacheRead/cacheCreate/out）、`custom-title`、`cost-state`（**聚合全部模型**，且**不覆盖** model 标签——曾致模型名闪烁；进程退出时偶发连写两行快照，39 次中见 1 次——**adapter 相邻折叠保末值**，中间隔其他事件则都保留）、`system`（stop 类 subtype → idle + `{k:'stop'}` 标记事件）。slug：`D:\foo\Bar` → `D--foo-Bar`。
 
-## PWA 硬约束（勿回退，详见 docs/history.md 的根因）
+## PWA 硬约束（勿回退， 的根因）
 
 **折叠/滚动**
 
@@ -99,4 +99,4 @@ npm start          # node bridge/index.js，端口 3742
 
 ## 路线图
 
-P0/P1 已收口（v44-v90：审批 diff、历史分页、always-allow、改动文件总览、导出 MD、费用面板、搜索批量、确认弹窗、品牌化）。**已裁定不做**：锁屏/推送通知（ntfy 代码保留但不配）、手动 /compact（2026-10-28 用户裁定，勿再提案）。剩余：`cli/cr.mjs`（PC 端 CLI 跨平台化，现仅 .ps1）、README Linux 部署节扩充。之后 Phase 3（Cowork 数据面，adapter-cowork.js + 轮询）、Phase 4（Cowork 控制面，UIA 主路线）。
+P0/P1 已收口（v44-v90：审批 diff、历史分页、always-allow、改动文件总览、导出 MD、费用面板、搜索批量、确认弹窗、品牌化）。**已裁定不做**：锁屏/推送通知（ntfy 代码保留但不配）。命令行类功能（/compact 等）后续会补充，文档无需特意提及。剩余：`cli/cr.mjs`（PC 端 CLI 跨平台化，现仅 .ps1）。之后 Phase 3（Cowork 数据面，adapter-cowork.js + 轮询）、Phase 4（Cowork 控制面，UIA 主路线）。
