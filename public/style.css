@@ -401,6 +401,11 @@ button { font-family: inherit; }
 .attach-chip .ac-x:active { color: var(--err); }
 .cbtn.attach { padding: 0 6px; }
 .bubble.user .bubble-img { display: block; width: min(240px, 100%); border-radius: 10px; margin-top: 6px; cursor: zoom-in; }
+/* ---------- v79：工具输出图片按原图大小、限宽限高 ----------
+   旧规则只匹配 user 气泡内的 img，工具结果图（同名 class、不同容器）无任何
+   约束——高分辨率截图全尺寸溢出。自然尺寸 + max 双限，比例保持，点开灯箱看原样。 */
+.tool-out-imgs { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.tool-out-imgs .bubble-img { display: block; width: auto; height: auto; max-width: min(100%, 520px); max-height: 300px; border-radius: 10px; cursor: zoom-in; }
 .bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
 /* ---------- v70：乐观泡菊花（8 棒 / 8px / 泡左贴边 / 与泡底对齐） ---------- */
 /* width:100% is load-bearing: a shrink-to-fit line makes the bubble's
