@@ -12,6 +12,14 @@
 
 **Form factor**: mobile-first (phone browser / add-to-home-screen PWA). The desktop browser works fully, but layout and interactions are designed for the phone; desktop niceties may come later.
 
+## Why claude-web
+
+- **The whole link stays on your LAN** — no cloud relay, no third-party account; the token lives on your own machine, and the entire stack is a single Node process.
+- **Sessions are files, coexisting with the official clients** — the bridge reads and appends the same transcript JSONL the official CLI and desktop app use: a session started from the phone is right there when you reopen the desktop app. Nothing is wrapped, copied, or sandboxed.
+- **No resident agents, arbitration by design** — each message spawns one `claude --resume -p` that exits when done, leaving no background agent behind; sends pass handoff arbitration (recent-write detection + PC claim locks), so multiple clients never fight over a session.
+- **Minimal and auditable** — a single runtime dependency (`ws`); the frontend is zero-build vanilla JS with no bundler, framework, or toolchain — you can read the whole codebase in an afternoon.
+- **Phone-first to the core** — optimistic bubbles, a message queue, approval cards with ±diff, folded live transcripts; the one-handed browsing experience is deliberately polished.
+
 ## Quick start
 
 ```bash
