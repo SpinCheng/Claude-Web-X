@@ -418,3 +418,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - fmtTs：今天=HH:MM，今年=MM-DD HH:MM，跨年=YYYY-MM-DD HH:MM（用户裁定：非今天加日期）。
 - brand-mark.png 撤出 .gitignore 正式入库（用户裁定，风险自担已明示）；README「不分发」条款改为来源与着色说明，无关联声明保留。
+
+
+## v87（2026-10-29）header 密度收敛（手机端快装不下）
+
+- 版本号并入 PERSONAL 胶囊（一枚胶囊承载，独立徽章元素删除；#build id 保留、bump 匹配模式改为 span 内文本）；
+- header 专属收紧：T4 字距 .22em→.12em（gate 保持大气）、胶囊字距减半+padding 收窄、图标 20→18px、间距微收。合计约省 60px，360px 屏从容。
