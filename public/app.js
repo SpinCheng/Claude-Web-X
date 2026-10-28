@@ -14,7 +14,7 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
-import { updateComposer, renderQueuePanel } from './js/views/composer.js';
+import { updateComposer, renderQueuePanel, setNewPending } from './js/views/composer.js';
 
 /* ---------------- token gate ---------------- */
 async function saveToken() {
@@ -131,6 +131,7 @@ function handleRunFrame(d) {
     // spawn-level failure (bad cwd, CLI missing): no session will ever appear
     if (state.pendingNew === d.runId && (d.state === 'error' || d.state === 'end')) {
       state.pendingNew = null;
+      setNewPending(false); // unlock the creating-state modal (still open)
       toast('任务没启动起来：' + (d.stderrTail || d.error || '查看工作目录是否正确').slice(0, 80));
     }
     if (state.pendingBranchRun === d.runId && (d.state === 'error' || d.state === 'end')) {
@@ -170,6 +171,7 @@ function handleRunFrame(d) {
   }
   if (state.pendingNew === d.runId && d.state === 'running') {
     state.pendingNew = null;
+    $('new-modal').classList.add('hidden'); // creating state ends here
     if (state.currentId !== d.sessionId) openDetail(d.sessionId);
   }
   // v40 branch adoption: the fork's real session id arrived (init line).

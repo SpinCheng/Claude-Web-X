@@ -424,8 +424,19 @@ function stopRun() {
 /* ---------------- new session ---------------- */
 // presetCwd: preselect the project dir (list-page group-head + button).
 // Existing onclick= wiring passes the event object here, so non-strings reset.
+// v63: creating-state guard - on a successful POST the modal STAYS open
+// with the button spun up; the 1-5s spawn window before the run frame
+// adopts the session id would otherwise show zero feedback (modal closed,
+// list inert). app.js closes the modal on adoption / unlocks on failure.
+function setNewPending(on) {
+  const go = $('new-go'), cancel = $('new-cancel');
+  go.disabled = on; cancel.disabled = on;
+  go.textContent = on ? '创建中…' : '开始';
+  go.classList.toggle('loading', on);
+}
 function openNewModal(presetCwd) {
   if (typeof presetCwd !== 'string') presetCwd = '';
+  setNewPending(false); // every open starts fresh
   const sel = $('new-cwd');
   sel.innerHTML = '';
   const seen = new Set();
@@ -465,6 +476,7 @@ function openNewModal(presetCwd) {
   $('new-text').focus();
 }
 function submitNewSession() {
+  if ($('new-go').disabled) return; // creating in flight - no double submit
   const text = $('new-text').value.trim();
   if (!text) { $('new-err').textContent = '任务内容不能为空'; return; }
   const custom = $('new-cwd-custom').value.trim();
@@ -478,11 +490,13 @@ function submitNewSession() {
   })
     .then((r) => r.json())
     .then((j) => {
-      if (!j.ok) { $('new-err').textContent = '启动失败：' + (j.error || ''); return; }
-      $('new-modal').classList.add('hidden');
-      state.pendingNew = j.runId;
+      if (!j.ok) { setNewPending(false); $('new-err').textContent = '启动失败：' + (j.error || ''); return; }
+      state.pendingNew = j.runId; // modal stays in creating state until adoption
+      setTimeout(() => { // safety: run frame lost (WS drop) - never lock the modal forever
+        if (state.pendingNew === j.runId) { state.pendingNew = null; setNewPending(false); toast('启动超时，稍后会出现在列表'); }
+      }, 30_000);
     })
-    .catch(() => { $('new-err').textContent = '网络错误'; });
+    .catch(() => { setNewPending(false); $('new-err').textContent = '网络错误'; });
 }
 
 /* ---------------- wiring ---------------- */
@@ -537,4 +551,4 @@ if (window.ResizeObserver && composerEl) {
   }).observe(composerEl);
 }
 
-export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setDraft, disarmFork };
+export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setNewPending, setDraft, disarmFork };

@@ -1,4 +1,4 @@
-# CLAUDE.md — claude-remote 工程手册
+# CLAUDE.md — claude-web 工程手册
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话的插件工程（LAN bridge + 免构建 PWA）。
 

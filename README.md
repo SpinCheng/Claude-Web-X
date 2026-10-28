@@ -1,4 +1,4 @@
-# claude-remote
+# claude-web
 
 **Remote control for local Claude Code sessions from your phone — LAN bridge + PWA, zero install, single `ws` dependency.**
 
@@ -14,8 +14,8 @@
 ## 快速开始
 
 ```powershell
-git clone <repo> claude-remote
-cd claude-remote
+git clone <repo> claude-web
+cd claude-web
 npm install
 npm start          # node bridge/index.js，端口 3742
 ```
@@ -69,7 +69,7 @@ CLI 自动升级后若行为异常，可在 `bridge/data/config.json` 设 `claud
 ## 目录结构
 
 ```
-claude-remote/
+claude-web/
 ├── README.md / SECURITY.md / CONTRIBUTING.md / LICENSE
 ├── CLAUDE.md                   # 工程事实与约定全集（机器无关部分；本机细节在 LOCAL.md，不入库）
 ├── package.json                # 仅 ws 一个运行时依赖，Node ≥ 20 ESM

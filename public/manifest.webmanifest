@@ -1,6 +1,6 @@
 {
-  "name": "claude-remote",
-  "short_name": "claude-remote",
+  "name": "claude-web",
+  "short_name": "claude-web",
   "description": "远程查看并操控本机 Claude Code 会话",
   "lang": "zh-CN",
   "start_url": "/",

@@ -432,6 +432,12 @@ button { font-family: inherit; }
 /* ---------- v51：确认弹窗（window.confirm 替身，沿用底部 sheet 模态语言） ---------- */
 .cf-body { color: var(--dim); font-size: 13px; line-height: 1.65; margin: -6px 0 16px; word-break: break-word; }
 .btn.danger { background: var(--err); color: #fff; }
+/* ---------- v63：新会话「创建中」态（按钮 spinner + 防双击；spinner 走线性——旋转类动画不减速） ---------- */
+.btn:disabled { opacity: .6; pointer-events: none; }
+.btn.loading { padding-right: 36px; position: relative; }
+.btn.loading::after { content: ""; position: absolute; right: 13px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .38); border-top-color: #fff; animation: btnSpin .7s linear infinite; }
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn.loading::after { animation-duration: 1.6s; } }
 .btn.danger:active { background: color-mix(in srgb, var(--err) 80%, #fff); }
 
 /* ---------- 权限模式 & 审批卡 ---------- */

@@ -315,3 +315,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - runner.resolveClaude → findClaudeBinary（claudePath 配置语义保留：override 存在则用，失效静默落回自动发现）。ask 分支新增旗标 `--permission-prompts host`（审查标记：2.1.308 行为未实测，需 ask 实跑验证一次）。
 - ⚠ hook-post.sh 需可执行位（Windows 无法 chmod）：入库时 `git update-index --chmod=+x bridge/hook-post.sh`；POSIX 裸 checkout 若丢位则手动 chmod。
 - 剩余：cr.mjs（PC CLI 仍 .ps1）、Linux fs.watch 实测、POSIX 实机验证。
+
+
+## v63（2026-10-28）新会话创建过渡态 + 项目更名 claude-web
+
+- 用户反馈：新建会话点「开始」后弹窗即关、等 spawn/init 的 1~5 秒页面零反馈。v63：POST 成功后**弹窗保持打开转「创建中」态**——开始钮 spinner（线性旋转）+ 禁双击、取消钮同步禁用；run 帧采纳 sessionId 时才关弹窗进详情（app.js 两处：成功关/失败解锁）；30 秒兜底超时防 run 帧丢失锁死弹窗；openNewModal 每次开先 setNewPending(false) 复位。
+- 更名 claude-remote → claude-web：可见面全部换（PWA title/品牌字/manifest、package.json、README H1+示例、SECURITY、CLAUDE.md 标题）。**文件夹有意不改名**——settings.json hooks 命令、开机自启 vbs 绝对路径、转录 slug（D--dev-workspaces-claude-remote）分组连续性、LOCAL.md 都锚在旧路径上，改名需要一次协调迁移，待用户另行拍板。
