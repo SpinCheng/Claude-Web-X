@@ -77,6 +77,28 @@ sequenceDiagram
 - 附件（图片压缩直传 / 文本内联）、产物预览（锁项目目录内、防 XSS 白名单）、导出 Markdown、改动文件 ± 汇总、会话内分支（fork）
 - 排队消息（增删/重排/插队）、乐观上屏（呼吸灯→落盘转实，停止转红）
 
+## 目录结构
+
+```
+claude-web/
+├── README.md / README.en.md / SECURITY.md / CONTRIBUTING.md / LICENSE
+├── CLAUDE.md                   # 工程事实与约定全集（机器无关部分；本机细节在 LOCAL.md，不入库）
+├── package.json                # 仅 ws 一个运行时依赖，Node ≥ 20 ESM
+├── bridge/                     # 常驻 daemon（HTTP+WS+静态+鉴权）
+│   ├── index.js / server.js    # 入口（配置迁移/事件接线/双开保护）/ 组装根（路由+静态+探针）
+│   ├── lib/                    # router / wshub(WS枢纽+审批) / auth / mime / models / platform(OS 差异单点)
+│   ├── routes/                 # sessions / message / attachments / hooks / approvals / pairing
+│   ├── parsers-cc.js           # 转录 JSONL 行判定纯函数（单测覆盖）
+│   ├── adapter-cc.js           # ~/.claude/projects 监听解析（状态推导、回收站、上下文记账）
+│   ├── runner.js               # 无驻留执行器（每条消息一次 resume -p；排队；模型/等级；权限路由）
+│   ├── handoff.js / ctxprobe.js / tailer.js / store.js / hooks.js / approve-mcp.mjs / hook-post.{cmd,sh}
+├── public/                     # PWA（免构建 vanilla JS）：index.html / app.js / js/ / style.css / pair.html / vendor(qrcode, MIT)
+├── cli/cr.ps1                  # 电脑端接管工具 list/attach/release/url
+├── scripts/                    # start-bridge.vbs / rotate-token.ps1 / make-icons.mjs / shots.mjs(截图)
+├── test/                       # unit(4 套 37 例) + e2e(隔离桥 :3799 + headless Edge，9 场景)
+└── docs/screenshots/           # README 截图（合成数据拍摄）
+```
+
 ## 运行环境
 
 | 组件 | 实测 | 说明 |

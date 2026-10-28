@@ -2,11 +2,11 @@
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话的插件工程（LAN bridge + 免构建 PWA）。
 
-- 架构基准：README「架构与消息流」双 mermaid 图（会话即文件、无驻留接管）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（106 行）→ `lib/`（router/wshub/auth/mime/models）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（244 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·行尾 ⋯ 气泡 / ctxring 圆环·明细·模型·等级弹窗 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail 与 list↔sessops 是函数级循环 import，均求值期零交叉）。
+- 架构基准：README「架构与消息流」双 mermaid 图（会话即文件、无驻留接管）；2026-10-27 分层重构（step 0-5 已落地）：**后端** `server.js`=组装根（111 行）→ `lib/`（router/wshub/auth/mime/models/**platform**-OS 差异单点）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，单测覆盖）；**前端** `app.js`=组装根（291 行：boot/gate/视图路由/WS 帧语义）→ `js/`（state 单例含 currentModel/currentEffort 持久化读取器 / api 带 401 回调 / ws 传输注入 handlers / md+util 纯函数）+ `js/views/`（toast / overlays 气泡·灯箱·预览·审批卡 / list 分组列表 / sessops 列表行操作·行尾 ⋯ 气泡 / ctxring 圆环·明细·模型·等级弹窗 / composer 输入区·附件·队列·新会话 / detail 视图壳 + transcript 轮次模型·renderTail 脆核——**滚动三律与 renderTail 不变量在 transcript.js**；composer↔detail、list↔sessops、detail↔ctxring 是函数级循环 import，均求值期零交叉）。
 - 本机专属事实（路径/中转环境）：`LOCAL.md`（gitignored）
 - 版本演进与调试史（症状→根因）：`docs/history.md`（本地保留，不入库——开源仓库不含过程文档）
-- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（parsers/turns/adapter/cost 共 37 例）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，9 场景：时间轴/md渲染/折叠标记/产物预览/API面/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
-- 功能缺口 Backlog：README「路线图/Backlog」节
+- E2E 冒烟套件（改桥/PWA 必跑）：`npm test` → `test/unit/`（parsers/turns/adapter/cost 共 37 例）+ `test/e2e/`（隔离实例 :3799 + 合成转录 + headless Edge CDP，9 场景：时间轴/md渲染/折叠标记/产物预览/API面/历史分页/三态钮/列表滚动/列表操作；fixture 勿走 bash 内联——反斜杠会被吃；harness 的 api() 头必须合并非替换；headless 自动 dismiss confirm，harness 已代答 accept）
+- 功能缺口与后续计划：README「路线图」节
 
 ## 快速开始
 
@@ -54,7 +54,7 @@ npm start          # node bridge/index.js，端口 3742
 
 `%USERPROFILE%\.claude\projects\<工作区slug>\<sessionId>.jsonl`（追加式）。adapter 消费：`user`（**人机判定按内容：2.1.308 本地工具的 tool_result 行 origin 为 null，只看 `origin.kind==='human'` 会漏配对——含 tool_result 块即机器回合**；**压缩续传摘要行 origin 缺失 + `isCompactSummary:true` → 折叠为 `{k:'compact',n}` 标记**；**技能注入行 origin 缺失 + 纯 text 数组 + 首段 "Base directory for this skill:" → 折叠为 `{k:'skill',name,n}` 标记**（name=路径末段）——勿按"origin 缺失"折叠：手机端 promptSource=sdk 的消息同样无 origin，必须保留气泡，只能认显式标记；`<command-*>` 信封归一成 `/名 参数`（勿再显示标签汤）；content 字符串或数组）、`assistant`（`message.content[]`：thinking/text/tool_use——**tool_use 的 `id` 是结果配对键**；`message.model` 是显示模型名的**唯一来源**；`message.usage` 是圆环**唯一数据源**：in/cacheRead/cacheCreate/out）、`custom-title`、`cost-state`（**聚合全部模型**，且**不覆盖** model 标签——曾致模型名闪烁；进程退出时偶发连写两行快照，39 次中见 1 次——**adapter 相邻折叠保末值**，中间隔其他事件则都保留）、`system`（stop 类 subtype → idle + `{k:'stop'}` 标记事件）。slug：`D:\foo\Bar` → `D--foo-Bar`。
 
-## PWA 硬约束（勿回退， 的根因）
+## PWA 硬约束（勿回退）
 
 **折叠/滚动**
 
