@@ -23,7 +23,7 @@
 ## Quick start
 
 ```bash
-git clone <repo> claude-web
+git clone https://github.com/SpinCheng/Claude-Web-X.git claude-web
 cd claude-web
 npm install
 npm start          # node bridge/index.js, port 3742
@@ -31,7 +31,7 @@ npm start          # node bridge/index.js, port 3742
 
 1. Open **http://localhost:3742/pair** on the PC (localhost-only) → pairing QR code
 2. Scan it from a phone on the same Wi-Fi → paired, permanent
-3. Optionally install autostart from the pair page
+3. Optionally install autostart from the pair page (Windows only)
 
 Linux/macOS: same commands (hooks use `bridge/hook-post.sh`). Two verified pitfalls: the CLI refuses `--dangerously-skip-permissions` under root/sudo — use a normal user; write `~/.claude/settings.json` (with your relay credentials in the `env` block) **before** starting the bridge.
 
@@ -85,6 +85,34 @@ Sessions are files: desktop, terminal and phone all write the same transcripts; 
 - Attachments (compressed images, inlined text), artifact preview (locked to the project dir, XSS-hardened), Markdown export, per-turn changed-files rollup, in-session fork
 - Message queue (edit/reorder/jump), optimistic bubbles (breathing dot → confirmed, red on stop)
 
+## Directory layout
+
+```
+claude-web/
+├── README.md / README.en.md / SECURITY.md / CONTRIBUTING.md / LICENSE
+├── CLAUDE.md                   # engineering facts & conventions
+├── package.json                # single runtime dep (ws), Node >= 20 ESM
+├── bridge/                     # daemon: HTTP+WS + static + auth
+│   ├── index.js / server.js    # entry / composition root (routes, static, probe)
+│   ├── lib/                    # router / wshub / auth / mime / models / platform (OS specifics)
+│   ├── routes/                 # sessions / message / attachments / hooks / approvals / pairing
+│   ├── parsers-cc.js           # transcript-line judgments (pure, unit-tested)
+│   ├── adapter-cc.js           # fs.watch on ~/.claude/projects transcripts
+│   ├── runner.js               # non-resident executor (one resume -p per message)
+│   └── handoff.js / ctxprobe.js / store.js / hooks.js / approve-mcp.mjs / hook-post.{cmd,sh}
+├── public/                     # PWA (zero-build vanilla JS) + pair.html + vendor(qrcode, MIT)
+├── cli/cr.mjs                  # PC-side takeover (cross-platform)
+├── scripts/                    # start-bridge.vbs / rotate-token.ps1 / make-icons.mjs / shots.mjs
+├── test/                       # unit (37) + e2e (isolated bridge + headless Edge, 9 scenarios)
+└── docs/screenshots/
+```
+
+## FAQ
+
+**Q: the model says it has no Bash/command-execution tool in a phone session, but git/bash clearly work on my PC?**
+
+Claude Code's Bash tool on Windows depends on *discovering Git Bash* (standard locations + the process PATH); if it is not found, the tool is not registered at all. Environment variables are a snapshot taken at process birth: a bridge started from a lean context (autostart, script chain) can lose the Git directories. This project's runner has a built-in fallback (probes common install locations and prepends them to the child PATH). If that still misses, add Git to the system PATH, or restart the bridge once from a full terminal.
+
 ## Requirements
 
 | Component | Verified | Notes |
@@ -97,7 +125,7 @@ The bridge consumes CLI behavior and data formats directly (transcript JSONL sha
 
 ## Roadmap
 
-Phases 0–2 done (recon → read-only → full duplex + productized PWA); the P0/P1 feature loop is closed (approval diff, history pagination, always-allow, changed-files rollup, export, cost panel, search/batch, in-app confirm dialogs, branding). Next: slash-command palette, quota/rate display, offline PWA shell, cross-platform PC CLI (cr.mjs), checkpoint rollback; later, Cowork data & control planes.
+Phases 0–2 done (recon → read-only → full duplex + productized PWA); the P0/P1 feature loop is closed (approval diff, history pagination, always-allow, changed-files rollup, export, cost panel, search/batch, in-app confirm dialogs, branding). Next: slash-command palette, quota/rate display, offline PWA shell, checkpoint rollback; later, Cowork data & control planes.
 
 ## Notes
 

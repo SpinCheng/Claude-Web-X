@@ -33,4 +33,4 @@ claude-web 把「能在你电脑上执行任意命令的 Claude Code」暴露给
 
 ## 负责任披露
 
-发现问题请开 GitHub Issue（敏感问题可加急标注），不要公开利用。
+漏洞请走 **GitHub 私有渠道**：仓库 Security 标签页 → Report a vulnerability（私有漏洞报告）；不可用时发邮件至仓库所有者（见 GitHub 主页）。请勿在公开 Issue 里贴 token、复现细节或利用代码。

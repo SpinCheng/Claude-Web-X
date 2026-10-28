@@ -1,5 +1,5 @@
 // test/unit/parsers.test.mjs - pure-function coverage for the transcript
-// judgment pitfalls documented in docs/history.md (v22/v24/v26/v28).
+// judgment pitfalls documented in CLAUDE.md (转录格式 section).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyLine, fenceTitle } from '../../bridge/parsers-cc.js';

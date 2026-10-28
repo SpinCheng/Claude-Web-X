@@ -6,7 +6,8 @@
 <img src="docs/screenshots/list.png" width="32%" alt="会话列表"> <img src="docs/screenshots/detail.png" width="32%" alt="会话转录"> <img src="docs/screenshots/new-task.png" width="32%" alt="新建任务">
 </p>
 
-> **免责声明**：本项目是为方便个人使用而开发的**非官方**作品，与 Anthropic PBC 及任何 Claude 品牌方无关联、未获其背书；Claude 及相关商标归其各自所有者。项目按[非商业许可](LICENSE)发布——个人学习研究可用、转载须注明出处、**禁止商用**。风险自担。
+> **免责声明**：本项目是为方便个人使用而开发的**非官方**作品，与 Anthropic PBC 及任何 Claude 品牌方无关联、未获其背书；Claude 及相关商标归其各自所有者。
+> 项目按[非商业许可](LICENSE)发布——个人学习研究可用、转载须注明出处、**禁止商用**。风险自担。
 >
 > **安全提醒**：这个工具把「能执行任意命令的 Claude Code」暴露给局域网网页。只在可信网络（家庭局域网 / Tailscale）使用，不要端口映射到公网。详见 [SECURITY.md](SECURITY.md)。
 
@@ -23,7 +24,7 @@
 ## 快速开始
 
 ```powershell
-git clone <repo> claude-web
+git clone https://github.com/SpinCheng/Claude-Web-X.git claude-web
 cd claude-web
 npm install
 npm start          # node bridge/index.js，端口 3742
@@ -31,9 +32,10 @@ npm start          # node bridge/index.js，端口 3742
 
 1. 电脑浏览器打开 **http://localhost:3742/pair**（仅本机可访问）→ 页面显示配对二维码
 2. 手机（连同一 Wi-Fi）扫码 → 自动配对并进入会话列表，之后永久有效
-3. 在 pair 页点 **安装开机自启**，登录后 bridge 自动后台运行（双开保护）
+3. 在 pair 页点 **安装开机自启**（仅 Windows），登录后 bridge 自动后台运行（双开保护）
 
-Linux / macOS：`npm install && npm start` 同样适用（hooks 走 `bridge/hook-post.sh`）。两个实测坑：**CLI 拒绝 root/sudo** 跑跳过权限模式——用普通用户；**先写好 `~/.claude/settings.json` 再起桥**（env 块缺失会被缓存锁死）。
+Linux / macOS：`npm install && npm start` 同样适用（hooks 走 `bridge/hook-post.sh`）。
+两个实测坑：**CLI 拒绝 root/sudo** 跑跳过权限模式——用普通用户；**先写好 `~/.claude/settings.json` 再起桥**（env 块缺失会被缓存锁死）。
 
 前提：本机装有可用的 Claude Code CLI 并完成登录（第三方客户端内置的 CLI 亦可，runner 自动发现）；API 凭证按你环境的惯例放在 `~/.claude/settings.json` 的 `env` 块，spawn 时由 bridge 显式注入子进程。
 
@@ -119,7 +121,9 @@ claude-web/
 
 ## 路线图
 
-Phase 0-2 完成（环境勘探 → 只读 → 全双工 + 产品化 PWA）。P0/P1 功能闭环已收口（审批 diff、历史分页、always-allow、改动文件总览、导出、费用面板、搜索批量、自定义确认弹窗、品牌化）。后续：斜杠命令面板、配额/速率显示、离线 PWA shell、PC 端 CLI 跨平台化（cr.mjs）、检查点回滚；之后是 Cowork 数据面与控制面。
+Phase 0-2 完成（环境勘探 → 只读 → 全双工 + 产品化 PWA）。
+P0/P1 功能闭环已收口（审批 diff、历史分页、always-allow、改动文件总览、导出、费用面板、搜索批量、自定义确认弹窗、品牌化）。
+后续：斜杠命令面板、配额/速率显示、离线 PWA shell、检查点回滚；之后是 Cowork 数据面与控制面。
 
 ## 注意
 
@@ -130,10 +134,13 @@ Phase 0-2 完成（环境勘探 → 只读 → 全双工 + 产品化 PWA）。P0
 
 ## 常见问题（Q&A）
 
-**Q：手机会话里 AI 说"没有 Bash/命令执行工具"，但我电脑上 git / bash 明明都能用？**
+**Q：手机会话里 AI 说「没有 Bash/命令执行工具」，但我电脑上 git / bash 明明都能用？**
 
-Claude Code 的 Bash 工具在 Windows 上依赖**发现 Git Bash**（标准位置 + 进程 PATH），找不到就整个工具不注册。环境变量是进程出生时的快照：bridge 从精简上下文启动（开机自启、脚本链）时可能丢 Git 目录。本工程 runner 已内置兜底（spawn 时探测常见安装位置并前置 PATH）；仍中招就把 Git 目录加进系统 PATH，或在完整终端里重启一次 bridge。
+Claude Code 的 Bash 工具在 Windows 上依赖**发现 Git Bash**（标准位置 + 进程 PATH），找不到就整个工具不注册。
+环境变量是进程出生时的快照：bridge 从精简上下文启动（开机自启、脚本链）时可能丢 Git 目录。
+本工程 runner 已内置兜底（spawn 时探测常见安装位置并前置 PATH）；仍中招就把 Git 目录加进系统 PATH，或在完整终端里重启一次 bridge。
 
 ## License
 
-[非商业许可](LICENSE)：个人学习研究可用、转载须注明出处、**禁止商用**（内含 vendored 的 qrcode-generator@1.4.4，按其原 MIT 许可）。贡献即表示接受本许可条款。
+[非商业许可](LICENSE)：个人学习研究可用、转载须注明出处、**禁止商用**（内含 vendored 的 qrcode-generator@1.4.4，按其原 MIT 许可）。
+贡献即表示接受本许可条款。

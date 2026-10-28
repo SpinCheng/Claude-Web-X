@@ -5,17 +5,19 @@ on:
 
 jobs:
   check:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm ci
+      - name: unit tests (37)
+        run: node --test test/unit/parsers.test.mjs test/unit/turns.test.mjs test/unit/adapter.test.mjs test/unit/cost.test.mjs
       - name: syntax check (bridge + pwa)
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem bridge/*.js, bridge/*.mjs, public/app.js, scripts/*.mjs
-          foreach ($f in $files) { node --check $f.FullName; if ($LASTEXITCODE -ne 0) { exit 1 } }
+        run: node --check bridge/server.js && node --check bridge/runner.js && node --check bridge/adapter-cc.js && node --check bridge/parsers-cc.js && node --check cli/cr.mjs && node --check public/app.js
       - name: import smoke (module graph loads)
         run: node -e "Promise.all(['./bridge/server.js','./bridge/runner.js','./bridge/ctxprobe.js','./bridge/adapter-cc.js'].map(m=>import(m))).then(()=>console.log('imports ok'))"

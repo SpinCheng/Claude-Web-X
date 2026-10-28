@@ -2,7 +2,7 @@
 // turn model (events -> turns), timeline DOM rendering, renderTail's 1:1
 // chat-children/turns invariant, dynamic height caps, scrolling and the
 // optimistic user bubble. Scroll laws and markCapped rules live HERE -
-// read docs/history.md (折叠/滚动系列坑) before touching anything.
+// read the PWA 硬约束 section of CLAUDE.md before touching anything.
 
 import { $, fmtTs } from '../util.js';
 import { state } from '../state.js';
