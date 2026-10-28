@@ -49,20 +49,42 @@ button { font-family: inherit; }
 @keyframes breathe { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .pgroup-ico[data-st="running"], .pgroup-ico[data-st="waiting"], .caret, .timeline, .node-body { animation: none !important; } }
 
-/* ---------- brand ---------- */
+/* ---------- brand（v84 终稿：官方标记 + P2 小徽章 + T4 词标 + PERSONAL 下标） ---------- */
 .brand { display: flex; align-items: center; gap: 9px; }
-.brand-word { font-family: var(--mono); font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
-.brand-dim { color: var(--faint); font-weight: 400; }
+/* official tray template mark via CSS mask - color follows state:
+   coral=connected, cream=disconnected, breathing=connecting (v84 ruling;
+   the old green/red lamp semantics are retired) */
+.mk { position: relative; display: inline-flex; flex: none; }
+.mk .mark { display: inline-block; width: 20px; height: 20px; flex: none; background: var(--fg);
+  -webkit-mask: url(/brand-mark.png) center/contain no-repeat; mask: url(/brand-mark.png) center/contain no-repeat; }
+.mk .mark.on { background: var(--acc); }
+.mk .mark.conn { animation: markConn 1.6s ease-in-out infinite; }
+@keyframes markConn { 0%, 100% { background: var(--fg); } 50% { background: var(--acc); } }
+@media (prefers-reduced-motion: reduce) { .mk .mark.conn { animation: none; background: var(--acc); } }
+/* P2s: P2 badge (panel2 bg + coral border) shrunk, overlapped onto the
+   icon's bottom-right corner - the personal-edition / non-official marker */
+.mk .pb { position: absolute; font: 700 6.5px/1 var(--mono); padding: 2px 3.5px; border-radius: 999px;
+  color: var(--acc-strong); background: #2E2B26; border: 1px solid var(--acc); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.mk .pb { right: -5.5px; bottom: -5.5px; }
+/* T4 wordmark: light weight, wide tracking, uppercase; Web picks up coral */
+.brand-word.t4 { font: 300 13px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; }
+.brand-word.t4.web { font-weight: 600; color: var(--acc-strong); margin-left: .22em; }
+/* PERSONAL subscript capsule: T4 typography, coral, hangs on the baseline */
+.cap-en { font: 300 8.5px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase;
+  color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px;
+  padding: 2.5px 6px 2.5px 8px; margin-left: 6px; align-self: flex-end; }
 .build-badge { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-left: 1px; letter-spacing: .03em; }
-.brand-lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
-.brand-lamp.on  { background: var(--ok); box-shadow: 0 0 8px rgba(143, 185, 141, .45); }
-.brand-lamp.off { background: var(--err); opacity: .7; }
+
+.gate .mk .mark { width: 30px; height: 30px; }
+.gate .mk .pb { font-size: 7.5px; padding: 2.5px 4px; right: -8px; bottom: -8px; }
+.gate .brand-word.t4 { font-size: 17px; }
+.gate .cap-en { font-size: 9.5px; padding: 3px 7px 3px 9px; }
+.gate .brand { gap: 11px; }
 
 /* ---------- gate：进入的仪式感 ---------- */
 .gate { align-items: center; justify-content: center; background: radial-gradient(120% 70% at 50% 0%, #241f1b 0%, var(--bg) 62%); }
 .gate-inner { width: min(86vw, 350px); background: var(--panel); border-radius: 18px; padding: 28px 24px; box-shadow: var(--sh-2); }
 .gate .brand-word { font-size: 19px; }
-.gate .brand-lamp { background: var(--acc); box-shadow: 0 0 10px rgba(217, 119, 87, .5); }
 .gate-sub { color: var(--dim); font-size: 13px; margin: 10px 0 18px 18px; }
 .gate-form { display: flex; gap: 8px; }
 .gate-form input { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 14px var(--mono); transition: border-color .15s, box-shadow .15s; }

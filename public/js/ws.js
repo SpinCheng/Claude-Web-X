@@ -13,11 +13,15 @@ function wsUrl() {
 
 export function connectWs() {
   if (state.ws) { try { state.ws.close(); } catch (e) { /* noop */ } }
+  // v84: connection state lives IN the brand mark now - cream->coral breath
+  // while connecting (reduced-motion: static coral)
+  const dot = document.getElementById('conn-dot');
+  if (dot) dot.className = 'mark conn';
   const ws = new WebSocket(wsUrl());
   state.ws = ws;
   ws.onopen = () => {
     state.wsRetry = 1000;
-    document.getElementById('conn-dot').className = 'brand-lamp on';
+    document.getElementById('conn-dot').className = 'mark on';
     if (state.currentId) sendWs({ type: 'subscribe', id: state.currentId });
     if (handlers.onOpen) handlers.onOpen(); // e.g. catch approval cards missed offline
   };
@@ -27,7 +31,7 @@ export function connectWs() {
     if (fn) fn(d);
   };
   ws.onclose = () => {
-    document.getElementById('conn-dot').className = 'brand-lamp off';
+    document.getElementById('conn-dot').className = 'mark';
     clearTimeout(state.wsTimer);
     state.wsTimer = setTimeout(connectWs, state.wsRetry);
     state.wsRetry = Math.min(state.wsRetry * 2, 8000);
