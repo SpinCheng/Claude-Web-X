@@ -49,14 +49,25 @@ button { font-family: inherit; }
 @keyframes breathe { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .pgroup-ico[data-st="running"], .pgroup-ico[data-st="waiting"], .caret, .timeline, .node-body { animation: none !important; } }
 
-/* ---------- brand ---------- */
+/* ---------- brand（v84：官方图标 + 衬线词标） ---------- */
 .brand { display: flex; align-items: center; gap: 9px; }
+.brand-logo { width: 22px; height: 22px; border-radius: 6px; flex: none; }
 .brand-word { font-family: var(--mono); font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+/* v84 wordmark: Claude 品牌用衬线词标——系统衬线栈（零依赖不加 webfont），
+   web 作静音珊瑚 chip 收尾（品牌身份元素，acc-tint 与既有徽章同语法） */
+.brand-word.serif { font-family: Georgia, 'Palatino Linotype', 'Times New Roman', serif; font-weight: 600; font-size: 17px; letter-spacing: .01em; }
+.brand-chip { font: 600 10px/1 var(--mono); color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 3.5px 8px; margin-left: 1px; letter-spacing: .06em; }
+.bar .brand-lamp { width: 6px; height: 6px; margin-left: 2px; }
 .brand-dim { color: var(--faint); font-weight: 400; }
 .build-badge { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-left: 1px; letter-spacing: .03em; }
 .brand-lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .brand-lamp.on  { background: var(--ok); box-shadow: 0 0 8px rgba(143, 185, 141, .45); }
 .brand-lamp.off { background: var(--err); opacity: .7; }
+
+.gate .brand-logo { width: 34px; height: 34px; border-radius: 9px; }
+.gate .brand-word.serif { font-size: 24px; }
+.gate .brand-chip { font-size: 11px; padding: 4px 9px; }
+.gate .brand { gap: 11px; }
 
 /* ---------- gate：进入的仪式感 ---------- */
 .gate { align-items: center; justify-content: center; background: radial-gradient(120% 70% at 50% 0%, #241f1b 0%, var(--bg) 62%); }
