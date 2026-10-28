@@ -414,6 +414,8 @@ button { font-family: inherit; }
 .uspin i { position: absolute; left: 50%; top: 0; width: 1.2px; height: 5px; margin-left: -0.6px; border-radius: 1px; background: var(--dim); transform-origin: 50% 5.5px; opacity: .3; animation: uspinFade 1s linear infinite; }
 @keyframes uspinFade { 0% { opacity: 1; } 100% { opacity: .15; } }
 @media (prefers-reduced-motion: reduce) { .uspin i { animation: none; opacity: .45; } }
+/* ---------- v76：确认弹窗双钮等宽 + 取消灰描边（用户裁定；描边覆盖"不用边框盒"默认纪律，与 .btn.deny 红描边同语法） ---------- */
+#confirm-modal .sheet-actions .btn.ghost { flex: 1 1 0; border: 1.5px solid var(--line); background: none; }
 
 /* ---------- 等待横幅（v21）：PC 端卡在权限确认/等待输入 ---------- */
 .wait-banner { display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; padding: 9px 12px; border-radius: 12px; background: rgba(217, 119, 87, .12); color: var(--acc-strong); font-size: 12.5px; line-height: 1.45; flex: none; }
