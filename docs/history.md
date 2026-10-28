@@ -349,3 +349,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户要求：转实等待期在气泡前面加菊花样式 loading（明确不要圆环转动）。实现：12 棒菊花（2×6px 棒，rotate k*30° + animationDelay -1+k/12s 的线性渐隐扫动），挂在 .u-line 弹性行上、气泡左侧；棒元素 JS 现造（CSS 只写基础规则，避免 12 条 nth-child）。
 - 不变量安全：菊花在 turn 元素内部，renderTail 1:1 不受影响；折叠确认/v66 对账把 pending 样式与菊花一并摘除。prefers-reduced-motion 降为静态均匀淡棒。
+
+
+## v72（2026-10-29）排队消息派发即乐观上屏
+
+- 用户反馈：排队任务开始执行时直接以转实状态上屏（v37 设计即如此——排队不发乐观泡，等派发落盘）。按裁定改为：queue-dispatched 帧到达即 pushOptimisticUser(d.text)（含菊花），真实 user 行落地由同文折叠原地转实；expectQueuedUser 旗标保留兜底（乐观 push 失败时仍走推新泡路径）。
+- 桥侧：queued-dispatch 广播补发 text 字段（原转发丢弃）。30s 兜底 retract（retract 对已确认泡是 no-op，天然安全）。

@@ -80,7 +80,9 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     hub.broadcastSessionsSoon();
   });
   runner.on('queued-dispatch', (q) => {
-    hub.broadcast({ type: 'queue-dispatched', sessionId: q.sessionId, remaining: q.remaining });
+    // v72: text rides along so the PWA can push the optimistic bubble at
+    // dispatch time (the transcript line lands seconds later)
+    hub.broadcast({ type: 'queue-dispatched', sessionId: q.sessionId, text: q.text, remaining: q.remaining });
     hub.broadcastSessionsSoon();
   });
   // any queue mutation (enqueue/remove/reorder/clear/drain) pushes a snapshot

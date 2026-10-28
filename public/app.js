@@ -10,7 +10,7 @@ import { $ } from './js/util.js';
 import { toast } from './js/views/toast.js';
 import { BUBBLES, queueApproval, showApproval, fetchPendingApprovals, showConfirm } from './js/views/overlays.js';
 import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
-  markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab } from './js/views/transcript.js';
+  markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser } from './js/views/transcript.js';
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
@@ -220,8 +220,19 @@ initWs({
   append: handleAppend,
   'queue-dispatched': (d) => {
     // v37: the dispatched message's user line must SHOW when it lands - arm
-    // the fold so a same-text elder isn't mistaken for a replayed duplicate
-    if (d.sessionId === state.currentId) { state.expectQueuedUser = true; toast('排队消息已自动发出'); }
+    // the fold so a same-text elder isn't mistaken for a replayed duplicate.
+    // v72: also push it optimistically right at dispatch (the transcript
+    // line lands seconds later; the same-text fold confirms this twin in
+    // place, spinner and all). Safety: if nothing lands in 30s (spawn
+    // failure), pull the twin back - retract no-ops once confirmed.
+    if (d.sessionId === state.currentId) {
+      state.expectQueuedUser = true;
+      toast('排队消息已自动发出');
+      if (d.text) {
+        const twin = pushOptimisticUser(d.text);
+        setTimeout(() => retractOptimisticUser(twin), 30_000);
+      }
+    }
   },
   queue: (d) => {
     // authoritative queue snapshot after any mutation (enqueue/remove/
