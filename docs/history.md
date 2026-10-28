@@ -343,3 +343,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 症状：乐观上屏后气泡一直半透明灰，结果都返回了也不转实。根因：转实靠同文折叠（append 事件），但转录 user 行的 append 广播可能早于 adoption 后的 subscribe（v65 无 id 乐观页期间根本没订阅），首屏 fetch 又可能扑空——种子泡没有任何事件能确认它。
 - 修法：种泡后 3 秒 reconcileFirstPage 一次性重拉首页——盘上有 user 事件则整体重建（真实实心 turn 替换种子）；折叠已确认或盘上仍无则 no-op。atBottom 捕获防滚动跳变。
+
+
+## v67（2026-10-28）乐观泡菊花 loading
+
+- 用户要求：转实等待期在气泡前面加菊花样式 loading（明确不要圆环转动）。实现：12 棒菊花（2×6px 棒，rotate k*30° + animationDelay -1+k/12s 的线性渐隐扫动），挂在 .u-line 弹性行上、气泡左侧；棒元素 JS 现造（CSS 只写基础规则，避免 12 条 nth-child）。
+- 不变量安全：菊花在 turn 元素内部，renderTail 1:1 不受影响；折叠确认/v66 对账把 pending 样式与菊花一并摘除。prefers-reduced-motion 降为静态均匀淡棒。

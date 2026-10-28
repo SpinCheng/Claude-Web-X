@@ -355,7 +355,27 @@ function renderTurn(t) {
       img.onclick = () => openLightbox(img.src);
       d.appendChild(img);
     }
-    row.appendChild(d);
+    // v67: chrysanthemum spinner rides a flex line BESIDE the optimistic
+    // bubble (bars fading in sequence - explicitly NOT a stroke ring);
+    // it lives inside the turn element, so renderTail's 1:1 chat/turns
+    // invariant is untouched. The confirm (fold) or v66 reconcile drops
+    // the whole pending styling together with it.
+    const line = document.createElement('div');
+    line.className = 'u-line';
+    if (t.optimistic) {
+      const sp = document.createElement('span');
+      sp.className = 'uspin';
+      sp.setAttribute('aria-hidden', 'true');
+      for (let k = 0; k < 12; k++) {
+        const bar = document.createElement('i');
+        bar.style.transform = 'rotate(' + k * 30 + 'deg)';
+        bar.style.animationDelay = (-1 + k / 12).toFixed(3) + 's';
+        sp.appendChild(bar);
+      }
+      line.appendChild(sp);
+    }
+    line.appendChild(d);
+    row.appendChild(line);
     const meta = document.createElement('div');
     meta.className = 'bmeta';
     if (t.ts) addTs(meta, t.ts);

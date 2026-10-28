@@ -402,6 +402,12 @@ button { font-family: inherit; }
 .cbtn.attach { padding: 0 6px; }
 .bubble.user .bubble-img { display: block; width: min(240px, 100%); border-radius: 10px; margin-top: 6px; cursor: zoom-in; }
 .bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
+/* ---------- v67：乐观泡菊花 loading（12 棒渐隐扫动，非圆环） ---------- */
+.turn.user .u-line { display: flex; align-items: center; justify-content: flex-end; gap: 8px; max-width: 100%; }
+.uspin { position: relative; flex: none; width: 18px; height: 18px; }
+.uspin i { position: absolute; left: 50%; top: 0; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: var(--dim); transform-origin: 50% 9px; opacity: .3; animation: uspinFade 1s linear infinite; }
+@keyframes uspinFade { 0% { opacity: 1; } 100% { opacity: .15; } }
+@media (prefers-reduced-motion: reduce) { .uspin i { animation: none; opacity: .45; } }
 
 /* ---------- 等待横幅（v21）：PC 端卡在权限确认/等待输入 ---------- */
 .wait-banner { display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; padding: 9px 12px; border-radius: 12px; background: rgba(217, 119, 87, .12); color: var(--acc-strong); font-size: 12.5px; line-height: 1.45; flex: none; }
