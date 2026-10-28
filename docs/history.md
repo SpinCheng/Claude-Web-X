@@ -404,11 +404,3 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 4 稿评审（design-spinner.html：菊花对照/呼吸圆点/三点波浪/微光条/半弧旋转），用户拍板 A。理由：与状态灯「运行中」同款 breathe 语言——全 app 一套加载语法，菊花属 iOS 方言与暗暖底不搭。
 - 实现：菊花 DOM（8 棒 JS 现造）删成单个 span 圆点；CSS 复用状态灯同款曲线（1.6s ease-in-out 呼吸缩放 .8→1.1 + 透明度 .35→1）；9px 珊瑚（acc-strong=活态）；reduced-motion 降为静态半透明。v67-v74 菊花系列（棒数/宽度/尺寸/贴边/对齐）就此归档。评审页已删。
-
-
-## v84（2026-10-29）品牌区：官方图标 + 衬线词标（拍板）
-
-- 用户裁定：用 claude 官方图标做 logo（直接引用现有 icon-192.png——与 PWA 主屏图标同一张资产，零依赖），标题文字加设计感。
-- 词标：claude→Claude 改系统衬线栈（Georgia/Palatino，零 webfont 红线），-web 改静音珊瑚 chip「web」（acc-tint 与徽章同语法）。gate 页 34px 图标 + 24px 衬线放大呈现。
-- 状态灯迁移：lamp 从品牌位挪到 build 徽章后（6px 微点），类名 on/off 不变（ws.js 只改 class，零改动兼容）。icon src 带 ?v=4 防缓存。
-- design-logo.html 评审页随拍板删除（A/B/C/D 四稿归档，最终=官方图标路线）。
