@@ -46,7 +46,16 @@ function openDetail(id) {
       // as an optimistic bubble; the same-text fold machinery confirms it
       // in place when the real event arrives (v20/v37 semantics).
       if (state.pendingNewText) {
-        if (!state.turns.some((t) => t.role === 'user')) pushOptimisticUser(state.pendingNewText);
+        if (!state.turns.some((t) => t.role === 'user')) {
+          pushOptimisticUser(state.pendingNewText);
+          // v66: the confirm append can be broadcast BEFORE our subscribe
+          // (adoption race) - nobody would ever flip optimistic:false and
+          // the bubble stays gray while results stream in. Re-fetch the
+          // first page once, late; a user event present means rebuild and
+          // the real (solid) turn replaces the seed. No-op when the fold
+          // already confirmed it.
+          setTimeout(() => reconcileFirstPage(id), 3000);
+        }
         state.pendingNewText = '';
       }
       // v44 pagination bookkeeping (both counted in events from the tail)
@@ -107,6 +116,22 @@ function openDetailProvisional(text, cwd) {
   ensureModels();
   pushOptimisticUser(text);
   scrollBottom(true);
+}
+
+function reconcileFirstPage(id) {
+  if (state.currentId !== id) return;
+  if (!state.turns.some((t) => t.role === 'user' && t.optimistic)) return; // confirmed already
+  api('/api/sessions/' + encodeURIComponent(id) + '/messages')
+    .then((r) => r.json())
+    .then((d) => {
+      if (state.currentId !== id) return;
+      if (!(d.events || []).some((e) => e.k === 'user')) return; // still nothing on disk
+      const atB = state.atBottom;
+      buildTurns(d.events);
+      renderAllTurns();
+      if (atB) scrollBottom(true);
+    })
+    .catch(() => { /* transient - the fold may still confirm later */ });
 }
 
 /* ---------------- history pagination (v44/v46): header row + pull gesture ---------------- */

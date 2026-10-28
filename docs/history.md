@@ -337,3 +337,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 架构：sessionId 在 CLI 写 init 行前不存在（冷启动 3 分 24 秒实测），详情页一切接口都挂 id → **无 id 乐观进页 + adoption 原地重绑**：openDetailProvisional 切页+种乐观泡+标题取首行 24 截断（客户端镜像 v64 桥侧规则）+meta「创建中…」；run 帧到达走普通 openDetail（fetch 重建 chat + v64 种子同 tick 重现气泡，无闪烁）。
 - 守卫：provisional 期间 sendMessage 拦截并提示「会话创建中」；失败/30s 超时若还在乐观页则 closeDetail 回列表（pendingNewText 保留→adoption 自动开真实会话）；openDetail/closeDetail 显式清 provisional 旗标。
 - composer↔detail 循环 import 新增两符号（openDetailProvisional/closeDetail），仍求值期零交叉。
+
+
+## v66（2026-10-28）乐观泡永久灰态补丁（v65 残留竞态）
+
+- 症状：乐观上屏后气泡一直半透明灰，结果都返回了也不转实。根因：转实靠同文折叠（append 事件），但转录 user 行的 append 广播可能早于 adoption 后的 subscribe（v65 无 id 乐观页期间根本没订阅），首屏 fetch 又可能扑空——种子泡没有任何事件能确认它。
+- 修法：种泡后 3 秒 reconcileFirstPage 一次性重拉首页——盘上有 user 事件则整体重建（真实实心 turn 替换种子）；折叠已确认或盘上仍无则 no-op。atBottom 捕获防滚动跳变。
