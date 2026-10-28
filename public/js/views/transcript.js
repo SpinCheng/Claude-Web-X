@@ -45,14 +45,25 @@ function applyEventToTurns(ev) {
     state.expectQueuedUser = false;
     // fold into a matching recent user turn: an unconfirmed optimistic one
     // (sent this session, transcript not written yet) gets confirmed in place;
-    // an already-confirmed match is a replayed/duplicate event -> no-op.
-    // Pushing instead would duplicate the bubble on double-fired appends.
+    // an already-confirmed match is either a re-delivered duplicate line or a
+    // GENUINE repeated question - same text alone cannot tell them apart.
+    // v75: timestamps decide. A double-fire re-delivers the SAME transcript
+    // line (ev.ts <= t.ts) -> replay no-op; a repeat question is a LATER line
+    // (ev.ts > t.ts) -> push fresh (identical questions used to swallow the
+    // 2nd/3rd bubble whole). Structure is only the fallback when a side has
+    // no ts: replay merely while the bot turn after the elder is still empty.
     for (let i = T.length - 1; i >= Math.max(0, T.length - 12); i--) {
       const t = T[i];
       if (t.role !== 'user') continue;
       if (t.text !== ev.text) continue;
       if (!t.optimistic) {
-        if (queuedDispatch) continue; // the elder is NOT this event - keep it, push fresh
+        const tsKnown = !!(ev.ts && t.ts);
+        if (queuedDispatch) continue; // not this event's twin - keep it, push fresh
+        if (tsKnown && ev.ts > t.ts) continue; // a later line: genuine repeat
+        if (tsKnown) return i; // same/older line re-delivered: replay
+        const next = T[i + 1];
+        const movedOn = !!(next && ((next.steps && next.steps.length) || (next.texts && next.texts.length) || (next.think && next.think.length)));
+        if (movedOn) continue; // conversation passed the elder: new question
         return i; // replay: already on screen, nothing to do
       }
       t.optimistic = false;

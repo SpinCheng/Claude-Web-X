@@ -30,12 +30,30 @@ const { state } = await import('../../public/js/state.js');
 
 const userTurns = () => state.turns.filter((t) => t.role === 'user');
 
-test('same-text user event without the flag is a replay: no-op', () => {
+test('same-line re-delivery (equal ts) is a replay: no-op', () => {
   state.turns = [];
   applyEventToTurns({ k: 'user', ts: '1', text: '继续' });
   applyEventToTurns({ k: 'assistant', ts: '2', parts: [{ t: 'text', v: 'ok' }] });
-  applyEventToTurns({ k: 'user', ts: '3', text: '继续' }); // double-fired append
-  assert.equal(userTurns().length, 1, 'replayed duplicate must not push');
+  applyEventToTurns({ k: 'user', ts: '1', text: '继续' }); // the SAME line, re-fired
+  assert.equal(userTurns().length, 1, 're-delivered duplicate must not push');
+});
+
+test('genuinely repeated identical question pushes a fresh bubble (v75)', () => {
+  state.turns = [];
+  applyEventToTurns({ k: 'user', ts: '1', text: '继续' });
+  applyEventToTurns({ k: 'assistant', ts: '2', parts: [{ t: 'text', v: 'ok' }] });
+  applyEventToTurns({ k: 'user', ts: '3', text: '继续' }); // asked AGAIN, later line
+  assert.equal(userTurns().length, 2, 'a later same-text line is a new question');
+});
+
+test('ts-less events fall back to the structural rule', () => {
+  state.turns = [];
+  applyEventToTurns({ k: 'user', ts: '', text: 'hi' });
+  applyEventToTurns({ k: 'user', ts: '', text: 'hi' }); // bot after elder still empty -> replay
+  assert.equal(userTurns().length, 1);
+  applyEventToTurns({ k: 'assistant', ts: '', parts: [{ t: 'text', v: 'ok' }] });
+  applyEventToTurns({ k: 'user', ts: '', text: 'hi' }); // conversation moved past -> new
+  assert.equal(userTurns().length, 2);
 });
 
 test('queued dispatch with same-text elder pushes a fresh turn', () => {
@@ -57,7 +75,7 @@ test('double-fire after a queued dispatch is deduped again', () => {
   applyEventToTurns({ k: 'assistant', ts: '2', parts: [{ t: 'text', v: 'ok' }] });
   state.expectQueuedUser = true;
   applyEventToTurns({ k: 'user', ts: '3', text: '继续' }); // dispatch lands
-  applyEventToTurns({ k: 'user', ts: '4', text: '继续' }); // double-fired copy
+  applyEventToTurns({ k: 'user', ts: '3', text: '继续' }); // double-fired copy (same line, same ts)
   assert.equal(userTurns().length, 2, 'second copy is a replay again');
 });
 
