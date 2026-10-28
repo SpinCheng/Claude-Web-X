@@ -15,6 +15,7 @@
 ```bash
 npm ci
 node --check bridge/*.js public/app.js   # 语法
+npm test                                 # 37 单测 + 9 e2e（隔离桥 :3799 + headless Edge）
 node bridge/index.js                     # 能起来、端口 3742
 ```
 

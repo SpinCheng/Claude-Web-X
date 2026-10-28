@@ -97,6 +97,6 @@ npm start          # node bridge/index.js，端口 3742
 5. Node ≥ 20 ESM；fs.watch(recursive) 不可用时自动降级轮询。
 6. **手机驱动的开发会话长在 bridge 进程树里**（runner 的 `--resume -p` 子进程）：会话内脚本杀 bridge = 杀掉本会话（stdin 管道断裂、turn 无结果中断，脱离的脚本仍会跑完拉起——bridge"自己恢复了"是假象）。重启 bridge 一律从 PC 侧做；确需会话内重启，接受当前 turn 被切断。
 
-## 路线图（候选下一批 = PWA·P0，详见 README Backlog）
+## 路线图
 
-P0 核心闭环：锁屏通知（ntfy 就绪）/ 手动 /compact / 审批 diff 视图 / 历史回看分页。P1：always-allow 白名单、改动文件总览、导出 MD（重命名、队列单条管理、会话搜索+批量管理 v43 已落地）。之后 Phase 3（Cowork 数据面，adapter-cowork.js + 轮询）、Phase 4（Cowork 控制面，UIA 主路线）。
+P0/P1 已收口（v44-v90：审批 diff、历史分页、always-allow、改动文件总览、导出 MD、费用面板、搜索批量、确认弹窗、品牌化）。**已裁定不做**：锁屏/推送通知（ntfy 代码保留但不配）、手动 /compact（2026-10-28 用户裁定，勿再提案）。剩余：`cli/cr.mjs`（PC 端 CLI 跨平台化，现仅 .ps1）、README Linux 部署节扩充。之后 Phase 3（Cowork 数据面，adapter-cowork.js + 轮询）、Phase 4（Cowork 控制面，UIA 主路线）。

@@ -9,7 +9,7 @@
 
 - 架构基准：[docs/方案-v2.md](docs/方案-v2.md)（"会话即文件、接管即恢复"，CC 优先，双向接管，第三方 API 环境）
 - 工程事实与约定全集：[CLAUDE.md](CLAUDE.md)（贡献前必读，配合 [CONTRIBUTING.md](CONTRIBUTING.md)）
-- 当前进度：**Phase 2 完成**（双向接管 + 无驻留执行器 + 产品化 PWA + 上下文/模型/推理等级控制），下一步 Phase 3（Cowork 数据面）
+- 当前进度：**Phase 2 完成 + PWA 核心闭环补全**（审批 diff / 历史分页 / 导出 MD / 费用面板 / 会话搜索批量 / 自定义确认弹窗 / 品牌化等 v44-v90 连续落地），跨平台（Linux 实测通过）；下一步 Phase 3（Cowork 数据面）
 
 ## 快速开始
 
@@ -24,6 +24,8 @@ npm start          # node bridge/index.js，端口 3742
 2. 手机（连同一 Wi-Fi）扫码 → 自动配对并进入会话列表，之后永久有效
 3. 在 pair 页点 **安装开机自启**，登录后 bridge 自动后台运行（双开保护）
 
+Linux/macOS：`npm install && npm start` 同样适用（hooks 走 `bridge/hook-post.sh`，需可执行位）。**两个实测坑**：CLI 拒绝 root/sudo 跑跳过权限模式——用普通用户；先写好 `~/.claude/settings.json` 再起桥（env 块缺失会被缓存锁死）。详见 CLAUDE.md「Linux 实测」节。
+
 前提：本机装有可用的 Claude Code CLI 并已完成登录（第三方客户端内置的 CLI 亦可，runner 会自动发现）；
 API 凭证按你环境的惯例放在 `~/.claude/settings.json` 的 `env` 块，spawn 时由 bridge 显式注入子进程。
 
@@ -33,9 +35,9 @@ API 凭证按你环境的惯例放在 `~/.claude/settings.json` 的 `env` 块，
 
 | 组件 | 实测版本 | 说明 |
 |---|---|---|
-| OS | Windows 11（10.0.22631+） | 启动器/PowerShell/路径均按 Windows 设计 |
+| OS | Windows 11（10.0.22631+）；Linux（OpenCloudOS 9.4 实测） | Windows 优先设计；Linux 已全链路实测（v61 起跨平台收敛，OS 差异集中在 `bridge/lib/platform.js`） |
 | Node.js | ≥ 20（实测 22.x） | ESM、`fs.watch(recursive)`、降级轮询 |
-| Claude Code CLI | **2.1.308** | 来源任意：npm 全局安装、或第三方桌面客户端内置副本（runner 按 mtime 自动发现，升级即跟随） |
+| Claude Code CLI | **2.1.308**（Win）/ **2.1.197**（Linux 实测） | 来源任意：npm 全局安装、或第三方桌面客户端内置副本（runner 按 mtime 自动发现，升级即跟随） |
 
 > **桌面客户端不是依赖**：bridge 从不与桌面 App 通信。桌面会话之所以在列表里可见，是因为桌面版底层运行同一 CLI、写同一份 `~/.claude/projects` 转录。第三方客户端在本工程中的唯一角色是**提供了一个已配好登录态的 CLI 分发渠道**（`%LOCALAPPDATA%\Claude-3p\claude-code\...`，且其实测环境无需官方订阅）——你也可以完全用官方渠道安装的 CLI。
 

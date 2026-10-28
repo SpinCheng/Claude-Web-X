@@ -430,3 +430,10 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈：点停止后气泡左侧呼吸点仍无限呼吸。根因：停止发生在 CLI 写 user 行之前时，无事件能确认孪生泡，optimistic 永真。
 - 修法：run 帧 end/error 且为本会话时，屏上剩余 optimistic 孪生标记 t.stopped → 呼吸点变红色静态（--err，不动画）；t.optimistic 保持 true（行若真落盘仍可折叠转实）。renderTail(min) 局部重渲。
+
+
+## 开源前文档审计（2026-10-29）
+
+- 卫生检查全过：LICENSE 在、tracked 文件零密钥（token 前缀扫描 + key 模式扫描）、SECURITY.md 威胁模型完整、工作区干净。
+- 修 5 处滞后：README 运行环境表加 Linux/CLI 2.1.197 实测行 + 快速开始补 Linux/macOS 说明与两坑（root 拒绝、settings 先写后起桥）+ 进度行更新到 v90 现状；CONTRIBUTING 自查补 npm test；CLAUDE.md 路线图尾巴清理（已裁定不做项从候选中移除）。
+- 建议未做（需素材）：README 配 2-3 张截图（列表/详情/费用面板）可显著提升开源第一印象，待 PC 截图后补。
