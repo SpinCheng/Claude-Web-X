@@ -426,6 +426,9 @@ button { font-family: inherit; }
 /* ---------- 等待横幅（v21）：PC 端卡在权限确认/等待输入 ---------- */
 .wait-banner { display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; padding: 9px 12px; border-radius: 12px; background: rgba(217, 119, 87, .12); color: var(--acc-strong); font-size: 12.5px; line-height: 1.45; flex: none; }
 .wait-banner svg { flex: none; opacity: .8; }
+/* v81: the lightbox reuses .overlay whose align-items:flex-end is bottom-sheet
+   grammar - images sat glued to the screen bottom. Center this one. */
+#lightbox { align-items: center; }
 .lightbox-img { max-width: 94vw; max-height: 88dvh; border-radius: 12px; }
 .file-prev { width: auto; flex: 1 1 auto; margin: 0 12px calc(30px + env(safe-area-inset-bottom)); max-width: 640px; }
 .fp-body { max-height: 62dvh; overflow: auto; overscroll-behavior: contain; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; margin: 0; }
