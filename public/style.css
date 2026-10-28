@@ -73,7 +73,10 @@ button { font-family: inherit; }
 .cap-en { font: 300 8.5px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase;
   color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px;
   padding: 2.5px 6px 2.5px 8px; margin-left: 6px; align-self: flex-end; }
-.build-badge { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-left: 1px; letter-spacing: .03em; }
+/* v86: version badge aligns with the PERSONAL capsule - same size (8.5px),
+   same subscript seat (align-self:flex-end + matching top padding), same
+   spacing rhythm; keeps faint+mono so it reads as meta, not brand */
+.build-badge { font: 400 8.5px/1 var(--mono); color: var(--faint); margin-left: 6px; letter-spacing: .06em; align-self: flex-end; padding: 2.5px 0; position: relative; top: .5px; }
 
 .gate .mk .mark { width: 30px; height: 30px; }
 .gate .mk .pb { font-size: 7.5px; padding: 2.5px 4px; right: -8px; bottom: -8px; }
