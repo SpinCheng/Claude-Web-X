@@ -297,3 +297,7 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## v59（2026-10-28）跳最新按钮居中 + 贴合输入栏
 
 - 用户要求：fab 水平居中、与输入框边距减半。静态 136px 改为 JS 锚定 composer 实时 top +12px（rect 为视口坐标，safe-area 自动随行）；queue/attach/fork 行撑高 dock 时由 ResizeObserver 跟随重算——静态魔数在 dock 长高时本来就会重叠。水平居中用 left/right:0 + margin auto（不用 transform，避免与 :active scale 打架）。
+
+## v60（2026-10-28）跳最新按钮对比度补偿
+
+- 用户反馈 v59 居中后按钮不明显。查证颜色未改（raise+sh-2 与历史一致）——变淡是视错觉：右缘时衬纯 --bg 暗底，居中后悬于 panel2 卡片/文字上方，同色对比塌了。补偿：表面 color-mix raise 82%+fg 提亮一档，阴影 sh-2→sh-3（纪律：不加边框，全靠阴影分层）。

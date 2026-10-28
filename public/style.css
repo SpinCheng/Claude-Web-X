@@ -330,7 +330,7 @@ button { font-family: inherit; }
 .caret { display: inline-block; width: 7px; height: 14px; background: var(--acc); vertical-align: -2px; margin-left: 3px; border-radius: 1.5px; animation: breathe 1s steps(2) infinite; }
 
 /* ---------- 跳最新 FAB ---------- */
-.fab { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: calc(136px + env(safe-area-inset-bottom)); width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--raise); color: var(--fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--sh-2); z-index: 6; transition: transform .12s; }
+.fab { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: calc(136px + env(safe-area-inset-bottom)); width: 42px; height: 42px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--raise) 82%, var(--fg)); color: var(--fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--sh-3); z-index: 6; transition: transform .12s; }
 .fab:active { transform: scale(.92); }
 
 /* ---------- dock 输入栏：悬浮岛 ---------- */
