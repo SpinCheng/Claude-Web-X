@@ -9,12 +9,19 @@ export function shortPath(p) {
   return parts[parts.length - 1] || p;
 }
 
-// ISO -> 'HH:MM' ('' when unparsable) - timestamps on bubbles/final cards
+// ISO -> 'HH:MM' today, 'MM-DD HH:MM' this year, 'YYYY-MM-DD HH:MM' older
+// ('' when unparsable) - timestamps on bubbles/final cards (v85: the bare
+// HH:MM made older turns read as if they happened today)
 export function fmtTs(iso) {
   const d = new Date(iso);
   if (isNaN(d)) return '';
   const p = (n) => String(n).padStart(2, '0');
-  return p(d.getHours()) + ':' + p(d.getMinutes());
+  const hm = p(d.getHours()) + ':' + p(d.getMinutes());
+  const now = new Date();
+  const today = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  if (today) return hm;
+  const md = p(d.getMonth() + 1) + '-' + p(d.getDate());
+  return d.getFullYear() === now.getFullYear() ? md + ' ' + hm : d.getFullYear() + '-' + md + ' ' + hm;
 }
 
 // epoch ms -> '刚刚 / N 分钟前 / N 小时前 / date' - session list rows

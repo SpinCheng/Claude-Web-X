@@ -412,3 +412,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - **连接状态移植进图标**（用户裁定，红绿灯语义退役）：已连=珊瑚、断开=奶白、连接中=奶白↔珊瑚 1.6s 呼吸（reduced-motion 静态珊瑚）；ws.js 三态写入 conn-dot（id 不变，类名 mark on/mark/mark conn）；原 brand-lamp 规则删除（会话状态灯 .lamp 不受影响）。
 - **法律面**：官方图标字节不进仓库（.gitignore public/brand-mark.png），README 注明自行放置方法——分发链干净；P 徽章作非官方区分标注。
 - 中途流程教训：一次未等拍板就实装被回滚（8148dce revert），本版为拍板后正式落地。
+
+
+## v85（2026-10-29）气泡时间加日期 + 官方图标入库
+
+- fmtTs：今天=HH:MM，今年=MM-DD HH:MM，跨年=YYYY-MM-DD HH:MM（用户裁定：非今天加日期）。
+- brand-mark.png 撤出 .gitignore 正式入库（用户裁定，风险自担已明示）；README「不分发」条款改为来源与着色说明，无关联声明保留。

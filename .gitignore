@@ -24,6 +24,3 @@ LOCAL.md
 .tmp*
 Thumbs.db
 .DS_Store
-
-# official Claude tray icon (template) - NOT distributed; see README 注意
-public/brand-mark.png

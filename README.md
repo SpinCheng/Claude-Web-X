@@ -136,7 +136,7 @@ claude-web/
 - API 密钥/token 永不写日志；`bridge/data/`（config、锁、回收站、探针缓存）已 gitignore。
 - 静态服务只允许 `public/` 目录内文件；配对面板仅同机访问。
 - 本项目面向第三方 API 中转/第三方客户端环境开发，与 Anthropic 官方无关联；在你自己的机器上使用，风险自担。
-- **官方图标不分发**：`public/brand-mark.png`（官方客户端托盘模板图）已 gitignore，仓库不含其字节。想启用官方图标，从本机官方客户端 `resources/TrayIconTemplate-Dark@2x.png` 自行复制为该路径即可（缺失时 header 图标位为空，其余功能不受影响）。
+- `public/brand-mark.png` 为 Claude 官方客户端托盘模板图（纯 alpha、无固有颜色，PWA 以 CSS mask 按主题着色；附 P 徽章作非官方区分标注）。与 Anthropic 官方无关联的声明仍然适用。
 
 ## 常见问题（Q&A）
 
