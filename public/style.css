@@ -177,7 +177,10 @@ button { font-family: inherit; }
 .chip.pc  { color: var(--acc-strong); }
 
 /* ============ 会话详情：时间线是唯一的大胆处 ============ */
-.chat { padding: 14px 14px calc(132px + env(safe-area-inset-bottom)); overflow-y: auto; overflow-anchor: none; }
+/* v82 嵌套滚动策略：页级滚动器（.chat/.groups）contain 挡文档回弹/下拉刷新；
+   内嵌滚动器（capped 系/.fp-body）必须 overscroll-behavior-y:auto——链式移交
+   父级，否则内层滚到边界手势即"卡死"（contain 切断链条，父级不接手）。 */
+.chat { padding: 14px 14px calc(132px + env(safe-area-inset-bottom)); overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .turn { margin: 10px 0; }
 
 /* 用户消息：暖石色块，无描边 */
@@ -238,11 +241,11 @@ button { font-family: inherit; }
 .think { font-size: 12.5px; line-height: 1.6; color: var(--dim); padding: 0 2px; white-space: pre-wrap; word-break: break-word; }
 .tool-chip { background: #171613; border-radius: 10px; padding: 9px 11px; font-family: var(--mono); font-size: 11.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-all; color: #CFC8BA; box-shadow: inset 0 1px 0 rgba(255, 250, 240, .03); }
 .tool-chip .p { color: var(--acc-strong); font-weight: 700; }
-.think.capped, .tool-chip.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.think.capped, .tool-chip.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; }
 /* 工具产出（v22）：tool_result 配对回填——文本限高同 capped 体系，图片缩略+灯箱 */
 .tool-out { margin: 6px 0 0; padding: 8px 10px; border-radius: 9px; background: var(--panel2); font: 11px/1.55 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; }
 .tool-out.err { color: var(--err); opacity: .85; }
-.tool-out.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.tool-out.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; }
 .flink { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); overflow-wrap: anywhere; }
 .flink:active { opacity: .7; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
@@ -431,7 +434,7 @@ button { font-family: inherit; }
 #lightbox { align-items: center; }
 .lightbox-img { max-width: 94vw; max-height: 88dvh; border-radius: 12px; }
 .file-prev { width: auto; flex: 1 1 auto; margin: 0 12px calc(30px + env(safe-area-inset-bottom)); max-width: 640px; }
-.fp-body { max-height: 62dvh; overflow: auto; overscroll-behavior: contain; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; margin: 0; }
+.fp-body { max-height: 62dvh; overflow: auto; overscroll-behavior-y: auto; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; margin: 0; }
 
 /* ---------- 弹层 ---------- */
 .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(10, 9, 7, .6); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }

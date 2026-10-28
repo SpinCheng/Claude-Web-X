@@ -392,3 +392,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## v80（2026-10-29）v79 追修：工具图比例被压扁
 
 - v79 后图片反而变形：容器同时命中 v23 老 flex-wrap 规则与新 column 规则，column 下默认 align-items:stretch 把图横向拉满容器、max-height 再压高——宽高两轴各自受制，比例撕开。修：align-items:flex-start（图按自身宽站）+ 删除已被完全取代的 v23 老规则。max 双限独立生效时浏览器按更紧者等比缩放，比例严格保持。
+
+
+## v82（2026-10-29）嵌套滚动手势链式修正
+
+- 用户反馈：可滚动区域嵌套时手势会卡死拖不动。根因：全部内嵌滚动器（think/tool-chip/tool-out 的 .capped、.fp-body）都带 overscroll-behavior:contain——内层滚到边界后链条被切断，父级（#chat）不接手，手势死在内层区域。
+- 策略：内嵌滚动器改 overscroll-behavior-y:auto（边界自然移交父级，动量延续即原生手感）；.chat 补 contain + touch 滚动（页级挡文档回弹/下拉刷新劫持）；.groups 维持原 contain。策略记入 CLAUDE.md 滚动约束节。
