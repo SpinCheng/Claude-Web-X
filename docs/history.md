@@ -398,3 +398,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈：可滚动区域嵌套时手势会卡死拖不动。根因：全部内嵌滚动器（think/tool-chip/tool-out 的 .capped、.fp-body）都带 overscroll-behavior:contain——内层滚到边界后链条被切断，父级（#chat）不接手，手势死在内层区域。
 - 策略：内嵌滚动器改 overscroll-behavior-y:auto（边界自然移交父级，动量延续即原生手感）；.chat 补 contain + touch 滚动（页级挡文档回弹/下拉刷新劫持）；.groups 维持原 contain。策略记入 CLAUDE.md 滚动约束节。
+
+
+## v83（2026-10-29）乐观泡加载指示换方案A：呼吸圆点（拍板）
+
+- 4 稿评审（design-spinner.html：菊花对照/呼吸圆点/三点波浪/微光条/半弧旋转），用户拍板 A。理由：与状态灯「运行中」同款 breathe 语言——全 app 一套加载语法，菊花属 iOS 方言与暗暖底不搭。
+- 实现：菊花 DOM（8 棒 JS 现造）删成单个 span 圆点；CSS 复用状态灯同款曲线（1.6s ease-in-out 呼吸缩放 .8→1.1 + 透明度 .35→1）；9px 珊瑚（acc-strong=活态）；reduced-motion 降为静态半透明。v67-v74 菊花系列（棒数/宽度/尺寸/贴边/对齐）就此归档。评审页已删。

@@ -411,18 +411,19 @@ button { font-family: inherit; }
 .tool-out-imgs { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; }
 .tool-out-imgs .bubble-img { display: block; width: auto; height: auto; max-width: min(100%, 520px); max-height: 300px; border-radius: 10px; cursor: zoom-in; }
 .bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
-/* ---------- v70：乐观泡菊花（8 棒 / 8px / 泡左贴边 / 与泡底对齐） ---------- */
+/* ---------- v83：乐观泡加载指示方案A——呼吸圆点（拍板，取代 v67-v74 菊花） ----------
+   与状态灯「运行中」同款语言（同 breathe 曲线：全 app 一套加载语法，菊花是
+   iOS 方言与暗暖底不搭）；9px 珊瑚=活态，符合注意力纪律。 */
 /* width:100% is load-bearing: a shrink-to-fit line makes the bubble's
    max-width:80% resolve against the line's own content width (circular) and
    the bubble collapses to a character-wide column (v67 regression, v68 fix) */
 .turn.user .u-line { display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px; width: 100%; }
 /* the bubble's legacy margin-left:auto (pre-u-line right alignment) would
-   shove the left-side spinner to the far edge - dead weight inside the line */
+   shove the left-side indicator to the far edge - dead weight inside the line */
 .turn.user .u-line .bubble.user { margin-left: 0; }
-.uspin { position: relative; flex: none; width: 11px; height: 11px; margin-bottom: 11px; }
-.uspin i { position: absolute; left: 50%; top: 0; width: 1.2px; height: 5px; margin-left: -0.6px; border-radius: 1px; background: var(--dim); transform-origin: 50% 5.5px; opacity: .3; animation: uspinFade 1s linear infinite; }
-@keyframes uspinFade { 0% { opacity: 1; } 100% { opacity: .15; } }
-@media (prefers-reduced-motion: reduce) { .uspin i { animation: none; opacity: .45; } }
+.uspin { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--acc-strong); margin-bottom: 13px; animation: uspinBreathe 1.6s ease-in-out infinite; }
+@keyframes uspinBreathe { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .uspin { animation: none; opacity: .6; } }
 /* ---------- v76：模态双钮等宽 + 取消灰描边（用户裁定，推广到全部底部 sheet 模态；描边覆盖"不用边框盒"默认纪律，与 .btn.deny 红描边同语法） ---------- */
 .sheet-actions .btn.ghost { flex: 1 1 0; border: 1.5px solid var(--line); background: none; }
 

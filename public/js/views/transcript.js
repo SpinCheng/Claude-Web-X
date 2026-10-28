@@ -371,23 +371,16 @@ function renderTurn(t) {
     // it lives inside the turn element, so renderTail's 1:1 chat/turns
     // invariant is untouched. The confirm (fold) or v66 reconcile drops
     // the whole pending styling together with it.
-    // v70: spinner LEFT of the bubble, hugging it - DOM order spinner-then-
-    // bubble inside the right-justified line puts the bars immediately left
-    // of the bubble; the bubble's legacy margin-left:auto (pre-u-line right
-    // alignment) is neutralized in CSS or it shoves the spinner to the far
-    // left (the v69 symptom). 8 bars, 8px, bottom-aligned with the bubble.
+    // v83 (variant A ruling): a single breathing dot left of the bubble -
+    // same grammar as the status lamp's "running" breathe. DOM order
+    // dot-then-bubble in the right-justified line keeps it hugging the
+    // bubble (the bubble's legacy margin-left:auto is neutralized in CSS).
     const line = document.createElement('div');
     line.className = 'u-line';
     if (t.optimistic) {
       const sp = document.createElement('span');
       sp.className = 'uspin';
       sp.setAttribute('aria-hidden', 'true');
-      for (let k = 0; k < 8; k++) {
-        const bar = document.createElement('i');
-        bar.style.transform = 'rotate(' + k * 45 + 'deg)';
-        bar.style.animationDelay = (-1 + k / 8).toFixed(3) + 's';
-        sp.appendChild(bar);
-      }
       line.appendChild(sp);
     }
     line.appendChild(d);
