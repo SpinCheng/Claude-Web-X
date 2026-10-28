@@ -1,5 +1,5 @@
 // js/md.js - pure text/DOM helpers for transcript rendering: markdown
-// (conclusion cards, v25) + Windows-path linkify (artifact preview, v23).
+// (conclusion cards, v25) + file-path linkify (artifact preview, v23).
 // No app state lives here; linkifyPaths takes the open-callback as a param.
 
 /* safe markdown: escape first, then block-level (fences / headings / hr /
@@ -66,11 +66,12 @@ export function miniMd(src) {
   return html;
 }
 
-/* artifact linkify: Windows file paths in tool text become links; separators
-   tolerate the JSON-doubled backslashes shown in tool chips; only whitelisted
-   extensions linkify (avoids mangling ordinary sentences) */
+/* artifact linkify: absolute file paths (Windows drives + POSIX /) in tool
+   text become links; separators tolerate the JSON-doubled backslashes shown
+   in tool chips; only whitelisted extensions linkify (avoids mangling
+   ordinary sentences); the lookbehind keeps URLs (//) and relative paths out */
 export const ART_IMG = /\.(png|jpe?g|webp|gif|bmp)$/i;
-const ART_PATH_RE = /[A-Za-z]:[\\/]{1,2}(?:[^\s"'<>|:*?\\/]+[\\/]{1,2})*[^\s"'<>|:*?\\/]*\.(?:png|jpe?g|webp|gif|bmp|txt|md|log|json|csv|ya?ml|xml|html?|css|mjs|cjs|js|ts|py|ps1|sh|ini|toml)\b/gi;
+const ART_PATH_RE = /(?<![\w/])(?:[A-Za-z]:[\\/]{1,2}|\/)(?:[^\s"'<>|:*?\\/]+[\\/]{1,2})*[^\s"'<>|:*?\\/]*\.(?:png|jpe?g|webp|gif|bmp|txt|md|log|json|csv|ya?ml|xml|html?|css|mjs|cjs|js|ts|py|ps1|sh|ini|toml)\b/gi;
 export function linkifyPaths(el, text, onOpen) {
   if (!text) return;
   let last = 0, mm;

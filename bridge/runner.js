@@ -16,6 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
+import { findClaudeBinary } from './lib/platform.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_CONCURRENT_RUNS = 4;
@@ -43,40 +44,8 @@ export class Runner extends EventEmitter {
   // live or recently-finished run record (for approval routing)
   getRun(runId) { return this.runs.get(runId) || null; }
 
-  // Resolution order: config override -> PATH -> newest bundled CLI under
-  // %LOCALAPPDATA%\Claude-3p\claude-code\<ver>\<hash>\claude.exe (3rd-party
-  // desktop client keeps its own copy there and upgrades create new dirs).
   resolveClaude() {
-    if (this._claudeExe) return this._claudeExe;
-    if (this.claudePathOverride && fs.existsSync(this.claudePathOverride)) {
-      this._claudeExe = this.claudePathOverride;
-      return this._claudeExe;
-    }
-    const roots = [
-      path.join(process.env.LOCALAPPDATA || '', 'Claude-3p', 'claude-code'),
-      path.join(process.env.LOCALAPPDATA || '', 'Claude', 'claude-code'),
-    ];
-    let best = null; // newest claude.exe by mtime
-    for (const root of roots) {
-      let versionDirs = [];
-      try { versionDirs = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
-      for (const vd of versionDirs) {
-        if (!vd.isDirectory()) continue;
-        let hashDirs = [];
-        try { hashDirs = fs.readdirSync(path.join(root, vd.name), { withFileTypes: true }); } catch { continue; }
-        for (const hd of hashDirs) {
-          if (!hd.isDirectory()) continue;
-          const exe = path.join(root, vd.name, hd.name, 'claude.exe');
-          try {
-            const st = fs.statSync(exe);
-            if (st.isFile() && (!best || st.mtimeMs > best.mtimeMs)) best = { exe, mtimeMs: st.mtimeMs };
-          } catch { /* not there */ }
-        }
-      }
-    }
-    if (best) { this._claudeExe = best.exe; return this._claudeExe; }
-    // fall back to PATH lookup (spawn will fail visibly if missing)
-    this._claudeExe = 'claude';
+    if (!this._claudeExe) this._claudeExe = findClaudeBinary(this.claudePathOverride);
     return this._claudeExe;
   }
 

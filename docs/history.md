@@ -290,8 +290,7 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 ## v58（2026-10-28）审批卡 Bash 命令直读 + 口径文案澄清
 
-- 用户截图：Bash 审批卡显示 JSON 转义汤（heredoc 的真实换行全成字面 
-）。根因：v44 分工里非 Edit 类一律 JSON.stringify(input,null,2)——JSON 字符串转义对 command 类多行文本不可读。v58：input.command 为字符串时直读命令原文（真实换行，pre-wrap 滚动盒，2000 字上限），其余未知工具仍 JSON 兜底。
+- 用户截图：Bash 审批卡显示 JSON 转义汤（heredoc 的真实换行全成字面 反斜杠+n）。根因：v44 分工里非 Edit 类一律 JSON.stringify(input,null,2)——JSON 字符串转义对 command 类多行文本不可读。v58：input.command 为字符串时直读命令原文（真实换行，pre-wrap 滚动盒，2000 字上限），其余未知工具仍 JSON 兜底。
 - 用户追问「官方价格是 CC 传过来的吗」→ 是（CC 内置价表算好随 cost-state 传回，项目零价表）；两处 sheet-note 文案按此改写（谁算的、怎么来的讲明）。
 
 ## v59（2026-10-28）跳最新按钮居中 + 贴合输入栏
@@ -301,3 +300,11 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 ## v60（2026-10-28）跳最新按钮对比度补偿
 
 - 用户反馈 v59 居中后按钮不明显。查证颜色未改（raise+sh-2 与历史一致）——变淡是视错觉：右缘时衬纯 --bg 暗底，居中后悬于 panel2 卡片/文字上方，同色对比塌了。补偿：表面 color-mix raise 82%+fg 提亮一档，阴影 sh-2→sh-3（纪律：不加边框，全靠阴影分层）。
+
+## v61（2026-10-28，另一会话产出、本会话审查后入库）跨平台收敛：lib/platform.js
+
+- OS 差异收敛到 `bridge/lib/platform.js` 单一归属（IS_WIN / CI_PATHS / findClaudeBinary / hookCmdPath / installAutostart / autostartInstalled），其余模块不得分支 process.platform（已 grep 验证干净）。Windows 逻辑 verbatim 搬迁；POSIX 为附加分支：CLI 发现 `~/.local/bin/claude`、hook 走 `hook-post.sh`（curl 直 POST，对应 PowerShell `@-` 破 curl 的坑）、autostart 明确未实现（面板报 not installed）。
+- CI_PATHS = 非 linux 大小写不敏感（NTFS/APFS）：preview 前缀守卫两侧同 ci()；md.js 的 ART_PATH_RE 增补 `/`-根 POSIX 绝对路径链接化（lookbehind 守卫保留）。
+- runner.resolveClaude → findClaudeBinary（claudePath 配置语义保留：override 存在则用，失效静默落回自动发现）。ask 分支新增旗标 `--permission-prompts host`（审查标记：2.1.308 行为未实测，需 ask 实跑验证一次）。
+- ⚠ hook-post.sh 需可执行位（Windows 无法 chmod）：入库时 `git update-index --chmod=+x bridge/hook-post.sh`；POSIX 裸 checkout 若丢位则手动 chmod。
+- 剩余：cr.mjs（PC CLI 仍 .ps1）、Linux fs.watch 实测、POSIX 实机验证。

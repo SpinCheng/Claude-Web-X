@@ -4,6 +4,7 @@ import path from 'node:path';
 import { authOk, readBody } from '../lib/auth.js';
 import { PREVIEW_MIME } from '../lib/mime.js';
 import { readModelCatalog } from '../lib/models.js';
+import { CI_PATHS } from '../lib/platform.js';
 
 export function register(router, ctx) {
   const { cfg, store, adapter, runner, ctxprobe, hub } = ctx;
@@ -59,7 +60,8 @@ export function register(router, ctx) {
     if (!rec || !rec.cwd || !rel || /^\\\\/.test(rel)) { json(res, 403, { error: 'forbidden' }); return; }
     const root = path.resolve(rec.cwd);
     const abs = path.resolve(root, rel);
-    if (!abs.toLowerCase().startsWith(root.toLowerCase() + path.sep)) {
+    const ci = (s) => (CI_PATHS ? s.toLowerCase() : s);
+    if (!ci(abs).startsWith(ci(root) + path.sep)) {
       json(res, 403, { error: 'outside project dir' }); return;
     }
     const mt = PREVIEW_MIME[path.extname(abs).toLowerCase()];

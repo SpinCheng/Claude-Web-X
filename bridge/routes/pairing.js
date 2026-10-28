@@ -1,7 +1,8 @@
 // routes/pairing.js - pairing panel API: localhost ONLY, no token (its
 // whole job is to hand the token to the person already sitting at this
 // machine)
-import { rotateToken, installAutostart, autostartInstalled, lanUrls } from '../pairing.js';
+import { rotateToken, lanUrls } from '../pairing.js';
+import { installAutostart, autostartInstalled } from '../lib/platform.js';
 
 export function register(router, ctx) {
   const { cfg, paths, hub } = ctx;
@@ -41,7 +42,7 @@ export function register(router, ctx) {
 
   router.post('/api/pair/autostart', (req, res) => {
     if (!sameMachine(req)) { refuse(res); return; }
-    const r = installAutostart(paths.vbsPath || '');
+    const r = installAutostart();
     res.writeHead(r.ok ? 200 : 500, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(r));
   });

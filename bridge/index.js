@@ -12,6 +12,7 @@ import { Runner } from './runner.js';
 import { CtxProbe } from './ctxprobe.js';
 import { Handoff } from './handoff.js';
 import { createServer } from './server.js';
+import { hookCmdPath } from './lib/platform.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -66,8 +67,7 @@ const ctxprobe = new CtxProbe({ runner, adapter, cachePath: path.join(DATA_DIR, 
 const paths = {
   configPath: CONFIG_PATH,
   settingsPath: path.join(os.homedir(), '.claude', 'settings.json'),
-  hookCmd: path.join(__dirname, 'hook-post.cmd').split(path.sep).join('/'), // forward slashes: escape-safe everywhere
-  vbsPath: path.join(__dirname, '..', 'scripts', 'start-bridge.vbs'),
+  hookCmd: hookCmdPath(),
   uploadsDir: path.join(DATA_DIR, 'uploads'),
 };
 const { server } = createServer(cfg, store, adapter, runner, handoff, paths, ctxprobe);
