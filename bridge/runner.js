@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
-import { findClaudeBinary } from './lib/platform.js';
+import { findClaudeBinary, bashToolEnv } from './lib/platform.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_CONCURRENT_RUNS = 4;
@@ -249,7 +249,9 @@ export class Runner extends EventEmitter {
     }
     const child = spawn(this.resolveClaude(), args, {
       cwd,
-      env: { ...process.env, ...this.settingsEnv() },
+      // bashToolEnv: prepend the detected git dirs so the CLI's Bash tool
+      // seats even when this bridge inherited a PATH without Git (v62)
+      env: { ...process.env, ...this.settingsEnv(), ...bashToolEnv(process.env) },
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });

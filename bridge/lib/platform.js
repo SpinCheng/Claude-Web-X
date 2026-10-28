@@ -52,6 +52,44 @@ export function findClaudeBinary(override) {
   return 'claude';
 }
 
+// Claude Code's Bash tool needs a discoverable Git Bash. This machine keeps
+// git under a user-local manager (hermes), NOT Program Files, so a bridge
+// started from a lean context (boot autostart / wscript chain, no user PATH)
+// spawns CLIs that silently lose the Bash tool ("Git Bash not found;
+// BashTool will be unavailable" in ~/.claude/debug). Resolve git's install
+// once and prepend its dirs to every spawned child's PATH.
+let _gitRoot;
+function findGitRoot() {
+  if (_gitRoot !== undefined) return _gitRoot;
+  _gitRoot = null;
+  if (IS_WIN) {
+    const cands = [];
+    const hermes = path.join(os.homedir(), 'AppData', 'Local', 'hermes');
+    cands.push(path.join(hermes, 'git')); // hermes "current" link
+    try {
+      for (const d of fs.readdirSync(path.join(hermes, 'tools'))) {
+        if (/^git-/.test(d)) cands.push(path.join(hermes, 'tools', d));
+      }
+    } catch { /* no hermes/tools */ }
+    cands.push('C:\\Program Files\\Git', 'C:\\Program Files (x86)\\Git');
+    for (const root of cands) {
+      try {
+        if (fs.statSync(path.join(root, 'bin', 'bash.exe')).isFile()) { _gitRoot = root; break; }
+      } catch { /* next */ }
+    }
+  }
+  return _gitRoot;
+}
+// extra env entries for spawned CLIs so the Bash tool always seats,
+// whatever context the bridge itself was started from
+export function bashToolEnv(baseEnv) {
+  const root = findGitRoot();
+  if (!root) return {};
+  const dirs = [path.join(root, 'cmd'), path.join(root, 'bin')].join(path.delimiter);
+  const base = (baseEnv && (baseEnv.PATH || baseEnv.Path)) || '';
+  return { PATH: dirs + path.delimiter + base };
+}
+
 // Hook callback script written into ~/.claude/settings.json. Windows routes
 // through cmd.exe via hook-post.cmd (PowerShell breaks curl's
 // "--data-binary @-"); POSIX runs hook-post.sh directly. Forward slashes

@@ -301,6 +301,13 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈 v59 居中后按钮不明显。查证颜色未改（raise+sh-2 与历史一致）——变淡是视错觉：右缘时衬纯 --bg 暗底，居中后悬于 panel2 卡片/文字上方，同色对比塌了。补偿：表面 color-mix raise 82%+fg 提亮一档，阴影 sh-2→sh-3（纪律：不加边框，全靠阴影分层）。
 
+## v62（2026-10-28）runner 注入 Git PATH——手机会话 Bash 工具失踪根因修复
+
+- 症状：桥重启（经 wscript 链）后，所有手机驱动会话（含新会话）的 Bash 工具消失（「source removed or disconnected」），Read/Edit 等正常；用户自测新会话同样缺失。
+- 根因链（全部实证）：CC 的 BashTool 在 Windows 上要能发现 Git Bash——`~/.claude/debug/*.txt` 明写「Git Bash not found; BashTool will be unavailable」。本机 Git 是 hermes 用户级安装（`%LOCALAPPDATA%\hermes\git\bin\bash.exe`），不在 Program Files（CLI 标准位置探测不到），全靠启动上下文的 PATH 携带。桥从终端手动启动（hermes PATH 在）时一切正常；经精简上下文（wscript 链/开机自启）重启后 PATH 无 Git → 之后 spawn 的每个 claude 进程都装不上 BashTool。10-24 起两份 debug 日志证明 hosted 会话一直就是这个状态。
+- 修复：platform.js 新增 `findGitRoot()`（hermes current → hermes tools/git-* → Program Files×2 依次探测 bin/bash.exe，结果缓存）+ `bashToolEnv(baseEnv)` 返回「git cmd/bin 前置后的完整 PATH」；runner spawn env 末位合入——桥无论从什么上下文启动，子会话 Bash 必落座。POSIX 返回 {}（bash 常在）。
+- 附带建议（用户侧、可选）：hosted 会话（Claude-3p 直接驱动）要 Bash 同理需客户端上下文带 Git PATH，或把 hermes git 目录加进系统 PATH。
+
 ## v61（2026-10-28，另一会话产出、本会话审查后入库）跨平台收敛：lib/platform.js
 
 - OS 差异收敛到 `bridge/lib/platform.js` 单一归属（IS_WIN / CI_PATHS / findClaudeBinary / hookCmdPath / installAutostart / autostartInstalled），其余模块不得分支 process.platform（已 grep 验证干净）。Windows 逻辑 verbatim 搬迁；POSIX 为附加分支：CLI 发现 `~/.local/bin/claude`、hook 走 `hook-post.sh`（curl 直 POST，对应 PowerShell `@-` 破 curl 的坑）、autostart 明确未实现（面板报 not installed）。
