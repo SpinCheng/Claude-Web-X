@@ -143,6 +143,16 @@ function handleRunFrame(d) {
     return;
   }
   state.runs[d.sessionId] = { runId: d.runId, state: d.state, startedAt: d.startedAt };
+  // v88: a run that ends with an unconfirmed optimistic twin (stopped before
+  // the CLI wrote the user line) flips its dot red+static instead of
+  // breathing forever; the twin stays foldable if the line lands later
+  if ((d.state === 'end' || d.state === 'error') && d.sessionId === state.currentId) {
+    let min = -1;
+    state.turns.forEach((t, i) => {
+      if (t.role === 'user' && t.optimistic) { t.stopped = true; if (min < 0) min = i; }
+    });
+    if (min >= 0) renderTail(min);
+  }
   if (d.sessionId === state.currentId) {
     updateComposer();
     updateRunStatus();

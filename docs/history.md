@@ -424,3 +424,9 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 版本号并入 PERSONAL 胶囊（一枚胶囊承载，独立徽章元素删除；#build id 保留、bump 匹配模式改为 span 内文本）；
 - header 专属收紧：T4 字距 .22em→.12em（gate 保持大气）、胶囊字距减半+padding 收窄、图标 20→18px、间距微收。合计约省 60px，360px 屏从容。
+
+
+## v88（2026-10-29）停止后乐观泡呼吸点转红
+
+- 用户反馈：点停止后气泡左侧呼吸点仍无限呼吸。根因：停止发生在 CLI 写 user 行之前时，无事件能确认孪生泡，optimistic 永真。
+- 修法：run 帧 end/error 且为本会话时，屏上剩余 optimistic 孪生标记 t.stopped → 呼吸点变红色静态（--err，不动画）；t.optimistic 保持 true（行若真落盘仍可折叠转实）。renderTail(min) 局部重渲。

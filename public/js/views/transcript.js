@@ -379,7 +379,9 @@ function renderTurn(t) {
     line.className = 'u-line';
     if (t.optimistic) {
       const sp = document.createElement('span');
-      sp.className = 'uspin';
+      // v88: stopped runs flip the twin's dot red+static (still foldable if
+      // the line somehow lands later - optimistic stays true)
+      sp.className = 'uspin' + (t.stopped ? ' stopped' : '');
       sp.setAttribute('aria-hidden', 'true');
       line.appendChild(sp);
     }

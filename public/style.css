@@ -458,6 +458,9 @@ button { font-family: inherit; }
 .uspin { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--acc-strong); margin-bottom: 13px; animation: uspinBreathe 1.6s ease-in-out infinite; }
 @keyframes uspinBreathe { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.1); } }
 @media (prefers-reduced-motion: reduce) { .uspin { animation: none; opacity: .6; } }
+/* v88: run ended while the twin was still unconfirmed - the prompt never
+   reached the transcript; red static beats an endless coral breath */
+.uspin.stopped { background: var(--err); animation: none; opacity: .8; }
 /* ---------- v76：模态双钮等宽 + 取消灰描边（用户裁定，推广到全部底部 sheet 模态；描边覆盖"不用边框盒"默认纪律，与 .btn.deny 红描边同语法） ---------- */
 .sheet-actions .btn.ghost { flex: 1 1 0; border: 1.5px solid var(--line); background: none; }
 
