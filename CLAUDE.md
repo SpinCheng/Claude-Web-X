@@ -14,7 +14,7 @@ npm install
 npm start          # node bridge/index.js，端口 3742
 ```
 
-手机浏览器打开启动日志里的 URL 输 token；PC 端接管 `cli\cr.ps1 list` → `cr attach <序号>`；配对面板可装开机自启（EADDRINUSE 双开保护）。config（`bridge/data/config.json`，gitignored）键：`token`/`port`/`claudePath`/`defaultCwd`/`yolo`/`notify.ntfyTopic`。
+手机浏览器打开启动日志里的 URL 输 token；PC 端接管 `node cli/cr.mjs list` → `attach <序号>`（跨平台）；配对面板可装开机自启（EADDRINUSE 双开保护）。config（`bridge/data/config.json`，gitignored）键：`token`/`port`/`claudePath`/`defaultCwd`/`yolo`/`notify.ntfyTopic`。
 
 ## 运行机制速记
 
@@ -94,4 +94,4 @@ npm start          # node bridge/index.js，端口 3742
 
 ## 路线图
 
-P0/P1 已收口（审批 diff、历史分页、always-allow、改动文件总览、导出 MD、费用面板、搜索批量、确认弹窗、品牌化）。**已裁定不做**：锁屏/推送通知。命令行类功能（/compact 等）后续会补充。剩余：`cli/cr.mjs`（PC CLI 跨平台化）。之后 Phase 3（Cowork 数据面）、Phase 4（Cowork 控制面，UIA）。
+P0/P1 已收口（审批 diff、历史分页、always-allow、改动文件总览、导出 MD、费用面板、搜索批量、确认弹窗、品牌化）。**已裁定不做**：锁屏/推送通知。命令行类功能（/compact 等）后续会补充。PC 端 CLI 已跨平台化（cli/cr.mjs 取代 ps1）。之后 Phase 3（Cowork 数据面）、Phase 4（Cowork 控制面，UIA）。
