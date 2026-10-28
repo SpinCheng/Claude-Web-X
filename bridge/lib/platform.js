@@ -71,6 +71,10 @@ function findGitRoot() {
         if (/^git-/.test(d)) cands.push(path.join(hermes, 'tools', d));
       }
     } catch { /* no hermes/tools */ }
+    // per-user Git for Windows install (the "only for me" installer option):
+    // rides the user registry PATH normally, but a lean-started bridge can
+    // miss it exactly like the hermes case
+    cands.push(path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Git'));
     cands.push('C:\\Program Files\\Git', 'C:\\Program Files (x86)\\Git');
     for (const root of cands) {
       try {
