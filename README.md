@@ -74,7 +74,7 @@ sequenceDiagram
   B-->>P: run 帧收尾（状态灯翻转）
 ```
 
-会话即文件：CLI 桌面端、终端、手机端写的都是同一份转录文件，bridge 只做无驻留恢复（`--resume <id> -p`），与桌面端零冲突；PC 终端接管用 `cli/cr.ps1`（list / attach / release）。
+会话即文件：CLI 桌面端、终端、手机端写的都是同一份转录文件，bridge 只做无驻留恢复（`--resume <id> -p`），与桌面端零冲突；PC 终端接管用 `node cli/cr.mjs`（list / attach / release / url，跨平台）。
 
 ## 能做什么
 
@@ -101,7 +101,7 @@ claude-web/
 │   ├── runner.js               # 无驻留执行器（每条消息一次 resume -p；排队；模型/等级；权限路由）
 │   ├── handoff.js / ctxprobe.js / tailer.js / store.js / hooks.js / approve-mcp.mjs / hook-post.{cmd,sh}
 ├── public/                     # PWA（免构建 vanilla JS）：index.html / app.js / js/ / style.css / pair.html / vendor(qrcode, MIT)
-├── cli/cr.ps1                  # 电脑端接管工具 list/attach/release/url
+├── cli/cr.mjs                  # 电脑端接管工具（跨平台）list/attach/release/url
 ├── scripts/                    # start-bridge.vbs / rotate-token.ps1 / make-icons.mjs / shots.mjs(截图)
 ├── test/                       # unit(4 套 37 例) + e2e(隔离桥 :3799 + headless Edge，9 场景)
 └── docs/screenshots/           # README 截图（合成数据拍摄）

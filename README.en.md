@@ -74,7 +74,7 @@ sequenceDiagram
   B-->>P: run frame closes the turn
 ```
 
-Sessions are files: desktop, terminal and phone all write the same transcripts; the bridge only does non-resident resumes (`--resume <id> -p`), so it never fights the desktop app. PC-side takeover lives in `cli/cr.ps1`.
+Sessions are files: desktop, terminal and phone all write the same transcripts; the bridge only does non-resident resumes (`--resume <id> -p`), so it never fights the desktop app. PC-side takeover lives in `cli/cr.mjs` (`node cli/cr.mjs list | attach | release | url`, cross-platform).
 
 ## Features
 
