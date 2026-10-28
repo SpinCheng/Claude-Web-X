@@ -48,6 +48,7 @@ npm start          # node bridge/index.js，端口 3742
 - `claude://` deep link 被官方 Store 版接管，第三方客户端收不到（Phase 4 改走 UIA）。
 - Cowork 存储（`Claude-3p\local-agent-mode-sessions\local_*.json`）字段齐全（sessionId/cliSessionId/cwd/title/createdAt/lastActivityAt/ms/model/permissionMode/isArchived）——Phase 3 可开工。
 - CLI 的 `/context` 在 `-p` 模式可用（stream-json：init 带 session_id、result 带 markdown 表）；**statusline 方案勿用**（仅交互会话触发、配置不热加载，已实测排除）。手工跑 /context 会留垃圾 jsonl，用 DELETE API 回收。
+- **Linux 实测（2026-10-28 腾讯云 OpenCloudOS 9.4 + CLI 2.1.197，全链路通过）**：① CLI 拒绝 root/sudo 跑 `--dangerously-skip-permissions`（run 秒死、仅子进程 stderr 有字）——**Linux 部署必须普通用户**；② 2.1.197 与 2.1.308 转录格式兼容（tool_use/tool_result/usage/custom-title/hooks 全正常）；③ Node ≥20.13 递归 fs.watch 在 Linux 可用（libuv 递归 inotify），延迟与 Windows 同级——轮询降级仅老 Node/特殊 FS；④ `git archive` 在 Windows 会按 autocrlf 把 .sh 打成 CRLF（shebang 炸）——已由 .gitattributes `*.sh eol=lf` 钉死；⑤ 部署顺序红线：**先写 ~/.claude/settings.json 再起桥**（settingsEnv 空结果缓存锁死，backlog 修复）。详见 docs/history.md「Linux 实机验证」节。
 
 **转录格式**
 

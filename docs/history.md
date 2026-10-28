@@ -355,3 +355,13 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈：排队任务开始执行时直接以转实状态上屏（v37 设计即如此——排队不发乐观泡，等派发落盘）。按裁定改为：queue-dispatched 帧到达即 pushOptimisticUser(d.text)（含菊花），真实 user 行落地由同文折叠原地转实；expectQueuedUser 旗标保留兜底（乐观 push 失败时仍走推新泡路径）。
 - 桥侧：queued-dispatch 广播补发 text 字段（原转发丢弃）。30s 兜底 retract（retract 对已确认泡是 no-op，天然安全）。
+
+## Linux 实机验证（2026-10-28，腾讯云 OpenCloudOS 9.4）三坑两修一勘误
+
+- 环境与结论：Node v20.19.2（云主机自带即满足红线）、CLI 2.1.197（npm -g 装 /usr/local/bin）、普通用户部署（见坑1）。35 单测全过；HTTP/WS 全 API 面（发现/追加/预览守卫/导出/改名/删除-trash-墓碑/鉴权 401）绿；**真实消息流全绿**：新会话 12s 首轮（init 行采纳、标题推导、outcome ok）、resume 轮、yolo+Bash 工具调用（tool_use/tool_result 按 id 配对、真实执行输出回填）、ctxprobe（1M 窗口+fixed 明细解析正常）、pairing rotate 写 hooks、Notification hook 真实触发（WS notify 帧）+ Stop 手动回环。CLI 2.1.197 与 2.1.308 转录格式兼容。
+- 坑1 **root 拒跑 yolo**：症状=接口发消息 202 后 run 秒死、不写转录、无任何报错（只有子进程 stderr 有字）——根因=CLI 在 Linux 检测 root/sudo 直接拒绝 `--dangerously-skip-permissions`（Windows 无此形态，从未暴露）。修法=**普通用户跑 bridge**（useradd 部署）。backlog：runner 可加「Linux+root」前置检测给明确错误。
+- 坑2 **git archive 出 CRLF shebang**：症状=hook-post.sh 有可执行位却 `cannot execute: required file not found`——根因=Windows 上 `git archive` 应用 autocrlf 把 .sh 打成 CRLF，shebang 变 `#!/bin/sh\r`。修复=.gitattributes 加 `*.sh text eol=lf`（commit 51d7b6a）。教训：Windows 环境产出的 .sh 一律先 `od -c` 看首行。
+- 坑3 **settingsEnv 空缓存锁死**：症状=「先起桥、后写 ~/.claude/settings.json」的部署顺序下所有 run 报未登录且**永不自愈**——根因=runner.settingsEnv() 惰性缓存，文件不存在时把 {} 缓存到进程终身。backlog：空结果不缓存（或 mtime 校验）。
+- 勘误：红线5 的「fs.watch(recursive) 不可用→轮询」担忧在 **Node ≥20.13 已不成立**（libuv 递归 inotify 落地）——Linux 实测发现 4ms / 追加 WS 帧 202ms（=adapter 防抖固有值），与 Windows 同级；降级路径保留给老 Node/特殊 FS。
+- 部署事实（README 部署节的原料）：认证 env 块的 base URL **必须从服务器直连可达**（本机 127.0.0.1 中转在云上不可达，验证靠 `ssh -R 15721:127.0.0.1:15721` 反向隧道）；访问面走 Tailscale 最干净（实测手机 DERP 中继 ~50ms、PC 直连 32ms），公网放行 3742 需 token 且源 IP 白名单别用代理出口 IP；CLI 纯文本 run 会等 stdin 3s（"no stdin data received in 3s"）——backlog：runner 无附件 run 显式关 stdin。
+- 工具教训（记录给未来的自己）：SSH 远程 `pkill -f <模式>` 会匹配**自身命令行**自杀（本验证踩了两次：模式文本/启动命令文本先后入坑）——远程清进程用 `pgrep -f` 拿 PID 再 kill，或模式用 `[.]` 防自匹配且命令行不含明文。
