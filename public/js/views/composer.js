@@ -429,6 +429,12 @@ function openNewModal(presetCwd) {
   if (typeof presetCwd !== 'string') presetCwd = '';
   const go = $('new-go'); // every open starts fresh
   go.disabled = false; go.classList.remove('loading');
+  // v78: group-head + already knows the project - the whole cwd section
+  // stays hidden (default IS that dir); the bare header + shows it
+  $('nsec-cwd').classList.toggle('hidden', !!presetCwd);
+  // progressive disclosure resets on every open
+  $('new-cwd-box').classList.remove('on');
+  $('new-cwd-manual').style.display = '';
   const sel = $('new-cwd');
   sel.innerHTML = '';
   const seen = new Set();
@@ -461,7 +467,7 @@ function openNewModal(presetCwd) {
   $('new-cwd-custom').value = '';
   $('new-text').value = '';
   $('new-err').textContent = '';
-  document.querySelectorAll('#new-perm .seg-btn').forEach((b) => {
+  document.querySelectorAll('#new-perm button').forEach((b) => {
     b.classList.toggle('active', b.dataset.v === state.perm);
   });
   $('new-modal').classList.remove('hidden');
@@ -473,7 +479,8 @@ function submitNewSession() {
   go.disabled = true; go.classList.add('loading');
   const text = $('new-text').value.trim();
   if (!text) { $('new-err').textContent = '任务内容不能为空'; return; }
-  const custom = $('new-cwd-custom').value.trim();
+  // manual path only counts while its disclosure is open (v78)
+  const custom = $('new-cwd-box').classList.contains('on') ? $('new-cwd-custom').value.trim() : '';
   const cwd = custom || $('new-cwd').value || '';
   const perm = document.querySelector('#new-perm .seg-btn.active')?.dataset.v || state.perm;
   const model = (document.querySelector('#new-perm .seg-btn.active')?.dataset.v, currentModel());
@@ -523,13 +530,24 @@ $('fork-x').onclick = disarmFork;
 $('new-session').onclick = openNewModal;
 $('new-go').onclick = submitNewSession;
 $('new-cancel').onclick = () => $('new-modal').classList.add('hidden');
-document.querySelectorAll('#new-perm .seg-btn').forEach((b) => {
+document.querySelectorAll('#new-perm button').forEach((b) => {
   b.onclick = () => {
-    document.querySelectorAll('#new-perm .seg-btn').forEach((x) => x.classList.remove('active'));
+    document.querySelectorAll('#new-perm button').forEach((x) => x.classList.remove('active'));
     b.classList.add('active');
     setPerm(b.dataset.v);
   };
 });
+// v78 progressive disclosure: manual path is a link, the input unfolds
+$('new-cwd-manual').onclick = () => {
+  $('new-cwd-box').classList.add('on');
+  $('new-cwd-manual').style.display = 'none';
+  $('new-cwd-custom').focus();
+};
+$('new-cwd-x').onclick = () => {
+  $('new-cwd-box').classList.remove('on');
+  $('new-cwd-manual').style.display = '';
+  $('new-cwd-custom').value = '';
+};
 $('new-text').addEventListener('input', function () {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, window.innerHeight * 0.3) + 'px';

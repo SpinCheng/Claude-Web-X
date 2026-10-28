@@ -464,6 +464,22 @@ button { font-family: inherit; }
 .seg.effort-row { margin-bottom: 4px; flex-wrap: wrap; }
 .seg.effort-row .seg-btn { padding: 10px 4px; font-size: 12.5px; min-width: 0; }
 .seg-btn.active { border-color: var(--acc); color: var(--acc-strong); box-shadow: 0 0 0 3px var(--acc-tint); }
+/* ---------- v78：新建任务弹窗方案A（分节卡片 + 渐进披露 + 轨道式权限段） ---------- */
+.nsec { background: var(--panel2); border-radius: 14px; padding: 12px 12px 11px; margin-bottom: 10px; box-shadow: inset 0 1px 0 var(--ink-hi); }
+.nsec-l { font: 600 11px/1 var(--sans); color: var(--dim); letter-spacing: .04em; margin: 0 0 6px 2px; }
+.nsec-h { color: var(--faint); font-size: 10.5px; margin: 5px 2px 0; }
+.nsec textarea, .nsec select, .nsec input { margin-bottom: 0; }
+.nsec-link { display: inline-block; margin-top: 8px; color: var(--acc-strong); font-size: 12px; font-weight: 600; cursor: pointer; }
+.nsec-manual { display: none; margin-top: 8px; }
+.nsec-manual.on { display: block; }
+.nsec-fbox { position: relative; }
+.nsec-fbox input { padding-right: 34px; }
+.nsec-x { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--faint); cursor: pointer; font-size: 15px; padding: 4px 8px; }
+.nsec-x:active { color: var(--fg); }
+/* 轨道式 pill 段：选择控件语法与提交钮分开（消除上下两组同形按钮的堆叠感） */
+.ptrack { display: flex; background: var(--bg); border-radius: 12px; padding: 3px; }
+.ptrack button { flex: 1; border: 0; background: none; color: var(--dim); font: 500 13px var(--sans); padding: 9px 0; border-radius: 9px; cursor: pointer; transition: background .15s, color .15s; }
+.ptrack button.active { background: var(--raise); color: var(--acc-strong); box-shadow: inset 0 1px 0 var(--ink-hi); font-weight: 600; }
 .approval-card .ap-session { font-size: 12px; margin-bottom: 6px; }
 .approval-card .ap-tool { font-size: 15px; color: var(--acc-strong); margin-bottom: 8px; }
 .approval-card .ap-input { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-height: 34dvh; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--fg); margin: 0 0 12px; }

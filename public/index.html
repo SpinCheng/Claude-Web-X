@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=77">
+  <link rel="stylesheet" href="/style.css?v=78">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <div class="brand small">
         <span class="brand-lamp" id="conn-dot" title="连接状态"></span>
         <span class="brand-word">claude<span class="brand-dim">-web</span></span>
-        <span id="build" class="build-badge">v77</span>
+        <span id="build" class="build-badge">v78</span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -247,20 +247,36 @@
   <div id="new-modal" class="overlay hidden">
     <div class="sheet">
       <div class="sheet-title">新建任务</div>
-      <textarea id="new-text" rows="3" placeholder="要 claude 做什么"></textarea>
-      <p class="sheet-note">工作目录决定任务归属的项目：选电脑上打开过的文件夹，否则桌面端看不到它</p>
-      <select id="new-cwd"></select>
-      <input id="new-cwd-custom" type="text" placeholder="或输入其他路径" spellcheck="false">
-      <p class="sheet-note">权限模式</p>
-      <div class="seg" id="new-perm">
-        <button class="seg-btn active" data-v="auto">自动执行</button>
-        <button class="seg-btn" data-v="ask">需要时审批</button>
+      <!-- v78 方案A：分节卡片 + 渐进披露（手动路径折叠为链接）+ 轨道式权限段。
+           从组头 ➕ 打开时 presetCwd 已知，整个目录节隐藏（用户裁定：默认就是该项目）。 -->
+      <div class="nsec">
+        <p class="nsec-l">任务内容</p>
+        <textarea id="new-text" rows="3" placeholder="要 claude 做什么"></textarea>
       </div>
+      <div class="nsec" id="nsec-cwd">
+        <p class="nsec-l">工作目录</p>
+        <select id="new-cwd"></select>
+        <p class="nsec-h">决定任务归属的项目；桌面端只能看到它打开过的文件夹</p>
+        <span class="nsec-link" id="new-cwd-manual" role="button" tabindex="0">＋ 手动输入其他路径</span>
+        <div id="new-cwd-box" class="nsec-manual">
+          <div class="nsec-fbox">
+            <input id="new-cwd-custom" type="text" placeholder="例如 D:\projects\my-app" spellcheck="false">
+            <span id="new-cwd-x" role="button" tabindex="0" aria-label="收起手动路径">×</span>
+          </div>
+        </div>
+      </div>
+      <div class="nsec">
+        <p class="nsec-l">权限模式</p>
+        <div class="ptrack" id="new-perm">
+          <button type="button" data-v="auto">自动执行</button>
+          <button type="button" data-v="ask">需要时审批</button>
+        </div>
+      </div>
+      <p id="new-err" class="gate-err"></p>
       <div class="sheet-actions">
         <button id="new-cancel" class="btn ghost">取消</button>
         <button id="new-go" class="btn primary">开始</button>
       </div>
-      <p id="new-err" class="gate-err"></p>
     </div>
   </div>
 
@@ -277,6 +293,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=77"></script>
+  <script type="module" src="/app.js?v=78"></script>
 </body>
 </html>
