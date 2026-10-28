@@ -424,19 +424,19 @@ function stopRun() {
 /* ---------------- new session ---------------- */
 // presetCwd: preselect the project dir (list-page group-head + button).
 // Existing onclick= wiring passes the event object here, so non-strings reset.
-// v63: creating-state guard - on a successful POST the modal STAYS open
-// with the button spun up; the 1-5s spawn window before the run frame
-// adopts the session id would otherwise show zero feedback (modal closed,
-// list inert). app.js closes the modal on adoption / unlocks on failure.
-function setNewPending(on) {
-  const go = $('new-go'), cancel = $('new-cancel');
-  go.disabled = on; cancel.disabled = on;
-  go.textContent = on ? '创建中…' : '开始';
-  go.classList.toggle('loading', on);
+// v64 (user ruling, replaces v63's modal-stays design): the modal CLOSES
+// on submit and a floating pill carries the wait - new-session cold start
+// measured 3+ MINUTES (the CLI writes nothing until its first transcript
+// line). The hint hides on adoption (app.js), on failure, or via the 30s
+// lost-frame safety net.
+function creatingHint(on) {
+  const el = $('creating');
+  if (el) el.classList.toggle('hidden', !on);
 }
 function openNewModal(presetCwd) {
   if (typeof presetCwd !== 'string') presetCwd = '';
-  setNewPending(false); // every open starts fresh
+  const go = $('new-go'); // every open starts fresh
+  go.disabled = false; go.classList.remove('loading');
   const sel = $('new-cwd');
   sel.innerHTML = '';
   const seen = new Set();
@@ -476,7 +476,9 @@ function openNewModal(presetCwd) {
   $('new-text').focus();
 }
 function submitNewSession() {
-  if ($('new-go').disabled) return; // creating in flight - no double submit
+  const go = $('new-go');
+  if (go.disabled) return; // POST in flight - no double submit
+  go.disabled = true; go.classList.add('loading');
   const text = $('new-text').value.trim();
   if (!text) { $('new-err').textContent = '任务内容不能为空'; return; }
   const custom = $('new-cwd-custom').value.trim();
@@ -490,13 +492,19 @@ function submitNewSession() {
   })
     .then((r) => r.json())
     .then((j) => {
-      if (!j.ok) { setNewPending(false); $('new-err').textContent = '启动失败：' + (j.error || ''); return; }
-      state.pendingNew = j.runId; // modal stays in creating state until adoption
-      setTimeout(() => { // safety: run frame lost (WS drop) - never lock the modal forever
-        if (state.pendingNew === j.runId) { state.pendingNew = null; setNewPending(false); toast('启动超时，稍后会出现在列表'); }
+      if (!j.ok) { $('new-err').textContent = '启动失败：' + (j.error || ''); return; }
+      $('new-modal').classList.add('hidden');
+      state.pendingNew = j.runId;
+      state.pendingNewText = text; // optimistic first bubble (seeded in openDetail)
+      creatingHint(true);
+      setTimeout(() => { // safety: run frame lost (WS drop) - never spin forever
+        if (state.pendingNew === j.runId) {
+          state.pendingNew = null; state.pendingNewText = '';
+          creatingHint(false); toast('启动超时，稍后会出现在列表');
+        }
       }, 30_000);
     })
-    .catch(() => { setNewPending(false); $('new-err').textContent = '网络错误'; });
+    .catch(() => { go.disabled = false; go.classList.remove('loading'); $('new-err').textContent = '网络错误'; });
 }
 
 /* ---------------- wiring ---------------- */
@@ -551,4 +559,4 @@ if (window.ResizeObserver && composerEl) {
   }).observe(composerEl);
 }
 
-export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setNewPending, setDraft, disarmFork };
+export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, creatingHint, setDraft, disarmFork };

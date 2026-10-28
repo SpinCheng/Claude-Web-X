@@ -438,6 +438,10 @@ button { font-family: inherit; }
 .btn.loading::after { content: ""; position: absolute; right: 13px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .38); border-top-color: #fff; animation: btnSpin .7s linear infinite; }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .btn.loading::after { animation-duration: 1.6s; } }
+/* ---------- v64：新会话创建提示（悬浮胶囊；采纳/失败/30s 兜底关闭） ---------- */
+.creating { position: fixed; left: 50%; top: 38%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; background: var(--panel); border-radius: 999px; padding: 12px 22px; box-shadow: var(--sh-3); color: var(--fg); font: 600 13px/1 var(--sans); pointer-events: none; }
+.cspin { flex: none; width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(242, 237, 227, .3); border-top-color: var(--fg); animation: btnSpin .7s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .cspin { animation-duration: 1.6s; } }
 .btn.danger:active { background: color-mix(in srgb, var(--err) 80%, #fff); }
 
 /* ---------- 权限模式 & 审批卡 ---------- */

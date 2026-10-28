@@ -321,3 +321,11 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈：新建会话点「开始」后弹窗即关、等 spawn/init 的 1~5 秒页面零反馈。v63：POST 成功后**弹窗保持打开转「创建中」态**——开始钮 spinner（线性旋转）+ 禁双击、取消钮同步禁用；run 帧采纳 sessionId 时才关弹窗进详情（app.js 两处：成功关/失败解锁）；30 秒兜底超时防 run 帧丢失锁死弹窗；openNewModal 每次开先 setNewPending(false) 复位。
 - 更名 claude-remote → claude-web：可见面全部换（PWA title/品牌字/manifest、package.json、README H1+示例、SECURITY、CLAUDE.md 标题）。**文件夹有意不改名**——settings.json hooks 命令、开机自启 vbs 绝对路径、转录 slug（D--dev-workspaces-claude-remote）分组连续性、LOCAL.md 都锚在旧路径上，改名需要一次协调迁移，待用户另行拍板。
+
+
+## v64（2026-10-28）新会话三连修（创建提示按用户裁定改版 / 首条不上屏竞态 / 标题截断）
+
+- 实测复现（真桥 curl 建会话）：新会话从 POST 到转录第一行耗时 **3 分 24 秒**（CLI 冷启动静默期——写 queue-operation 前毫无输出；期间无 sessionId、无 events、无标题），这就是等待感的本体；后续跟进（resume）无此静默。冷启动慢因未深查（疑与中转无外网、CLI 启动期联网检查超时有关），记档待查。
+- 创建提示 v63 方案（弹窗保持+按钮 spinner）废弃，按用户裁定改：**点开始弹窗即关，悬浮胶囊提示「正在创建会话…」**（居中 38%、pointer-events none 不挡交互；采纳/失败/30s 丢帧兜底三路关闭）；POST 期间按钮短暂禁用防双击。
+- 首条输入不上屏 = 竞态：转录 user 行与 adoption run 帧几乎同毫秒落盘，首屏 events 拉取可能扑空、append 广播又可能抢在 subscribe 前。修法复用乐观机制：submitNewSession 存 `state.pendingNewText`，openDetail 首屏无 user turn 时 `pushOptimisticUser` 种泡，真实事件到达由同文折叠原地确认（v20/v37 幂等语义，双发 dedupe 依旧成立）。
+- 标题 fallback：首条 human 文本 slice(0,48) → **首行 + 24 字硬上限 + 省略号**（多行只取首行）；单测同步改写。

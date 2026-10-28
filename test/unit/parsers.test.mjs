@@ -106,10 +106,12 @@ test('assistant line is the ONLY source of the display model label; cost-state n
   assert.equal(patch.model, 'glm-5.3');
 });
 
-test('first human message seeds the fallback title', () => {
-  const { patch } = run([user({ message: { role: 'user', content: 'this is a long first question about bridges' } })]);
+test('first human message seeds the fallback title (first line, 24-cap, ellipsis)', () => {
+  const { patch } = run([user({ message: { role: 'user', content: 'line one keeps going well past twenty-four chars\nline two ignored' } })]);
   assert.equal(patch.titleFallback, true);
-  assert.ok(patch.title.startsWith('this is a long'));
+  assert.equal(patch.title, 'line one keeps going wel…');
+  const { patch: p2 } = run([user({ message: { role: 'user', content: 'short q' } })]);
+  assert.equal(p2.title, 'short q');
 });
 
 // regression: the step-4 extraction left an undefined rec0 in the usage

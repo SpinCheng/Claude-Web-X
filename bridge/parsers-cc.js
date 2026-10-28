@@ -152,7 +152,13 @@ export function applyLine(id, obj, patch, events, rec) {
           patch.firstUserChars = text.length;
         }
         const haveTitle = patch.title || (rec && rec0.title && rec0.title !== '(loading)');
-        if (!haveTitle && text) { patch.title = text.slice(0, 48); patch.titleFallback = true; }
+        if (!haveTitle && text) {
+          // v64: first LINE only, hard 24-char cap + ellipsis - the raw
+          // prompt used to ride along at 48 chars and read as a wall of text
+          const first = text.split('\n').map((l) => l.trim()).filter(Boolean)[0] || '';
+          patch.title = first.slice(0, 24) + (first.length > 24 ? '…' : '');
+          patch.titleFallback = true;
+        }
         const ev = { k: 'user', ts: obj.timestamp || '', text };
         if (images.length) ev.images = images;
         return ev;

@@ -11,7 +11,7 @@ import { $, shortPath } from '../util.js';
 import { state } from '../state.js';
 import { auth, api } from '../api.js';
 import { sendWs } from '../ws.js';
-import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns } from './transcript.js';
+import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns, pushOptimisticUser } from './transcript.js';
 import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
 
@@ -39,6 +39,15 @@ function openDetail(id) {
       if (state.currentId !== id) return;
       buildTurns(d.events || []);
       renderAllTurns();
+      // v64: new-session race - the transcript user line lands within
+      // milliseconds of the adoption run frame, so the first page can miss
+      // it (append broadcast beats our subscribe). Seed the prompt we sent
+      // as an optimistic bubble; the same-text fold machinery confirms it
+      // in place when the real event arrives (v20/v37 semantics).
+      if (state.pendingNewText) {
+        if (!state.turns.some((t) => t.role === 'user')) pushOptimisticUser(state.pendingNewText);
+        state.pendingNewText = '';
+      }
       // v44 pagination bookkeeping (both counted in events from the tail)
       state.histTotal = d.total || 0;
       state.histBefore = (d.events || []).length;
