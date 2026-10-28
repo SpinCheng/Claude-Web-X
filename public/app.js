@@ -14,7 +14,7 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
-import { updateComposer, renderQueuePanel, creatingHint } from './js/views/composer.js';
+import { updateComposer, renderQueuePanel } from './js/views/composer.js';
 
 /* ---------------- token gate ---------------- */
 async function saveToken() {
@@ -132,7 +132,7 @@ function handleRunFrame(d) {
     if (state.pendingNew === d.runId && (d.state === 'error' || d.state === 'end')) {
       state.pendingNew = null;
       state.pendingNewText = '';
-      creatingHint(false);
+      if (state.provisional && !document.getElementById('detail').classList.contains('hidden')) closeDetail();
       toast('任务没启动起来：' + (d.stderrTail || d.error || '查看工作目录是否正确').slice(0, 80));
     }
     if (state.pendingBranchRun === d.runId && (d.state === 'error' || d.state === 'end')) {
@@ -172,7 +172,8 @@ function handleRunFrame(d) {
   }
   if (state.pendingNew === d.runId && d.state === 'running') {
     state.pendingNew = null;
-    creatingHint(false); // adopted - the detail view takes over
+    // adopted - plain openDetail re-binds in place: the chat rebuilds and
+    // the v64 seed re-shows the optimistic bubble in the same tick
     if (state.currentId !== d.sessionId) openDetail(d.sessionId);
   }
   // v40 branch adoption: the fork's real session id arrived (init line).

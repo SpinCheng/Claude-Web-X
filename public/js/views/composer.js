@@ -13,7 +13,7 @@ import { auth, api } from '../api.js';
 import { toast } from './toast.js';
 import { openBubble, closeBubble, openLightbox, openFilePreview, showConfirm } from './overlays.js';
 import { pushOptimisticUser, retractOptimisticUser } from './transcript.js';
-import { renderDriverChip } from './detail.js';
+import { renderDriverChip, openDetailProvisional, closeDetail } from './detail.js';
 
 /* ---------------- permission mode ---------------- */
 function setPerm(v) {
@@ -290,7 +290,8 @@ function updateComposer() {
 function sendMessage(force) {
   const input = $('msg-input');
   const text = input.value.trim();
-  if (!text || !state.currentId) return;
+  if (!text) return;
+  if (!state.currentId) { if (state.provisional) toast('会话创建中，稍候再发'); return; }
   if (state.armedBranch === state.currentId) { sendFork(text, input.value); return; }
   _send(text, input.value, force);
 }
@@ -424,15 +425,6 @@ function stopRun() {
 /* ---------------- new session ---------------- */
 // presetCwd: preselect the project dir (list-page group-head + button).
 // Existing onclick= wiring passes the event object here, so non-strings reset.
-// v64 (user ruling, replaces v63's modal-stays design): the modal CLOSES
-// on submit and a floating pill carries the wait - new-session cold start
-// measured 3+ MINUTES (the CLI writes nothing until its first transcript
-// line). The hint hides on adoption (app.js), on failure, or via the 30s
-// lost-frame safety net.
-function creatingHint(on) {
-  const el = $('creating');
-  if (el) el.classList.toggle('hidden', !on);
-}
 function openNewModal(presetCwd) {
   if (typeof presetCwd !== 'string') presetCwd = '';
   const go = $('new-go'); // every open starts fresh
@@ -495,12 +487,13 @@ function submitNewSession() {
       if (!j.ok) { $('new-err').textContent = '启动失败：' + (j.error || ''); return; }
       $('new-modal').classList.add('hidden');
       state.pendingNew = j.runId;
-      state.pendingNewText = text; // optimistic first bubble (seeded in openDetail)
-      creatingHint(true);
-      setTimeout(() => { // safety: run frame lost (WS drop) - never spin forever
+      state.pendingNewText = text; // adoption seed (openDetail re-shows it after the rebuild)
+      openDetailProvisional(text, cwd); // v65: straight into the conversation
+      setTimeout(() => { // safety: run frame lost (WS drop) - never hang the page
         if (state.pendingNew === j.runId) {
           state.pendingNew = null; state.pendingNewText = '';
-          creatingHint(false); toast('启动超时，稍后会出现在列表');
+          if (state.provisional) closeDetail();
+          toast('启动超时，稍后会出现在列表');
         }
       }, 30_000);
     })
@@ -559,4 +552,4 @@ if (window.ResizeObserver && composerEl) {
   }).observe(composerEl);
 }
 
-export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, creatingHint, setDraft, disarmFork };
+export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setDraft, disarmFork };

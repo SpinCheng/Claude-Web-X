@@ -329,3 +329,11 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 创建提示 v63 方案（弹窗保持+按钮 spinner）废弃，按用户裁定改：**点开始弹窗即关，悬浮胶囊提示「正在创建会话…」**（居中 38%、pointer-events none 不挡交互；采纳/失败/30s 丢帧兜底三路关闭）；POST 期间按钮短暂禁用防双击。
 - 首条输入不上屏 = 竞态：转录 user 行与 adoption run 帧几乎同毫秒落盘，首屏 events 拉取可能扑空、append 广播又可能抢在 subscribe 前。修法复用乐观机制：submitNewSession 存 `state.pendingNewText`，openDetail 首屏无 user turn 时 `pushOptimisticUser` 种泡，真实事件到达由同文折叠原地确认（v20/v37 幂等语义，双发 dedupe 依旧成立）。
 - 标题 fallback：首条 human 文本 slice(0,48) → **首行 + 24 字硬上限 + 省略号**（多行只取首行）；单测同步改写。
+
+
+## v65（2026-10-28）新会话乐观进页（用户裁定，取代 v64 悬浮胶囊）
+
+- 用户裁定：点创建**直接切到会话页乐观上屏**，与普通发送的乐观机制同构——悬浮胶囊废弃删除。
+- 架构：sessionId 在 CLI 写 init 行前不存在（冷启动 3 分 24 秒实测），详情页一切接口都挂 id → **无 id 乐观进页 + adoption 原地重绑**：openDetailProvisional 切页+种乐观泡+标题取首行 24 截断（客户端镜像 v64 桥侧规则）+meta「创建中…」；run 帧到达走普通 openDetail（fetch 重建 chat + v64 种子同 tick 重现气泡，无闪烁）。
+- 守卫：provisional 期间 sendMessage 拦截并提示「会话创建中」；失败/30s 超时若还在乐观页则 closeDetail 回列表（pendingNewText 保留→adoption 自动开真实会话）；openDetail/closeDetail 显式清 provisional 旗标。
+- composer↔detail 循环 import 新增两符号（openDetailProvisional/closeDetail），仍求值期零交叉。

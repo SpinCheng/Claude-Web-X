@@ -17,6 +17,7 @@ import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } f
 
 /* ---------------- history (system back = leave detail) ---------------- */
 function openDetail(id) {
+  state.provisional = false;
   state.currentId = id;
   state.atBottom = true;
   state.userCollapsedLive = false;
@@ -64,6 +65,7 @@ function openDetail(id) {
   history.pushState({ cr: 'detail' }, '', '#s');
 }
 function closeDetail() { // via the ← button only
+  state.provisional = false; // adoption auto-opens the real session (v64 seed)
   sendWs({ type: 'unsubscribe' });
   disarmFork();
   state.currentId = null;
@@ -73,6 +75,38 @@ function closeDetail() { // via the ← button only
   const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
   $('detail').classList.add('hidden');
   $('list').classList.remove('hidden');
+}
+
+// v65: provisional detail - submit jumps STRAIGHT into the conversation with
+// the prompt as an optimistic bubble. The session id only exists once the CLI
+// writes its init line (3+ min cold start measured); adoption then calls the
+// ordinary openDetail, whose fetch rebuilds the chat and the v64 seed re-shows
+// the bubble synchronously in the same tick (no flicker). Same UX grammar as
+// optimistic bubbles inside a live conversation (user ruling).
+function truncTitle(t) {
+  const f = (t || '').split('\n').map((x) => x.trim()).filter(Boolean)[0] || '';
+  return f.slice(0, 24) + (f.length > 24 ? '…' : '');
+}
+function openDetailProvisional(text, cwd) {
+  state.provisional = true;
+  state.currentId = null;
+  state.atBottom = true;
+  state.userCollapsedLive = false;
+  state.histBefore = 0; state.histTotal = 0; state.histLoading = false;
+  updateHistoryPill();
+  state.attach = [];
+  renderAttachChips();
+  disarmFork();
+  state.turns = [];
+  $('list').classList.add('hidden');
+  $('detail').classList.remove('hidden');
+  $('chat').innerHTML = '';
+  $('d-title').textContent = truncTitle(text);
+  $('d-meta').textContent = (cwd ? shortPath(cwd) + ' · ' : '') + '创建中…';
+  renderDriverChip();
+  ensureModels();
+  pushOptimisticUser(text);
+  scrollBottom(true);
 }
 
 /* ---------------- history pagination (v44/v46): header row + pull gesture ---------------- */
@@ -225,4 +259,4 @@ function renderWaitBanner() {
     : '等待权限确认' + (w.tool ? ' · ' + w.tool : '') + '——在电脑端批准后自动继续';
 }
 
-export { openDetail, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner, loadOlder, updateHistoryPill };
+export { openDetail, openDetailProvisional, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner, loadOlder, updateHistoryPill };
