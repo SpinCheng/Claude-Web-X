@@ -243,7 +243,6 @@ button { font-family: inherit; }
 .tool-out { margin: 6px 0 0; padding: 8px 10px; border-radius: 9px; background: var(--panel2); font: 11px/1.55 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; }
 .tool-out.err { color: var(--err); opacity: .85; }
 .tool-out.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.tool-out-imgs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .flink { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); overflow-wrap: anywhere; }
 .flink:active { opacity: .7; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
@@ -401,10 +400,12 @@ button { font-family: inherit; }
 .attach-chip .ac-x:active { color: var(--err); }
 .cbtn.attach { padding: 0 6px; }
 .bubble.user .bubble-img { display: block; width: min(240px, 100%); border-radius: 10px; margin-top: 6px; cursor: zoom-in; }
-/* ---------- v79：工具输出图片按原图大小、限宽限高 ----------
-   旧规则只匹配 user 气泡内的 img，工具结果图（同名 class、不同容器）无任何
-   约束——高分辨率截图全尺寸溢出。自然尺寸 + max 双限，比例保持，点开灯箱看原样。 */
-.tool-out-imgs { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+/* ---------- v79/v80：工具输出图片按原图大小、限宽限高（比例严格保持） ----------
+   v79 落地后图片被压扁：容器沿用了 v23 的 flex，column 布局下默认
+   align-items:stretch 把图横向拉满容器、再被 max-height 压高——比例撕开。
+   v80：align-items:flex-start，图按自身宽度站，max 双限独立生效（浏览器
+   按更紧者等比缩放）。v23 老 flex-wrap 规则已被完全取代，删除。 */
+.tool-out-imgs { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; }
 .tool-out-imgs .bubble-img { display: block; width: auto; height: auto; max-width: min(100%, 520px); max-height: 300px; border-radius: 10px; cursor: zoom-in; }
 .bubble.user.pending { opacity: .68; } /* optimistic (v21): shown at tap, transcript not written yet */
 /* ---------- v70：乐观泡菊花（8 棒 / 8px / 泡左贴边 / 与泡底对齐） ---------- */

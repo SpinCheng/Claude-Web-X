@@ -387,3 +387,8 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈：过程中（工具结果）的图片太大。根因是选择器覆盖缺口——`.bubble.user .bubble-img` 只管用户气泡附件（240px），工具输出图同 class 不同容器、零约束，按原图分辨率全尺寸渲染。
 - 修法：`.tool-out-imgs .bubble-img` 自然尺寸（width/height auto）+ max-width min(100%,520px) + max-height 300px（比例保持，双限取更紧者）；点图仍进灯箱看原样。用户气泡附件维持 240px 既有裁定。
+
+
+## v80（2026-10-29）v79 追修：工具图比例被压扁
+
+- v79 后图片反而变形：容器同时命中 v23 老 flex-wrap 规则与新 column 规则，column 下默认 align-items:stretch 把图横向拉满容器、max-height 再压高——宽高两轴各自受制，比例撕开。修：align-items:flex-start（图按自身宽站）+ 删除已被完全取代的 v23 老规则。max 双限独立生效时浏览器按更紧者等比缩放，比例严格保持。
