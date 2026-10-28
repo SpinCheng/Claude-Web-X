@@ -293,3 +293,7 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 - 用户截图：Bash 审批卡显示 JSON 转义汤（heredoc 的真实换行全成字面 
 ）。根因：v44 分工里非 Edit 类一律 JSON.stringify(input,null,2)——JSON 字符串转义对 command 类多行文本不可读。v58：input.command 为字符串时直读命令原文（真实换行，pre-wrap 滚动盒，2000 字上限），其余未知工具仍 JSON 兜底。
 - 用户追问「官方价格是 CC 传过来的吗」→ 是（CC 内置价表算好随 cost-state 传回，项目零价表）；两处 sheet-note 文案按此改写（谁算的、怎么来的讲明）。
+
+## v59（2026-10-28）跳最新按钮居中 + 贴合输入栏
+
+- 用户要求：fab 水平居中、与输入框边距减半。静态 136px 改为 JS 锚定 composer 实时 top +12px（rect 为视口坐标，safe-area 自动随行）；queue/attach/fork 行撑高 dock 时由 ResizeObserver 跟随重算——静态魔数在 dock 长高时本来就会重叠。水平居中用 left/right:0 + margin auto（不用 transform，避免与 :active scale 打架）。

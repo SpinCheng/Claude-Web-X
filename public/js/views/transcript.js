@@ -619,6 +619,13 @@ function updateJumpFab() {
   const chat = $('chat');
   const overflow = chat.scrollHeight > chat.clientHeight + 40;
   $('jump').classList.toggle('hidden', !(overflow && !state.atBottom));
+  // v59: horizontally centered, anchored 12px above the composer's LIVE top
+  // edge (queue/attach/fork rows grow the dock; a static offset would
+  // overlap it). rect is viewport-based, so the safe area rides along.
+  const comp = $('composer');
+  if (comp && typeof window !== 'undefined' && window.innerHeight) {
+    $('jump').style.bottom = (window.innerHeight - comp.getBoundingClientRect().top + 12) + 'px';
+  }
 }
 // scroll events arrive asynchronously after content growth; re-check on the
 // next frame so atBottom reflects the post-growth geometry
@@ -718,6 +725,8 @@ function prependTurns(older) {
 
 /* ---------------- wiring ---------------- */
 $('jump').onclick = () => { state.atBottom = true; scrollBottom(true); updateJumpFab(); };
+// dock height changes (queue/attach rows, run-status) move the fab too
+if (typeof ResizeObserver === 'function') new ResizeObserver(() => updateJumpFab()).observe($('composer'));
 $('chat').addEventListener('scroll', () => {
   const el = $('chat');
   state.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
