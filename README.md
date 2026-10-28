@@ -137,6 +137,21 @@ claude-remote/
 - 静态服务只允许 `public/` 目录内文件；配对面板仅同机访问。
 - 本项目面向第三方 API 中转/第三方客户端环境开发，与 Anthropic 官方无关联；在你自己的机器上使用，风险自担。
 
+## 常见问题（Q&A）
+
+**Q：手机会话里 AI 说"没有 Bash/命令执行工具"，但我电脑上 git / bash 明明都能用？**
+
+这是 Claude Code 的 Bash 工具在 Windows 上的已知依赖：它需要**发现 Git Bash**（探测标准安装位置 + 进程 PATH），找不到就整个工具不注册（可在 `~/.claude/debug/*.txt` 看到 `Git Bash not found; BashTool will be unavailable`）。
+
+关键在**环境变量是进程出生时的快照，逐层遗传、从不同步**：你的终端有完整用户 PATH，不代表 bridge 子进程有——bridge 若从精简上下文启动（开机自启、脚本链），它继承的 PATH 可能缺 Git 目录，之后它 spawn 的所有会话都会缺 Bash。
+
+本项目 runner 已内置兜底（v62）：spawn 时自动探测常见 Git 安装位置（hermes、`%LOCALAPPDATA%\Programs\Git`、Program Files 等）并把 `cmd`/`bin` 前置进子进程 PATH。仍中招说明 Git 装在非常规位置，任选其一：
+
+1. **把 Git 的目录加进系统 PATH**（一劳永逸，连桌面客户端直接驱动的会话也受益）；
+2. 在带完整 PATH 的上下文（你的终端）里手动重启一次 bridge。
+
+前提只有一条：机器上得装了 Git for Windows（Bash 工具的硬依赖，与本项目无关）。
+
 ## License
 
 [MIT](LICENSE)（内含 vendored 的 [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) @1.4.4，同为 MIT）
