@@ -430,8 +430,3 @@ miniMd 从"围栏码+行内码+加粗"升级为块级解析：标题/分割线/�
 
 - 用户反馈：点停止后气泡左侧呼吸点仍无限呼吸。根因：停止发生在 CLI 写 user 行之前时，无事件能确认孪生泡，optimistic 永真。
 - 修法：run 帧 end/error 且为本会话时，屏上剩余 optimistic 孪生标记 t.stopped → 呼吸点变红色静态（--err，不动画）；t.optimistic 保持 true（行若真落盘仍可折叠转实）。renderTail(min) 局部重渲。
-
-
-## v90（2026-10-29）P 徽章改 SVG 字形
-
-- v89 的 flex 居中没解决：5.5px 等宽字形光栅化后墨迹相对 em 盒有固有偏移，行盒居中无效。P 改内联 SVG 路径（stem+碗形），几何确定性居中，任意缩放不糊；aria-label=Personal 保留语义。
