@@ -2,12 +2,12 @@
 
 用手机（PWA）远程查看并操控本机 Claude Code 会话（LAN bridge + 免构建 PWA）。
 
-> **手册纪律**：本文件只收录现在时硬约束与固化事实，每次会话整体载入上下文，保持精炼。不写版本号、翻车叙事、时间线——那些进本地 `docs/history.md`（gitignored）。新裁定先蒸馏成一行规则再落笔；条目过时随手删除。
+> **手册纪律**：本文件只收录跨文件硬约束与固化事实，每次会话整体载入，保持精炼。机制细节住在所属模块的文件头注释（改哪个文件先读它），此处不重复。不写版本号、翻车叙事、时间线——那些进本地 `docs/history.md`（gitignored）。新裁定先蒸馏成一行规则再落笔；条目过时随手删除。
 
 ## 架构
 
-- README「架构与消息流」双 mermaid 图。后端 `bridge/`：`server.js` 组装根 → `lib/`（router/wshub/auth/mime/models/**platform**=OS 差异单点，勿在其他模块分支 process.platform）+ `routes/`（sessions/message/attachments/hooks/approvals/pairing）+ `parsers-cc.js`（转录行判定纯函数，有单测）+ `agents.js`（子代理 tracker）+ `titlegen.js`（新会话 LLM 标题）。前端 `public/`：`app.js` 组装根（boot/gate/路由/WS 帧语义）→ `js/`（state/api/ws/md/util）+ `js/views/`（toast/overlays/list/sessops/ctxring/composer/detail + transcript）。composer↔detail、list↔sessops、detail↔ctxring、transcript↔agentview 为函数级循环 import（求值期零交叉）。**滚动三律与 renderTail 不变量在 transcript.js**。
-- 本机细节：`LOCAL.md`；调试时间线：`docs/history.md`（均 gitignored、不入库）。设计稿（`docs/design/`、`docs/mockup-*`）、方案文档、README 截图之外的 docs 资产一律不入库。
+- README「架构与消息流」双 mermaid 图 + 目录树。后端 `bridge/`：`server.js` 组装根 + `lib/`（router/wshub/auth/mime/models/**platform**=OS 差异单点，勿在其他模块分支 process.platform）+ `routes/` + `parsers-cc.js`（转录行判定纯函数，有单测）。前端 `public/` 免构建 vanilla JS：`app.js` 组装根（boot/gate/路由/WS 帧语义）→ `js/` + `js/views/`。函数级循环 import（求值期零交叉）：composer↔detail、list↔sessops、detail↔ctxring、transcript↔agentview。**滚动三律与 renderTail 不变量在 transcript.js 文件头**。
+- 本机细节：`LOCAL.md`；调试时间线：`docs/history.md`（均 gitignored）。docs 里只有 `screenshots/`（README 截图）入库；设计稿（`docs/design/`、`docs/mockup-*`）与方案文档不入库。
 - 测试：`npm test` = 59 单测（parsers/turns/adapter/cost/commands/agents/titlegen）+ 11 e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）。fixture 勿走 bash 内联（反斜杠被吃）；harness 的 api() 头必须合并非替换；harness 停桥必须 `closeAllConnections()` + 等 close 回调——server.close() 不等 keep-alive 排空，Windows 允许双绑 :3799 → 新旧桥竞态应答。
 
 ## 快速开始
@@ -18,27 +18,27 @@ npm install
 npm start          # node bridge/index.js，端口 3742
 ```
 
-手机浏览器打开启动日志里的 URL 输 token；PC 端接管 `node cli/cr.mjs list` → `attach <序号>`（跨平台）；配对面板 `http://localhost:3742/pair`（PC 双栏布局，API 仅同机）可装开机自启（EADDRINUSE 双开保护）。config（`bridge/data/config.json`，gitignored）键：`token`/`port`/`claudePath`/`defaultCwd`/`yolo`/`titleGen`/`notify.ntfyTopic`。
+手机浏览器打开启动日志里的 URL 输 token；PC 端接管 `node cli/cr.mjs list` → `attach <序号>`（跨平台）；配对面板 `http://localhost:3742/pair`（API 仅同机）可装开机自启（EADDRINUSE 双开保护）。config（`bridge/data/config.json`，gitignored）键：`token`/`port`/`claudePath`/`defaultCwd`/`yolo`/`titleGen`/`notify.ntfyTopic`。
 
-## 运行机制
+## 运行机制（跨文件硬规则）
 
 - **消息链路**：`POST /api/sessions/:id/message` → handoff 仲裁 → runner spawn `claude --resume -p --output-format stream-json --verbose`（完成即退，无驻留）。转录实时更新走 adapter 的 fs.watch；run 帧只管生命周期（新会话 id 取自 init 行）。
-- **handoff 仲裁**：转录 8s 内新写入 → 409 `recent-local-write`；PC 持有 claim（cr attach）→ 409 `pc-claim`；自己的活 run 在跑时跳过 mtime 仲裁。
-- **runner**：yolo 默认加 `--dangerously-skip-permissions`；perm=ask 走 `--permission-prompt-tool` + 内联 `--mcp-config`（approve-mcp.mjs 回调手机审批卡，3 分钟超时自动拒；另加 `--permission-prompts host`）；`--model`/`--effort` 直传；busy 入队（≤5，结束 800ms 自动派发；单条 API=快照/删/重排/runnow）；全局并发 ≤4；spawn env 前置探测 git 目录（**Windows BashTool 靠发现 Git Bash 落座**，桥从精简上下文启动会丢 PATH→全部手机会话缺 Bash）。PWA 选择持久化：`cr_model`(+label)/`cr_effort`/`cr_perm`。
+- **handoff 仲裁**：转录 8s 内新写入 → 409 `recent-local-write`；PC 持有 claim（cr attach）→ 409 `pc-claim`；自己的活 run 在跑时跳过 mtime 仲裁（语义细节在 handoff.js）。
+- **runner**：perm=ask 走 `--permission-prompt-tool` + 内联 `--mcp-config`（approve-mcp.mjs 回调手机审批卡，3 分钟超时自动拒）；yolo（默认）加 `--dangerously-skip-permissions`；`--model`/`--effort` 直传。spawn env 前置探测 git 目录——**Windows BashTool 靠发现 Git Bash 落座**，桥从精简上下文启动会丢 PATH → 手机会话全缺 Bash。队列/并发参数见 runner.js。PWA 选择持久化：`cr_model`(+label)/`cr_effort`/`cr_perm`。
 - **附件**：图片走 `--input-format stream-json` stdin 图片块（**stdin 写完必须保持打开**，立即 close 挂死 CLI）；文本类 ≤24KB 内联进 prompt；CLI 对图片消息多注入的 `[Image: source]` user turn 已由 adapter 折叠。
-- **新会话自动标题**：手机新建会话（仅 `runner.start()` 路径，run 带 `newSession` 标记 + spawn 时的 model 串）首跑结束 → `titlegen.js` 一次性 `claude -p`（ctxprobe 同款旗标、45s 超时、无权限旗标）取标题（首条 user + 末条 assistant 文本，各截 1600/1000）→ 走 `appendTitle`+`pinRename` 同手动改名路径；**仅 `titleFallback` 仍在时写入**（落笔前重查——LLM 期间手动改名让位）；PC/fork/resume 会话不触发；失败静默保留截取标题；`-p` 幽灵转录归档进 trash 带重试（adapter 可能晚于 close 发现文件）；cfg `titleGen`=false 关。
+- **标题**：截取自首条 user 文本（记录带 `titleFallback` 标记）。真标题=转录 `custom-title` 行：手动改名与 titlegen 自动标题**共用 `appendTitle`+`pinRename` 写入路径**（行尾无 `\n` 先补；不 bump lastActive；钉防 Desktop 回写）。自动标题：手机新建会话首跑结束由 `titlegen.js` 一次性 `-p` 生成（机制见其文件头；cfg `titleGen`=false 关）。
+- **write-fence**：改名钉只被**活流**（emitAppends=true 的 drain）解除；boot 重放/readTranscript 无权解钉或夺标题。
 - **会话状态** = running（runner 内存）+ lastRun（桥重启即失）+ lastOutcome（转录 system 行推导，持久）。**所有 sessions 帧必须走 `mergedSessions()`**；它携带 `runId`（重载后仍可 cancel）。未注册非 GET 一律 405——新端点必须重启桥才加载。
 - **等待横幅**：Notification hook **只认权限类**消息（"waiting for your input" 每轮必发且无清除时机，认了就常驻）；清除双路=该会话任何 append / Stop hook。
 - **上下文探针**：按 (cwd, modelId) 缓存，跑一次性 `-p /context`；**归档在解析判定之前、成败都执行**。
-- **重命名** = 往转录追加原生 `custom-title` 行（行尾无 `\n` 先补；不 bump lastActive）。**write-fence**：改名钉只被**活流**（emitAppends=true 的 drain）解除；boot 重放/readTranscript 无权解钉或夺标题。
 - **列表交互**：行是真 `<button>`，内嵌交互元素必须用 span（嵌 button 会被 fragment 解析器提出去打碎布局）；右键有选区守卫；**列表行长按不选文本**（`.srow/.pgroup-head` user-select:none，输入框除外）。
 - **审批卡**：Edit/Write/MultiEdit/NotebookEdit 渲染 ±diff，其余 JSON；**必须 createElement/textContent 构建**（模型产物拼 HTML 即 XSS 面）；「本次会话始终允许」→ 内存 Map 按会话放行。
-- **历史分页**：`readTranscript(limit, before)` → `{events,total}`（400 条展示切片，盘上全量）；加载行 `#hist-more` 在 header 下、**必须挂 #chat 外**（renderTail 1:1 不变量）；跟手渐显：f=clamp((64−scrollTop)/64) 直驱行高/透明度/内字位移（**勿加 CSS transition**）；`parseOlderTurns` 纯重放（**勿复用 applyEventToTurns**）；切在轮中间时 mergeBotTurns 缝合；跨页 toolres 先进 `state.orphanToolRes` 暂存、prepend 后回填。
+- **历史分页**：`readTranscript(limit, before)` → `{events,total}`；加载行 `#hist-more` **必须挂 #chat 外**（renderTail 1:1 不变量）；跟手渐显：f=clamp((64−scrollTop)/64) 直驱行高/透明度（**勿加 CSS transition**）；`parseOlderTurns` 纯重放（**勿复用 applyEventToTurns**）；跨页 toolres 先进 `state.orphanToolRes` 暂存、prepend 后回填。
 - **确认弹窗**：禁 window.confirm/alert——一律 `showConfirm({title,body,ok,danger,onOk,onCancel})`（底部 sheet 模态；danger=红钮+焦点落取消侧）。
-- **费用面板**：header 费用文本即入口（珊瑚+变化脉冲）；**零价表设计**（官方无价格 API）：官方口径=cost-state 原值 / 倍率 / 自定义分模型单价；价格偏好存 localStorage 不进桥；桥侧留存 cost-state 的 models map。
-- **子代理直播**：`agents.js` AgentTracker。数据面：`<slug>/<sessionId>/subagents/agent-<agentId>.jsonl`（+`.meta.json`：toolUseId/finished/requestShape 等）实时增量落盘；adapter 递归 watcher 里 `subagents` 路径段**路由进 tracker、绝不进会话体系**（`_ensureSession` 双保险）。归属链：父转录 Agent tool_use 的 id ↔ meta.toolUseId；meta 完成时才写 → 运行期靠 FIFO 派生队列 + 迟到补认领纠偏；完成信号双路（meta `finished` / 父转录 toolres）；boot 重放净零（桥中途重启可恢复）。帧只走订阅者、`api-request*` blob 行永不解析；HTTP `GET /api/sessions/:id/agents/:agentId/events` + messages 附 `agents` 摘要。前端硬规则：帧到达=**就地 patch DOM，不碰 renderTail**（未渲染才走 renderTail）；`#agent-sheet` 气泡复用主视图节点渲染（活期 400ms 去抖重拉）；一切时长=startedAt..finishedAt（**完成态冻结，勿用 Date.now() 滴答**）；直播行 act 的文件路径折 basename、标题截断。
+- **费用面板**：**零价表设计**（官方无价格 API）：官方口径=cost-state 原值 / 倍率 / 自定义分模型单价；价格偏好存 localStorage 不进桥。
+- **子代理直播**：adapter 递归 watcher 里 `subagents` 路径段**路由进 tracker、绝不进会话体系**（`_ensureSession` 双保险）；归属/完成信号/boot 重放机制见 agents.js 文件头。前端硬规则：帧到达=**就地 patch DOM，不碰 renderTail**（未渲染才走 renderTail）；一切时长=startedAt..finishedAt（**完成态冻结，勿用 Date.now() 滴答**）；`#agent-sheet` 气泡复用主视图节点渲染。
 - **产物预览**：锁会话 cwd 内（resolve+不区分大小写前缀校验）+ 扩展白名单 + ≤2MB；html **默认 text/plain**，仅 `render=1` 且 .html/.htm 才 text/html + `CSP: sandbox allow-scripts`；cwd 外不可预览（by design）。全屏预览页 `#html-prev` 统一入口（同源链接/产物文件/附件文本），DOM 嵌在 #detail 内、**必须 `position:fixed; inset:0`**（static 会被 flex 裁成半屏且 z-index 无效；e2e 有几何断言）。iframe 一律 `srcdoc` 注入文本 + `sandbox="allow-scripts"`（**勿加 same-origin**；blob/直连 src 的导航会污染联合会话历史）；关闭只置 `srcdoc=""`、勿再动 src；异源链接不拦（新标签）。history 三裁定：pushState 用唯一 `#hp/N`（相邻同条目 Chromium 静默遍历）；返回钮/ESC **直接 closeHtmlPreview，勿 fire-and-forget back**；手势 back 走 popstate 尽力而为。助手结论 miniMd 渲染后用 `linkifyDom`（DOM 走查、跳过 a/code/pre）生成 `.flink`。
-- **斜杠命令**：`GET /api/sessions/:id/commands` = 内置白名单（`lib/commands.js`；可用性=supportsNonInteractive + `-p` 冒烟实证）+ 自定义命令发现（`~/.claude/commands` 与 `<cwd>/.claude/commands` 递归、子目录 `:` 命名空间、项目覆盖用户）。**派发=普通消息**（composer 组 `/名 参数` 直走消息链路，busy 队列串行；无多命令合并）。**命令块统一框架（勿逐命令打补丁）**，转录行序：caveat user 行（`<local-command-caveat>` 剥空整行折叠，与信封是两条独立行）→ 信封 user 行（归一 `/名 参数`）→ stdout 行（user/system 两种载体、`<local-command-stdout>` 包裹 → `k:'cmdout'` 面板）→ prompt 型命令的展开体 user 行 → goal Stop hook 注入 user 行（前缀 "A session-scoped Stop hook" 折叠）→ assistant 响应。四条硬规则：①stdout 提取必须在 stripReminder **之前**（后者整块删空）；②`_cmdEnv` **武装必须在事件返回处**（函数中段武装会自噬——信封行折叠自己）；③展开体=武装后紧邻的下一条纯文本 user 行折叠，user 载体 stdout 与任何非 user 行**到达即解除武装**（防吞用户真消息）；④展开体检查必须在 stdout/caveat/hook 拦截**之后**。clear 的信封/stdout 落新会话文件、新 sid 走 runner adoption；未知命令=当纯文本发模型。前端：`/` 唤起平铺选单（锚定气泡、无 scrim、不动 history）；点选→单选标签 chip（`.input-line` 内；✕/空框退格整删）。已知缺口待拍板：/clear 派生新会话后不自动跳转。
+- **斜杠命令**：菜单=`GET /api/sessions/:id/commands`（内置白名单 `lib/commands.js`，收录标准=supportsNonInteractive + `-p` 冒烟实证；+ 自定义命令发现，项目覆盖用户）；**派发=普通消息**（composer 组 `/名 参数` 直走消息链路，无多命令合并）。**命令块框架（勿逐命令打补丁）**四条硬规则（转录行序见 parsers-cc.js 注释）：①stdout 提取必须在 stripReminder **之前**（后者整块删空）；②`_cmdEnv` **武装必须在事件返回处**（中段武装自噬——信封行折叠自己）；③展开体=武装后紧邻的下一条纯文本 user 行折叠，user 载体 stdout 与任何非 user 行**到达即解除武装**（防吞用户真消息）；④展开体检查必须在 stdout/caveat/hook 拦截**之后**。clear 的信封/stdout 落新会话文件、新 sid 走 runner adoption；未知命令=当纯文本发模型。已知缺口待拍板：/clear 派生新会话后不自动跳转。
 - 其余功能（导出 MD、改动文件汇总、会话分支、搜索/批量、队列面板）见对应 routes/views 文件头注释。
 
 ## 已实测确认的数据事实（勿再调研）
@@ -101,4 +101,4 @@ npm start          # node bridge/index.js，端口 3742
 
 ## 路线图
 
-P0/P1 已收口（审批 diff、历史分页、always-allow、改动文件总览、导出 MD、费用面板、搜索批量、确认弹窗、品牌化、斜杠命令、子代理直播、新会话自动标题）。**已裁定不做**：锁屏/推送通知。PC 端 CLI 已跨平台化（cli/cr.mjs）。之后 Phase 3（Cowork 数据面）、Phase 4（Cowork 控制面，UIA）。
+**已裁定不做**：锁屏/推送通知。下一步：Phase 3（Cowork 数据面）→ Phase 4（Cowork 控制面，UIA）。
