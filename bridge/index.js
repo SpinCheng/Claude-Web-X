@@ -34,6 +34,7 @@ function loadConfig() {
     claudePath: '', // optional: absolute path to claude.exe; empty = auto-resolve
     defaultCwd: '', // optional: cwd for phone-started sessions; empty = home
     yolo: true, // dispatched turns skip permission checks (headless can't approve)
+    titleGen: true, // new-task titles via a throwaway -p summary call (v115)
   };
   if (!cfg) {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaults, null, 2));

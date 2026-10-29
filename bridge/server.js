@@ -25,6 +25,7 @@ import * as routesHooks from './routes/hooks.js';
 import * as routesAttachments from './routes/attachments.js';
 import * as routesSessions from './routes/sessions.js';
 import * as routesMessage from './routes/message.js';
+import { TitleGen } from './titlegen.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -35,6 +36,8 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR };
 
   const router = createRouter();
+  // v115: LLM auto-title for phone-created sessions (cfg.titleGen=false off)
+  const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false });
   routesPairing.register(router, ctx);     // panel first: same-machine, no token
   routesApprovals.register(router, ctx);
   routesHooks.register(router, ctx);
@@ -78,6 +81,11 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
       handoff.phoneRunEnded(u.sessionId);
       hub.denyAllForRun(u.runId, 'run ended');
     }
+    // v115: first run of a phone-created session ended -> ask the model for a
+    // real title instead of the 24-char prompt truncation (titlegen guards:
+    // once per id, only while the record still shows the truncation fallback,
+    // re-checked at write time so a concurrent manual rename wins)
+    if (u.state === 'end' && u.newSession && u.sessionId) titlegen.maybeTitle(u.sessionId, u.model || '');
     hub.broadcast({ type: 'run', ...u });
     hub.broadcastSessionsSoon();
   });

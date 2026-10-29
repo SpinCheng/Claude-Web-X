@@ -14,7 +14,7 @@ npm install
 npm start          # node bridge/index.js，端口 3742
 ```
 
-手机浏览器打开启动日志里的 URL 输 token；PC 端接管 `node cli/cr.mjs list` → `attach <序号>`（跨平台）；配对面板可装开机自启（EADDRINUSE 双开保护）。config（`bridge/data/config.json`，gitignored）键：`token`/`port`/`claudePath`/`defaultCwd`/`yolo`/`notify.ntfyTopic`。
+手机浏览器打开启动日志里的 URL 输 token；PC 端接管 `node cli/cr.mjs list` → `attach <序号>`（跨平台）；配对面板可装开机自启（EADDRINUSE 双开保护）。config（`bridge/data/config.json`，gitignored）键：`token`/`port`/`claudePath`/`defaultCwd`/`yolo`/`titleGen`/`notify.ntfyTopic`。
 
 ## 运行机制速记
 
@@ -27,7 +27,7 @@ npm start          # node bridge/index.js，端口 3742
 - **子代理直播（v112 方案A）**：`bridge/agents.js` AgentTracker。数据面：`<slug>/<sessionId>/subagents/agent-<agentId>.jsonl`（+`.meta.json`：toolUseId/description/finished/requestShape）实时增量落盘，adapter 递归 watcher 里的 `subagents` 路径段**路由进 tracker、绝不进会话体系**（幽灵会话坑已堵，`_ensureSession` 双保险）。归属链：父转录 Agent tool_use 的 id ↔ meta.toolUseId；meta 在完成时才写 → 运行期靠 **FIFO 派生队列**（文件创建序=spawn 序）+ **迟到补认领**（`_adoptUnmatched`：文件事件跑赢父转录 drain 时反向配对），meta 落地后纠偏。完成信号双路：meta `finished:true` / 父转录 toolres（CLI 被杀也兜得住）；boot 重放 use+res 净零、只留真 pending（桥中途重启可恢复归属）。帧 `agent {id, agentId, toolUseId, desc, state, steps, act, startedAt}` 只走订阅者、`api-request*` blob 行永不解析。HTTP：`GET /api/sessions/:id/agents/:agentId/events`（同一 applyLine，气泡数据）+ messages 响应附带 `agents` 摘要（历史会话的完成态节点免帧即有「全文」入口）。前端：Agent/Task tool 节点=「代理」badge+desc 标题+**直播行（.agent-live，节点头下、折叠体外）**+活点呼吸；直播行/完成态 chip 点击开 `#agent-sheet` 气泡（BUBBLES 注册、scrim/back 通用关法）；帧到达=**就地 patch DOM，不碰 renderTail**（未渲染才走 renderTail(i+1)）；气泡=renderStepsInto 复用主视图节点渲染，活期 400ms 去抖重拉、底部跟随；transcript↔agentview 函数级循环 import（同 composer↔detail 先例）。**v114 补两裁定**：①**计时冻结**——tracker 记 `finishedAt`（meta/toolres 双路置位），帧/摘要全链路携带；前端一切时长=startedAt..finishedAt（完成态永远冻结，气泡头/节点 dur 曾用 Date.now() 滴答不停，实测翻车会话 884c3a2a 四个后台 agent）；②**设计稿对齐**——节点头 dur=活态时长（fallback 无状态时才显工具名）、后台徽章=meta.requestShape（实测 background 语义确认）、直播行=`↳ act · 第 N 步`+时长+右缘「全文 ›」（act 的文件路径**折 basename**，勿全路径刷屏）、标题截断。
 - **等待横幅**：Notification hook **只认权限类**消息（"waiting for your input" 每轮必发且无清除时机，认了就常驻）；清除双路=该会话任何 append / Stop hook。
 - **上下文探针**：按 (cwd, modelId) 缓存，跑一次性 `-p /context`；**归档在解析判定之前、成败都执行**。
-- **重命名** = 往转录追加原生 `custom-title` 行（行尾无 `\n` 先补；不 bump lastActive）。**write-fence**：改名钉只被**活流**（emitAppends=true 的 drain）解除；boot 重放/readTranscript 无权解钉或夺标题。
+- **重命名** = 往转录追加原生 `custom-title` 行（行尾无 `\n` 先补；不 bump lastActive）。**write-fence**：改名钉只被**活流**（emitAppends=true 的 drain）解除；boot 重放/readTranscript 无权解钉或夺标题。**新会话自动标题（v115，titlegen.js）**：手机新建会话（仅 `runner.start()` 路径，run 带 `newSession`+spawn 时的 model 串）首跑结束 → 一次性 `claude -p`（ctxprobe 同款旗标、45s 超时、无权限旗标）取标题（首条 user + 末条 assistant 文本各截 1600/1000）→ 走 appendTitle+pinRename 同手动改名路径；**仅 `titleFallback` 仍在时写入**（落笔前重查——LLM 期间手动改名让位；PC/fork/resume 会话不触发；失败静默保留截取标题）；`-p` 幽灵转录归档进 trash **带重试**（adapter 可能晚于 close 发现文件；ctxprobe 无重试是潜在泄漏点）；cfg `titleGen`=false 关。
 - **列表交互**：行是真 `<button>`，内嵌交互元素必须用 span（嵌 button 会被 fragment 解析器提出去打碎布局）；右键有选区守卫；**列表行长按不选文本**（v97 裁定反转 v35——`.srow/.pgroup-head` user-select:none，输入框除外）。
 - **审批卡**：Edit/Write/MultiEdit/NotebookEdit 渲染 ±diff，其余 JSON；**必须 createElement/textContent 构建**（模型产物拼 HTML 即 XSS 面）；「本次会话始终允许」→ 内存 Map 按会话放行。
 - **历史分页**：`readTranscript(limit, before)` → `{events,total}`（400 条展示切片，盘上全量）；加载行 `#hist-more` 在 header 下、**必须挂 #chat 外**（renderTail 1:1 不变量）；跟手渐显：f=clamp((64−scrollTop)/64) 直驱行高/透明度/内字位移（**勿加 CSS transition**）；`parseOlderTurns` 纯重放（**勿复用 applyEventToTurns**）；切在轮中间时 mergeBotTurns 缝合；跨页 toolres 先进 `state.orphanToolRes` 暂存、prepend 后回填。

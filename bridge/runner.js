@@ -165,7 +165,15 @@ export class Runner extends EventEmitter {
   // stream's init line and reported via an 'update' event.
   start(text, cwd, opts = {}) {
     if (!text) return { error: 'bad-request' };
-    return this._spawnRun([], text, cwd || os.homedir(), null, opts.perm || 'auto', opts.model || '', opts.effort || '');
+    const r = this._spawnRun([], text, cwd || os.homedir(), null, opts.perm || 'auto', opts.model || '', opts.effort || '');
+    // v115: mark phone-created sessions so titlegen fires on the first run's
+    // end (set post-spawn: the immediate 'running' frame predates it, the
+    // 'end' frame - the one titlegen listens for - always carries it)
+    if (!r.error) {
+      const run = this.runs.get(r.runId);
+      if (run) { run.newSession = true; run.model = opts.model || ''; }
+    }
+    return r;
   }
 
   // v94: a CLI process can linger after finishing its turn when the Stop
@@ -358,6 +366,10 @@ export class Runner extends EventEmitter {
       cancelled: run.cancelled,
       startedAt: run.startedAt,
       forkFrom: run.forkFrom || undefined,
+      // v115 titlegen: new-session runs ride their spawn model along (the
+      // exact CLI-proven --model string; other runs don't carry it)
+      newSession: run.newSession || undefined,
+      model: (run.newSession && run.model) || undefined,
       stderrTail: run.state === 'error' || (run.state === 'end' && run.exitCode !== 0)
         ? run.stderrTail : undefined,
     });
