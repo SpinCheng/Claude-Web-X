@@ -212,6 +212,19 @@ initWs({
   onOpen: () => fetchPendingApprovals(), // catch cards missed while disconnected
   sessions: (d) => {
     state.sessions = d.sessions || [];
+    // v100: reconcile client run memory against bridge truth - a run-end
+    // frame missed (WS drop, bridge restart, page was on the list page and
+    // never subscribed) used to leave state.runs[id]='running' forever, and
+    // the lamp reads it FIRST. The bridge is the authority: demote.
+    const live = new Set((d.sessions || []).filter((s) => s.running).map((s) => s.id));
+    for (const id of Object.keys(state.runs)) {
+      const r = state.runs[id];
+      // 10s grace: a just-started run can race a stale sessions frame (the
+      // frame was snapshotted before the spawn registered)
+      if (!live.has(id) && r.state === 'running' && Date.now() - (r.startedAt || 0) > 10_000) {
+        r.state = 'ended';
+      }
+    }
     state.waits = {};
     for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
     renderList();
