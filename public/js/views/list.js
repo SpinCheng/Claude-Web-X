@@ -244,8 +244,17 @@ async function runBatchDelete(ids) {
 /* ---------------- wiring ---------------- */
 $('list-search').addEventListener('input', function () {
   state.listQuery = this.value;
+  $('search-clear').classList.toggle('hidden', !this.value);
   renderList();
 });
+$('search-clear').onclick = () => {
+  const i = $('list-search');
+  i.value = '';
+  state.listQuery = '';
+  $('search-clear').classList.add('hidden');
+  renderList();
+  i.focus();
+};
 $('list-manage').onclick = () => setBatch(!state.batchMode);
 $('b-done').onclick = () => setBatch(false);
 $('b-del').onclick = batchDelete;
