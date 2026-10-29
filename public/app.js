@@ -160,6 +160,11 @@ function handleAppend(d) {
   for (const ev of d.events || []) {
     const ef = applyEventToTurns(ev);
     if (ef != null && ef < editStart) editStart = ef;
+    // title live-update, path #2: the sessions-frame path (renderMeta) is the
+    // primary, but a dropped/failed frame would leave the open detail's
+    // header stale until re-entry - the append event carries the title itself
+    // and only reaches the subscriber looking at this page
+    if (ev.k === 'title' && ev.title) $('d-title').textContent = ev.title;
   }
   // a stop marker means the turn ENDED (any driver): close the live view so
   // the finished turn re-renders collapsed

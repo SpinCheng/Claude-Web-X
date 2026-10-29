@@ -51,7 +51,7 @@ async function previewArtifact(winPath) {
   const url = '/api/sessions/' + encodeURIComponent(state.currentId) + '/preview?p=' + encodeURIComponent(winPath);
   try {
     const r = await fetch(url, { headers: auth() });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) { const err = new Error('HTTP ' + r.status); err.status = r.status; throw err; }
     const name = winPath.split(/[\\/]/).pop();
     if (ART_IMG.test(winPath)) {
       const blob = await r.blob();
@@ -66,7 +66,15 @@ async function previewArtifact(winPath) {
       else openHtmlPreview({ name, srcText: text.slice(0, 128 * 1024), sourceOnly: true });
     }
   } catch (e) {
-    toast('预览失败：' + ((e && e.message) || '文件不可用'));
+    // status-specific reasons - "HTTP 403" tells the user nothing about WHY
+    // a visible link refused to open
+    const why = {
+      403: '在会话目录外，不可预览',
+      404: '文件不存在（或已被删除）',
+      413: '超过 2MB 预览上限',
+      415: '该类型不支持预览',
+    }[e.status] || ((e && e.message) || '文件不可用');
+    toast('预览失败：' + why);
   }
 }
 

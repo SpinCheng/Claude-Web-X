@@ -1,5 +1,5 @@
 // test/e2e/run-all.mjs - sequential smoke suite runner: `npm test`
-const SCENARIOS = ['timeline', 'markdown', 'folds', 'preview', 'api', 'paged', 'list', 'composer', 'cmdmenu', 'sessops', 'agents', 'navback'];
+const SCENARIOS = ['timeline', 'markdown', 'folds', 'preview', 'api', 'paged', 'list', 'composer', 'cmdmenu', 'sessops', 'agents', 'navback', 'titlelive'];
 
 let failed = 0;
 for (const name of SCENARIOS) {
