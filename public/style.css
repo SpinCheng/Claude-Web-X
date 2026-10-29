@@ -146,7 +146,7 @@ button { font-family: inherit; }
 /* v98: custom clear icon (native one is suppressed above) */
 .search-clear { display: none; flex: none; color: var(--faint); cursor: pointer; padding: 4px; border-radius: 50%; }
 .search-clear:active { color: var(--fg); background: var(--panel2); }
-.search-clear.on { display: inline-flex; }
+.search-clear:not(.hidden) { display: inline-flex; }
 .icon-btn.active { color: var(--acc); }
 .srow .ck { flex: none; width: 21px; height: 21px; margin-right: 1px; border-radius: 50%; border: 1.5px solid var(--line); color: #fff; display: inline-flex; align-items: center; justify-content: center; transition: background .12s, border-color .12s; }
 .srow .ck.on { background: var(--acc); border-color: var(--acc); }
