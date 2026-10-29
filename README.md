@@ -119,12 +119,6 @@ claude-web/
 
 本工程直接消费 CLI 的行为与数据格式（转录 JSONL 字段、旗标名、hooks 回调），**与 CLI 版本强耦合**——CLI 升级后若异常，可在 `bridge/data/config.json` 设 `claudePath` 钉住版本。
 
-## 路线图
-
-Phase 0-2 完成（环境勘探 → 只读 → 全双工 + 产品化 PWA）。
-P0/P1 功能闭环已收口（审批 diff、历史分页、always-allow、改动文件总览、导出、费用面板、搜索批量、自定义确认弹窗、品牌化）。
-后续：斜杠命令面板、配额/速率显示、离线 PWA shell、检查点回滚；之后是 Cowork 数据面与控制面。
-
 ## 注意
 
 - Windows 下写 `.ps1` 必须纯 ASCII（PS 5.1 按 GBK 解析）；JS/MD 无此限制
