@@ -768,4 +768,4 @@ window.addEventListener('resize', updateJumpFab);
 export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderAllTurns, renderTurn, renderTail, updateJumpFab, scrollBottom,
   pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns, fileChanges,
-  pairToolResults, drainOrphanRes, mergeBotTurns };
+  pairToolResults, drainOrphanRes, mergeBotTurns, copyText };

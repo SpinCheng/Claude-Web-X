@@ -17,6 +17,7 @@ import { auth, api } from '../api.js';
 import { toast } from './toast.js';
 import { openBubble, closeBubble, showConfirm } from './overlays.js';
 import { renderList } from './list.js';
+import { copyText } from './transcript.js';
 
 const I = {
   stop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
@@ -25,6 +26,7 @@ const I = {
   down: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
   doc: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>',
   back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+  copy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
 };
 
 let renameId = '';
@@ -66,6 +68,7 @@ function openRowActions(id) {
   // those surface as the wait banner instead)
   const running = (state.runs[id] || {}).state === 'running' || !!s.running;
   if (running) list.appendChild(actRow(I.stop, '停止运行', '中断这台手机发起的运行', 'warn', () => stopFromList(id)));
+  list.appendChild(actRow(I.copy, '复制名称 / 路径 / ID', '写入剪贴板（三行）', '', () => copySessionInfo(id)));
   list.appendChild(actRow(I.pencil, '重命名', '修改会话显示名', '', () => openRename(id)));
   list.appendChild(actRow(I.down, '导出 Markdown', '下载完整记录或结论摘要', '', () => openExportScope(id)));
   list.appendChild(actRow(I.trash, '删除会话', '转录移入电脑回收站，可找回', 'danger', () => deleteFromList(id)));
@@ -82,6 +85,48 @@ function actRow(icon, label, sub, tone, fn) {
   el.querySelector('.o-sub').textContent = sub;
   el.onclick = fn;
   return el;
+}
+
+/* ---------------- copy (v95): name / cwd / id in one shot ---------------- */
+function copySessionInfo(id) {
+  const s = state.sessions.find((x) => x.id === id);
+  if (!s) return;
+  const info = [s.title || s.id.slice(0, 8), s.cwd || s.project || '', s.id].join('\n');
+  closeBubble('row-actions');
+  copyText(info);
+  toast('已复制：名称、路径、会话 ID');
+}
+
+
+/* ---------------- group copy (v95): project name / path ---------------- */
+function openGroupCopy(g) {
+  closeBubble('row-actions');
+  // lightweight inline bubble anchored as a bottom bubble (same overlay
+  // machinery feel); built on the fly, removed on dismissal
+  const ov = document.createElement('div');
+  ov.className = 'overlay bub';
+  ov.id = 'group-copy';
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet bubble act-bubble';
+  const title = document.createElement('div');
+  title.className = 'act-title';
+  title.textContent = g.label;
+  const list = document.createElement('div');
+  list.className = 'act-list';
+  const mk = (label, sub, text) => {
+    const row = actRow(I.copy, label, sub, '', () => {
+      copyText(text);
+      toast('已复制：' + label);
+      ov.remove();
+    });
+    list.appendChild(row);
+  };
+  mk('复制项目名称', '目录的显示名', g.label);
+  mk('复制完整路径', g.path, g.path);
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+  sheet.append(title, list);
+  ov.appendChild(sheet);
+  document.body.appendChild(ov);
 }
 
 /* ---------------- stop ---------------- */
