@@ -13,7 +13,7 @@ import { toast } from './toast.js';
 // row-actions/rename-modal (v34) live on the LIST page but share the same
 // machinery: open hides siblings, scrim click + system back close.
 // effort-sheet is gone since v36 (levels merged into the model sheet)
-const BUBBLES = ['ctx-sheet', 'model-sheet', 'perm-sheet', 'row-actions', 'rename-modal', 'cost-sheet'];
+const BUBBLES = ['ctx-sheet', 'model-sheet', 'perm-sheet', 'row-actions', 'rename-modal', 'cost-sheet', 'agent-sheet'];
 function openBubble(id) {
   // switching bubbles reuses the open state; no history churn
   for (const b of BUBBLES) {
@@ -24,48 +24,48 @@ function openBubble(id) {
 }
 function closeBubble(id) {
   $(id).classList.add('hidden');
+  if (id === 'agent-sheet') state.agentView = null; // v112: drop the bubble's binding
 }
 // tap the scrim (the overlay itself, not the bubble) to dismiss
 for (const id of BUBBLES) {
   $(id).addEventListener('click', (e) => { if (e.target === $(id)) closeBubble(id); });
 }
 
-/* ---------- lightbox / text file preview ---------- */
+/* ---------- lightbox ---------- */
 function openLightbox(src) {
   $('lightbox-img').src = src;
   $('lightbox').classList.remove('hidden');
 }
 function openFilePreview(a) {
   if (!a.file) return;
-  $('fp-name').textContent = a.name;
-  $('fp-body').textContent = '加载中…';
-  $('file-prev').classList.remove('hidden');
   fetch('/files/' + a.file.split('/').map(encodeURIComponent).join('/'), { headers: auth() })
-    .then((r) => r.text())
-    .then((t) => { $('fp-body').textContent = t.slice(0, 32 * 1024); })
-    .catch(() => { $('fp-body').textContent = '（读取失败）'; });
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then((t) => openHtmlPreview({ name: a.name, srcText: t, sourceOnly: true }))
+    .catch(() => toast('读取失败'));
 }
 
-/* ---------- artifact preview (v23): linked Windows paths in tool text ---------- */
+/* ---------- artifact preview (v23) ---------- */
+const ART_HTML = /\.html?$/i;
 let artPreviewUrl = '';
 async function previewArtifact(winPath) {
   const url = '/api/sessions/' + encodeURIComponent(state.currentId) + '/preview?p=' + encodeURIComponent(winPath);
   try {
     const r = await fetch(url, { headers: auth() });
     if (!r.ok) throw new Error('HTTP ' + r.status);
+    const name = winPath.split(/[\\/]/).pop();
     if (ART_IMG.test(winPath)) {
       const blob = await r.blob();
       if (artPreviewUrl) URL.revokeObjectURL(artPreviewUrl);
       artPreviewUrl = URL.createObjectURL(blob);
       openLightbox(artPreviewUrl);
     } else {
-      $('fp-name').textContent = winPath.split(/[\\/]/).pop();
-      $('fp-body').textContent = '加载中…';
-      $('file-prev').classList.remove('hidden');
-      $('fp-body').textContent = (await r.text()).slice(0, 64 * 1024);
+      const text = await r.text();
+      // v105/v107: html renders fullscreen in-app (srcdoc, opaque origin);
+      // everything else opens the page in source mode
+      if (ART_HTML.test(winPath)) openHtmlPreview({ name, text, srcText: text.slice(0, 128 * 1024) });
+      else openHtmlPreview({ name, srcText: text.slice(0, 128 * 1024), sourceOnly: true });
     }
   } catch (e) {
-    $('file-prev').classList.add('hidden');
     toast('预览失败：' + ((e && e.message) || '文件不可用'));
   }
 }
@@ -211,16 +211,20 @@ function fetchPendingApprovals() {
 
 /* ---------- wiring ---------- */
 $('lightbox').onclick = () => { $('lightbox').classList.add('hidden'); $('lightbox-img').src = ''; };
-$('file-prev').onclick = (e) => { if (e.target.id === 'file-prev') $('file-prev').classList.add('hidden'); };
 // keyboard escape route for the click-to-close overlays (v27 a11y); never
 // hijacks Esc while composing (textarea keeps it for IME cancel etc.)
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const t = e.target;
   if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) return;
-  for (const id of ['lightbox', 'file-prev', 'row-actions', 'rename-modal']) {
+  for (const id of ['lightbox', 'html-prev', 'row-actions', 'rename-modal']) {
     const el = $(id);
-    if (el && !el.classList.contains('hidden')) { el.classList.add('hidden'); if (id === 'lightbox') $('lightbox-img').src = ''; return; }
+    if (el && !el.classList.contains('hidden')) {
+      if (id === 'lightbox') $('lightbox-img').src = '';
+      if (id === 'html-prev') { closeHtmlPreview(); return; }
+      el.classList.add('hidden');
+      return;
+    }
   }
 });
 $('ap-allow').onclick = () => respondApproval('allow');
@@ -265,5 +269,58 @@ function showConfirm(o) {
   (o.danger ? $('cf-cancel') : ok).focus({ preventScroll: true });
 }
 
-export { BUBBLES, openBubble, closeBubble, showConfirm, openLightbox, openFilePreview, previewArtifact,
+/* ---------- v104/v105 in-app preview page: same-origin links AND artifact
+   files open full-screen inside the PWA; iframe is allow-scripts-only
+   (opaque origin), never same-origin */
+let hpSrcText = '';
+let hpSeq = 0;
+function setHpView(run) {
+  $('hp-tab-run').classList.toggle('on', run);
+  $('hp-tab-src').classList.toggle('on', !run);
+  $('hp-frame').classList.toggle('hidden', !run);
+  $('hp-src').classList.toggle('hidden', run);
+}
+async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?}
+  // v107: content is ALWAYS injected via srcdoc. Never set iframe.src here -
+  // blob/direct src navigations append entries to the joint session history,
+  // so a back press silently steps iframe state and the close-on-back wiring
+  // dies (measured: every src change grows history.length). srcdoc never
+  // navigates; sandbox allow-scripts keeps the doc opaque-origin.
+  if (o.text === undefined && o.url) {
+    try {
+      const r = await fetch(o.url, { headers: auth() });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const t = await r.text();
+      o.text = t;
+      if (o.srcText === undefined) o.srcText = t.slice(0, 128 * 1024);
+    } catch (e) {
+      toast('页面加载失败：' + ((e && e.message) || ''));
+      return;
+    }
+  }
+  $('hp-title').textContent = o.name || o.url || '';
+  hpSrcText = o.srcText !== undefined ? o.srcText : '';
+  $('hp-src').textContent = hpSrcText || '（空）';
+  $('hp-tabs').classList.toggle('hidden', !!o.sourceOnly);
+  const f = $('hp-frame');
+  f.removeAttribute('src');
+  f.srcdoc = o.text !== undefined ? o.text : '';
+  setHpView(!o.sourceOnly);
+  $('html-prev').classList.remove('hidden');
+  hpSeq++;
+  history.pushState({ cr: 'htmlprev', n: hpSeq }, '', '#hp/' + hpSeq);
+}
+function closeHtmlPreview() {
+  $('html-prev').classList.add('hidden');
+  $('hp-frame').srcdoc = '';
+  hpSrcText = '';
+}
+// direct close only: a fire-and-forget history.back() here races the next
+// open's pushState (the traversal can commit late and pop the NEW entry);
+// stale htmlprev entries left behind are swallowed by the popstate branch
+$('hp-back').onclick = () => closeHtmlPreview();
+$('hp-tab-run').onclick = () => setHpView(true);
+$('hp-tab-src').onclick = () => setHpView(false);
+
+export { BUBBLES, openBubble, closeBubble, showConfirm, openLightbox, openFilePreview, previewArtifact, openHtmlPreview, closeHtmlPreview,
   queueApproval, showApproval, fetchPendingApprovals };

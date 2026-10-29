@@ -42,7 +42,13 @@ export async function bootBridge() {
   await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
   return {
     tmp, store, adapter, runner, handoff, server,
-    stop: async () => { adapter.stop(); server.close(); await sleep(300); fs.rmSync(tmp, { recursive: true, force: true }); },
+    stop: async () => {
+      adapter.stop();
+      server.closeAllConnections(); // keep-alive sockets would otherwise hold the port
+      await new Promise((r) => server.close(() => r())); // port fully released before tmp removal
+      await sleep(100);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    },
   };
 }
 

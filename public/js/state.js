@@ -42,6 +42,10 @@ export const state = {
   histLoading: false, // v44: an older-page fetch is in flight
   orphanToolRes: new Map(), // v46: toolres whose tool_use is on an older page
                             // (pagination split) - parked here until it loads
+  agents: {},          // v112: toolUseId -> {agentId, desc, agentType, bg,
+                       // finished, state, steps, act, startedAt} (agent frames
+                       // + the messages fetch's agents summary)
+  agentView: null,     // v112: the open agent bubble {toolUseId, agentId}
 };
 
 export { CLOSED_KEY };

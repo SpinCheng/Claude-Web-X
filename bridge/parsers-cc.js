@@ -40,6 +40,10 @@ export function applyLine(id, obj, patch, events, rec) {
     // system lines (e.g. a leaked ctxprobe sidecar) must still group by its
     // real project instead of falling back to the workspace slug
     if (obj.cwd) patch.cwd = obj.cwd;
+    // v114 command-block state: an envelope line arms "next plain user line is
+    // the expanded prompt body". Any NON-user line disarms - a local-type
+    // command (no body) must not swallow the human's next real message.
+    if (obj.type !== 'user' && rec) rec._cmdEnv = false;
     switch (obj.type) {
       case 'user': {
         // compaction continuation (2.1.308): the CLI injects the resume
@@ -136,12 +140,40 @@ export function applyLine(id, obj, patch, events, rec) {
           }
         }
         if (!text && !images.length) return null;
+        // v111: a command's stdout arrives as its OWN user line wrapped in
+        // <local-command-stdout> (2.1.308, e.g. /model "Set model to ...") -
+        // surface it as the command's visible result. Must run BEFORE
+        // stripReminder, which blanks the wrapper entirely.
+        if (!images.length) {
+          const so = text.match(/^\s*<local-command-stdout>([\s\S]*?)<\/local-command-stdout>\s*$/);
+          // a stdout follower proves this is a local-type command (no expand
+          // body) - disarm so the human's next message is never swallowed
+          if (so && so[1].trim()) {
+            if (rec) rec._cmdEnv = false;
+            return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
+          }
+        }
+        const rawText = text;
         text = stripReminder(text);
         if (!text && !images.length) return null;
         // CLI-injected chatter: when an image is attached the CLI adds its own
         // user turn pointing the model at the extracted temp file - not human
         // content, fold it out of the timeline
         if (!images.length && /^\[Image: source: .+\]\s*$/.test(text)) return null;
+        // v111: /goal arms a session Stop hook and injects its directive as a
+        // user line - machine text aimed at the model, never a human bubble.
+        // The model acknowledges the goal in its reply, so nothing is lost.
+        if (/^A session-scoped Stop hook is now active with condition:/.test(text)) return null;
+        // v114: prompt-type commands (custom .md / init / security-review)
+        // write their EXPANDED template body as the next plain user line -
+        // machine-expanded text for the model, never a second human bubble.
+        // Armed by the envelope line right before (rec._cmdEnv survives drain
+        // batch boundaries). MUST run after the stdout/caveat/hook checks: a
+        // local-type command's first follower is its stdout line.
+        if (rec && rec._cmdEnv && !images.length) {
+          rec._cmdEnv = false;
+          return null; // expanded body folds away; the bubble shows /name args
+        }
         if (patch.est) patch.est.prose += text.length;
         // fallback title from first human message only; explicit custom-title wins.
         // Guard against same-batch overwrites (store not yet updated mid-batch).
@@ -161,6 +193,10 @@ export function applyLine(id, obj, patch, events, rec) {
         }
         const ev = { k: 'user', ts: obj.timestamp || '', text };
         if (images.length) ev.images = images;
+        // v114: arm at the EXIT - raw tag soup normalized into a clean
+        // /name args means this line IS an envelope; the NEXT plain user
+        // line (if nothing else intervenes) is its expanded prompt body
+        if (rawText !== text && /^\/[^\/\s]/.test(text) && rec) rec._cmdEnv = true;
         return ev;
       }
       case 'assistant': {
@@ -239,6 +275,10 @@ export function applyLine(id, obj, patch, events, rec) {
         return { k: 'stats', ts: '', stats };
       }
       case 'system': {
+        if (obj.subtype === 'local_command') {
+          const so = String(obj.content || '').match(/^\s*<local-command-stdout>([\s\S]*?)<\/local-command-stdout>\s*$/);
+          if (so && so[1].trim()) return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
+        }
         if (STOP_SUBTYPES.has(obj.subtype)) {
           patch.status = 'idle';
           if (OUTCOME_SUBTYPES[obj.subtype]) patch.lastOutcome = OUTCOME_SUBTYPES[obj.subtype];
@@ -277,5 +317,6 @@ function stripReminder(text) {
     .replace(/<command-message>[\s\S]*?<\/command-message>/g, '')
     .replace(/<command-args>[\s\S]*?<\/command-args>/g, '')
     .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
     .trim();
 }

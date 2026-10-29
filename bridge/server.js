@@ -65,6 +65,8 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     // transcript writing again = the PC answered the prompt; drop the banner
     hub.waitClear(a.id);
   });
+  // v112: live subagent summary frames (routed to session subscribers)
+  adapter.on('agent', (f) => hub.broadcast(f));
 
   // ------- wire runner events (Phase 2) -------
   runner.on('update', (u) => {

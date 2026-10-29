@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>斜杠命令选单 · 设计稿 v3</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #1D1C1A; --panel: #26241F; --panel2: #2E2B26; --raise: #36332D;
+  --ink-hi: rgba(255, 250, 240, .045);
+  --fg: #F2EDE3; --dim: #A79F92; --faint: #6E675D; --line: #36332D;
+  --acc: #D97757; --acc-strong: #E8926F; --acc-tint: rgba(217, 119, 87, .14);
+  --ok: #8FB98D; --warn: #D9A262;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --sh-2: 0 2px 10px rgba(12, 10, 8, .35), inset 0 1px 0 var(--ink-hi);
+  --sh-3: 0 -6px 28px rgba(12, 10, 8, .45);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body { background: #141311; color: var(--fg); font: 15px/1.55 var(--sans); -webkit-font-smoothing: antialiased; padding: 20px 14px 60px; }
+.hidden { display: none !important; }
+
+/* ---------- 稿面外壳（非 app 视觉） ---------- */
+.mock-head { max-width: 640px; margin: 0 auto 14px; }
+.mock-title { font-size: 17px; font-weight: 650; }
+.mock-sub { font-size: 12px; color: var(--dim); margin-top: 3px; }
+.mock-sub .mono { font-size: 11px; }
+.toggles { max-width: 640px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.tgroup { display: flex; align-items: center; gap: 8px; }
+.tlabel { font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .05em; }
+.tbtn { font: 12px var(--sans); color: var(--dim); background: var(--panel); border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: background .12s, color .12s; }
+.tbtn.on { background: var(--acc-tint); color: var(--acc-strong); font-weight: 600; }
+.steps { max-width: 640px; margin: 0 auto 10px; font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .03em; }
+.steps b { color: var(--dim); font-weight: 600; }
+
+/* ---------- 手机画框 ---------- */
+.phone { width: min(100vw - 4px, 400px); height: min(780px, 84dvh); margin: 0 auto; background: var(--bg); border: 1px solid var(--raise); border-radius: 26px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.chat { flex: 1; overflow-y: auto; padding: 16px 14px; overscroll-behavior: contain; }
+.chat-scrim { position: absolute; inset: 0 0 0 0; background: rgba(10,9,7,.5); z-index: 5; opacity: 0; pointer-events: none; transition: opacity .18s; }
+.phone.sheet-mode .chat-scrim { opacity: 1; pointer-events: auto; }
+
+/* 转录假内容（近似 app 语言） */
+.u-bub { margin-left: auto; max-width: 82%; background: var(--panel2); border-radius: 16px 16px 4px 16px; padding: 10px 13px; font-size: 14.5px; line-height: 1.45; width: fit-content; }
+.a-node { margin-top: 12px; background: var(--panel); border-radius: 14px; padding: 11px 13px; box-shadow: var(--sh-2); }
+.a-head { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .04em; }
+.a-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--acc); flex: none; }
+.a-body { margin-top: 7px; font-size: 13.5px; color: var(--dim); }
+.sys-note { margin: 12px auto 0; width: fit-content; font-family: var(--mono); font-size: 10.5px; color: var(--warn); background: var(--panel); border-radius: 999px; padding: 5px 13px; letter-spacing: .03em; }
+
+/* ---------- 底部栈：选单 + composer ---------- */
+.bottom-stack { flex: none; position: relative; z-index: 6; display: flex; flex-direction: column; }
+
+/* 选单 — 气泡形态（默认）：贴 dock 上方，无遮罩，点外部即收 */
+.slm { margin: 0 12px 8px; background: var(--panel); border-radius: 16px; padding: 6px; box-shadow: 0 -6px 28px rgba(12,10,8,.45), 0 14px 44px rgba(0,0,0,.55), inset 0 1px 0 var(--ink-hi); animation: bubIn .22s cubic-bezier(.34,1.4,.5,1); transform-origin: 50% 100%; position: relative; }
+.slm::after { content: ""; position: absolute; bottom: -5px; left: 78%; width: 12px; height: 12px; background: var(--panel); transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
+@keyframes bubIn { from { transform: scaleY(.92) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* 选单 — 底部 sheet 形态 */
+.phone.sheet-mode .slm { margin: 0; border-radius: 20px 20px 0 0; padding: 8px 8px calc(6px + env(safe-area-inset-bottom)); }
+.phone.sheet-mode .slm::after { display: none; }
+
+.slm-list { max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; }
+.slm-group { font-family: var(--mono); font-size: 10px; color: var(--faint); letter-spacing: .06em; padding: 9px 10px 4px; }
+.slm-row { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 44px; padding: 9px 10px; border: 0; border-radius: 10px; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.slm-row:active { background: var(--panel2); }
+.slm-row.cur { background: var(--acc-tint); }
+.slm-name { font-family: var(--mono); font-size: 13.5px; font-weight: 600; flex: none; }
+.slm-name .sl { color: var(--faint); font-weight: 400; }
+.slm-name b { color: var(--acc-strong); font-weight: 600; }
+.slm-desc { flex: 1; min-width: 0; font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slm-desc .tv { color: var(--faint); }
+.slm-arg { flex: none; font-family: var(--mono); font-size: 10px; color: var(--faint); background: var(--panel2); border-radius: 999px; padding: 2px 8px; line-height: 1.5; }
+.slm-src { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 2px 8px; letter-spacing: .05em; }
+.slm-empty { padding: 18px 12px 16px; text-align: center; }
+.slm-empty .e1 { font-size: 13px; color: var(--dim); }
+.slm-empty .e2 { font-size: 11.5px; color: var(--faint); margin-top: 4px; }
+.slm-foot { border-top: 1px solid rgba(54,51,45,.5); margin-top: 4px; padding: 7px 10px 4px; font-family: var(--mono); font-size: 10px; color: var(--faint); letter-spacing: .04em; display: flex; justify-content: space-between; }
+
+/* 命令标签 chip（点选后落入 dock 内，语言同 fork-chip；空框退格=整删） */
+.cmd-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0 2px; }
+.cmd-tag { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 4px 6px 4px 11px; line-height: 1.4; }
+.cmd-tag .x { color: var(--faint); cursor: pointer; font-weight: 400; padding: 0 3px; font-size: 13px; }
+.cmd-arg-hint { font-family: var(--mono); font-size: 10px; color: var(--faint); }
+/* 气泡内的命令标签（发送后同样渲染） */
+.u-bub .b-tag { display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 2px 9px; margin-right: 2px; vertical-align: 1px; }
+
+/* ---------- composer（复刻真实结构样式） ---------- */
+.composer { padding: 0 12px calc(10px + env(safe-area-inset-bottom)); }
+.composer-dock { background: var(--panel); border-radius: 18px; padding: 6px 8px 6px 12px; box-shadow: var(--sh-3), inset 0 1px 0 var(--ink-hi); }
+.composer-dock textarea { width: 100%; border: 0; background: none; color: var(--fg); resize: none; min-height: 40px; padding: 9px 2px; font: 15px/1.4 var(--sans); outline: none; }
+.composer-dock textarea::placeholder { color: var(--faint); }
+.composer-toolbar { display: flex; align-items: center; padding: 2px 4px 4px; }
+.tdot { width: 2px; height: 2px; border-radius: 50%; background: var(--line); margin: 0 4px; flex: none; }
+.cbtn { height: 34px; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--dim); background: none; border: 0; padding: 0 8px; border-radius: 9px; cursor: pointer; flex: none; }
+.cbtn.mode { color: var(--acc-strong); font-weight: 600; }
+.cbtn.model { color: var(--dim); font-size: 11.5px; }
+.cbtn.model .ellipsis { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.cbtn.ring { gap: 4px; }
+.ring-svg { width: 15px; height: 15px; transform: rotate(-90deg); flex: none; }
+.ring-bg { fill: none; stroke: var(--raise); stroke-width: 3; }
+.ring-fg { fill: none; stroke: var(--acc); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 24 56.55; }
+.pv { font-family: var(--mono); font-size: 11px; }
+.send { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: var(--acc); color: #fff; border: 0; display: flex; align-items: center; justify-content: center; flex: none; cursor: pointer; box-shadow: 0 2px 10px rgba(217,119,87,.35); }
+.send:active { background: var(--acc-strong); transform: scale(.92); }
+
+/* ---------- 决策点清单 ---------- */
+.decisions { max-width: 640px; margin: 26px auto 0; }
+.d-title { font-size: 15px; font-weight: 650; margin-bottom: 10px; }
+.d-item { background: var(--panel); border-radius: 14px; padding: 13px 15px; margin-bottom: 9px; box-shadow: var(--sh-2); }
+.d-key { font-family: var(--mono); font-size: 10.5px; color: var(--acc-strong); letter-spacing: .05em; }
+.d-q { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.d-opts { font-size: 12.5px; color: var(--dim); margin-top: 5px; line-height: 1.7; }
+.d-opts .rec { color: var(--fg); }
+.d-opts .rec::before { content: "★ "; color: var(--acc); }
+.d-note { font-size: 11.5px; color: var(--faint); margin-top: 5px; }
+</style>
+</head>
+<body>
+
+<div class="mock-head">
+  <div class="mock-title">斜杠命令选单 · 设计稿 v3</div>
+  <div class="mock-sub">在画框里输入 <span class="mono">/</span> 唤起 → 过滤 → 点选。<b>标签 chip 可累积多条命令</b>（重复点选同一条=移除；✕ 可删；空框退格=删末位整条）；发送后逐条排队执行（复刻桥侧 busy 队列语义），气泡内同样渲染标签。顶部开关切换决策形态；下方 D1–D6 为决策点。</div>
+</div>
+
+<div class="toggles">
+  <div class="tgroup"><span class="tlabel">形态</span>
+    <button class="tbtn on" id="t-bub">气泡（推荐）</button>
+    <button class="tbtn" id="t-sheet">底部 sheet</button>
+  </div>
+  <div class="tgroup"><span class="tlabel">分组</span>
+    <button class="tbtn on" id="t-group">分组带头</button>
+    <button class="tbtn" id="t-flat">平铺 + 徽章</button>
+  </div>
+</div>
+
+<div class="steps"><b>①</b> 输入 / 唤起 &nbsp;·&nbsp; <b>②</b> 过滤 &nbsp;·&nbsp; <b>③</b> 点选累积<b>多标签</b> &nbsp;·&nbsp; <b>④</b> 空框退格删末位 &nbsp;·&nbsp; <b>⑤</b> 发送=逐条入队 &nbsp;·&nbsp; 点画框聊天区即收起</div>
+
+<div class="phone" id="phone">
+  <div class="chat" id="chat">
+    <div class="u-bub">把登录页的报错处理重构一下，错误码统一走一个映射表</div>
+    <div class="a-node">
+      <div class="a-head"><span class="a-dot"></span>CLAUDE · opus-4-6 · 12s</div>
+      <div class="a-body">已读取 src/auth/errors.ts，正在整理现有 14 个错误码分支…</div>
+    </div>
+    <div class="sys-note" id="fake-run" style="display:none"></div>
+  </div>
+  <div class="chat-scrim" id="chat-scrim"></div>
+
+  <div class="bottom-stack">
+    <div class="slm hidden" id="slm">
+      <div class="slm-list" id="slm-list"></div>
+      <div class="slm-empty hidden" id="slm-empty">
+        <div class="e1">无匹配命令</div>
+        <div class="e2">按发送将作为普通文本发给模型（待实验确认）</div>
+      </div>
+      <div class="slm-foot"><span>点选回填 · 继续输入过滤</span><span id="slm-count"></span></div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-dock">
+        <div id="cmd-chips" class="cmd-chips hidden"></div>
+        <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
+        <div class="composer-toolbar">
+          <button class="cbtn">📎</button>
+          <span class="tdot"></span>
+          <button class="cbtn mode">自动</button>
+          <span class="tdot"></span>
+          <span class="cbtn ring"><svg class="ring-svg" viewBox="0 0 24 24"><circle class="ring-bg" cx="12" cy="12" r="9"/><circle class="ring-fg" cx="12" cy="12" r="9"/></svg><span class="pv">42%</span></span>
+          <span class="tdot"></span>
+          <button class="cbtn model"><span class="ellipsis">sonnet-5-1 · 中</span></button>
+          <button class="send" id="send" aria-label="发送"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4l7 7h-4v9h-6v-9H5z"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="decisions">
+  <div class="d-title">决策点（回复编号 + 选择即可）</div>
+
+  <div class="d-item"><div class="d-key">D1 · 触发</div><div class="d-q">什么时候唤起选单？</div>
+    <div class="d-opts"><span class="rec">输入以 / 开头时自动弹出（行业标准，零学习成本）</span><br>工具栏加一个命令按钮点击弹出</div>
+    <div class="d-note">自动弹出与「把 /xxx 当普通文本发给模型」不冲突——选单只是辅助层，手输任意 /xxx 仍可发送。</div>
+  </div>
+
+  <div class="d-item"><div class="d-key">D2 · 形态</div><div class="d-q">选单用气泡还是底部 sheet？（顶部开关可切换体感）</div>
+    <div class="d-opts"><span class="rec">锚定气泡：无遮罩、轻、输入不被打断，tap 聊天区即收</span><br>底部 sheet：有遮罩更「模态」，但每输一个字都在模态层里，重</div>
+    <div class="d-note">推荐气泡——这是输入补全不是操作确认，不该模态。且与现有 .overlay.bub 视觉语言同源。</div>
+  </div>
+
+  <div class="d-item"><div class="d-key">D3 · 分组</div><div class="d-q">内置 / 项目 / 用户三级来源怎么呈现？</div>
+    <div class="d-opts"><span class="rec">分组带头（mono 小字组头，扫读快）</span><br>平铺 + 来源徽章（列表更紧凑，命令多时来源辨识靠徽章）</div>
+  </div>
+
+  <div class="d-item"><div class="d-key">D4 · 点选行为 <span style="color:var(--ok)">✓ 已拍板</span></div><div class="d-q">点选命令后：解析为标签 chip（本次新增要求）</div>
+    <div class="d-opts"><span class="rec">点选 → dock 内生成标签 chip（/name + ✕），不占输入框字符；带参命令参数提示并入标签行</span><br>空输入框按退格 = 整标签一次删除（非逐字符）<br>发送后气泡内同样渲染为标签 chip + 参数文本；手输完整 /xxx 发送也按此解析</div>
+    <div class="d-note">实现口径：真 PWA 里标签行复用 fork-chip 的 dock 内布局；气泡侧解析前导 /cmd（转录里命令信封已归一成「/名 参数」）。标签态下打开选单重新点选 = 替换标签。<b>v3 追加</b>：CLI（TUI）无链式多命令语法（/a /b 会把 /b 当 /a 的参数；-p 行为列入实验 A 验证），故多命令 = <b>多 chip 逐条派发</b>——每条独立 POST，桥侧 busy 队列（≤5、run 结束 800ms 自动派发）串行执行，每条独立 run/转录 turn、可单独 cancel；点选累积、重复点选=移除、空框退格删末位。</div>
+  </div>
+
+  <div class="d-item"><div class="d-key">D5 · 无匹配</div><div class="d-q">选单过滤为空时，/xxx 还能发吗？</div>
+    <div class="d-opts"><span class="rec">照常可发（当作普通文本，行为交给实验 A 的实测结论）</span><br>禁止发送（拦住，但可能误伤自定义命令没被扫到的场景）</div>
+    <div class="d-note">依赖前置实验：未知命令在 -p 模式下是报错还是当文本。实测前建议放行不拦。</div>
+  </div>
+
+  <div class="d-item"><div class="d-key">D6 · 内置清单范围</div><div class="d-q">内置命令白名单收哪些？（稿内标「待验证」的以实验 A 结论为准）</div>
+    <div class="d-opts"><span class="rec">首批只收实测可用的：compact / clear / context / cost / model / memory / add-dir</span><br>全量内置命令（含 TUI 专用，在 -p 下无意义）</div>
+    <div class="d-note">设计稿里「待验证」角标的命令 = 实验未做，先占位看列表形态。</div>
+  </div>
+</div>
+
+<script>
+const CMDS = [
+  { name: 'compact',  desc: '压缩上下文，释放窗口空间', arg: '[指示]', src: '内置' },
+  { name: 'clear',    desc: '清空对话上下文', src: '内置', tv: '待验证' },
+  { name: 'context',  desc: '上下文占用明细', src: '内置' },
+  { name: 'cost',     desc: '本会话费用统计', src: '内置', tv: '待验证' },
+  { name: 'model',    desc: '切换模型（或走现有模型 chip）', arg: '[名称]', src: '内置', tv: '待验证' },
+  { name: 'memory',   desc: '编辑 CLAUDE.md 记忆文件', src: '内置', tv: '待验证' },
+  { name: 'add-dir',  desc: '添加额外工作目录', arg: '[路径]', src: '内置', tv: '待验证' },
+  { name: 'deploy',   desc: '部署到指定环境', arg: '[env]', src: '项目' },
+  { name: 'review-pr', desc: '审查一个 GitHub PR', arg: '[编号]', src: '项目' },
+  { name: 'daily',    desc: '汇总今日会话生成日报', src: '用户' },
+  { name: 'zh2en',    desc: '中译英并润色', src: '用户' },
+];
+const SRC_ORDER = { '内置': 0, '项目': 1, '用户': 2 };
+const SRC_HEAD = { '内置': '内置 BUILT-IN', '项目': '项目 .claude/commands', '用户': '用户 ~/.claude/commands' };
+const SRC_SHORT = { '内置': '内置', '项目': '项目', '用户': '用户' };
+
+const $ = id => document.getElementById(id);
+const input = $('msg-input'), slm = $('slm'), list = $('slm-list'), empty = $('slm-empty');
+let mode = 'bubble', grouped = true;
+let pickedCmds = [];
+
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function curQuery() {
+  const v = input.value;
+  if (!v.startsWith('/') || v.includes(' ')) return null;
+  return v.slice(1).toLowerCase();
+}
+
+function render() {
+  const q = curQuery();
+  slm.classList.toggle('hidden', q === null);
+  $('chat-scrim').style.pointerEvents = 'none';
+  if (q === null) { $('slm-count').textContent = ''; return; }
+  const hits = CMDS.filter(c => c.name.startsWith(q) || c.name.includes(q));
+  empty.classList.toggle('hidden', hits.length > 0);
+  $('slm-count').textContent = hits.length ? hits.length + ' 条' : '';
+  list.innerHTML = '';
+  const groups = grouped ? [...new Set(hits.map(c => c.src).sort((a,b) => SRC_ORDER[a]-SRC_ORDER[b]))] : [null];
+  for (const g of groups) {
+    if (g) { const h = document.createElement('div'); h.className = 'slm-group'; h.textContent = SRC_HEAD[g]; list.appendChild(h); }
+    for (const c of hits.filter(x => !g || x.src === g)) {
+      const b = document.createElement('button'); b.className = 'slm-row'; b.type = 'button';
+      const nm = document.createElement('span'); nm.className = 'slm-name';
+      const at = c.name.toLowerCase().indexOf(q);
+      nm.innerHTML = '<span class="sl">/</span>' + (at >= 0 && q
+        ? esc(c.name.slice(0, at)) + '<b>' + esc(c.name.slice(at, at + q.length)) + '</b>' + esc(c.name.slice(at + q.length))
+        : esc(c.name));
+      b.appendChild(nm);
+      const de = document.createElement('span'); de.className = 'slm-desc';
+      de.textContent = c.desc + (c.tv ? ' · ' + c.tv : '');
+      if (c.tv) { const t = document.createElement('span'); t.className = 'tv'; t.textContent = ' · ' + c.tv; de.textContent = c.desc; de.appendChild(t); }
+      b.appendChild(de);
+      if (grouped && c.arg) { const a = document.createElement('span'); a.className = 'slm-arg'; a.textContent = c.arg; b.appendChild(a); }
+      if (!grouped) { const s = document.createElement('span'); s.className = 'slm-src'; s.textContent = SRC_SHORT[c.src]; b.appendChild(s); }
+      b.addEventListener('click', () => pick(c));
+      list.appendChild(b);
+    }
+  }
+}
+
+function renderChips() {
+  const row = $('cmd-chips');
+  row.innerHTML = '';
+  for (const c of pickedCmds) {
+    const tag = document.createElement('span');
+    tag.className = 'cmd-tag';
+    const nm = document.createElement('b'); nm.textContent = '/' + c.name;
+    const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
+    x.onclick = () => { pickedCmds = pickedCmds.filter((y) => y !== c); renderChips(); };
+    tag.append(nm, x);
+    row.appendChild(tag);
+    if (c.arg) { const hh = document.createElement('span'); hh.className = 'cmd-arg-hint'; hh.textContent = '参数 ' + c.arg; row.appendChild(hh); }
+  }
+  row.classList.toggle('hidden', pickedCmds.length === 0);
+  input.placeholder = pickedCmds.length ? ('已排 ' + pickedCmds.length + ' 条 · 再点 / 加命令，或输入说明') : '提出后续修改要求';
+}
+function pick(c) {
+  input.value = '';
+  if (pickedCmds.some((y) => y.name === c.name)) pickedCmds = pickedCmds.filter((y) => y.name !== c.name);
+  else pickedCmds.push(c);
+  renderChips();
+  slm.classList.add('hidden');
+  input.focus();
+  render();
+}
+
+input.addEventListener('input', () => { render(); });
+input.addEventListener('focus', render);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace' && input.value === '' && pickedCmds.length) { e.preventDefault(); pickedCmds.pop(); renderChips(); }
+});
+$('chat').addEventListener('click', () => { slm.classList.add('hidden'); input.blur(); });
+$('chat-scrim').addEventListener('click', () => slm.classList.add('hidden'));
+
+function pushBub(cmdName, argText, plain) {
+  const bub = document.createElement('div'); bub.className = 'u-bub';
+  if (cmdName) {
+    const t = document.createElement('span'); t.className = 'b-tag'; t.textContent = '/' + cmdName;
+    bub.appendChild(t);
+    if (argText) bub.appendChild(document.createTextNode(' ' + argText));
+  } else {
+    bub.textContent = plain;
+  }
+  $('chat').appendChild(bub);
+}
+$('send').addEventListener('click', () => {
+  let v = input.value.trim();
+  input.value = '';
+  const queue = pickedCmds.slice();
+  pickedCmds = [];
+  renderChips();
+  // 手输入行：开头连续的 /已知命令 全部解析成标签（一条消息多命令）
+  if (v) {
+    const toks = v.split(/\s+/);
+    while (toks.length && toks[0].startsWith('/') && CMDS.some((c) => c.name === toks[0].slice(1).toLowerCase())) {
+      queue.push(CMDS.find((c) => c.name === toks[0].slice(1).toLowerCase()));
+      toks.shift();
+    }
+    v = toks.join(' ');
+  }
+  // 参数归属：末位命令带参且有输入文本 -> 文本作其参数，否则文本独立成泡
+  let text = v;
+  if (text && queue.length && queue[queue.length - 1].arg) {
+    const last = queue[queue.length - 1];
+    queue[queue.length - 1] = { name: last.name, arg: last.arg, argText: text };
+    text = '';
+  }
+  for (const c of queue) pushBub(c.name, c.argText || '');
+  if (text) pushBub(null, null, text);
+  if (queue.length) {
+    const note = $('fake-run');
+    note.textContent = '⟳ ' + queue.map((c) => '/' + c.name).join(' -> ') + ' 依次入队（模拟）— 桥侧 busy 队列串行派发';
+    note.style.display = '';
+  }
+  $('chat').scrollTop = $('chat').scrollHeight;
+  slm.classList.add('hidden');
+});
+
+function setMode(m) {
+  mode = m;
+  $('phone').classList.toggle('sheet-mode', m === 'sheet');
+  $('t-bub').classList.toggle('on', m === 'bubble');
+  $('t-sheet').classList.toggle('on', m === 'sheet');
+}
+function setGroup(g) {
+  grouped = g;
+  $('t-group').classList.toggle('on', g);
+  $('t-flat').classList.toggle('on', !g);
+  render();
+}
+$('t-bub').onclick = () => setMode('bubble');
+$('t-sheet').onclick = () => setMode('sheet');
+$('t-group').onclick = () => setGroup(true);
+$('t-flat').onclick = () => setGroup(false);
+</script>
+</body>
+</html>

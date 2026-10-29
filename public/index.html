@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=102">
+  <link rel="stylesheet" href="/style.css?v=114">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v102</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v114</span></span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -114,6 +114,7 @@
     </button>
     <div id="composer" class="composer">
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
+      <div id="cmd-menu" class="cmd-menu hidden"><div id="cmd-menu-list" class="cmd-menu-list"></div></div>
       <div class="composer-dock">
         <div id="queue-area"></div>
         <div id="fork-chip" class="fork-chip hidden">
@@ -121,7 +122,10 @@
           <span id="fork-x" role="button" aria-label="取消分支">×</span>
         </div>
         <div id="attach-chips" class="attach-chips hidden"></div>
-        <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
+        <div class="input-line">
+          <div id="cmd-chips" class="cmd-chips hidden"></div>
+          <textarea id="msg-input" rows="1" placeholder="提出后续修改要求"></textarea>
+        </div>
         <div class="composer-toolbar" id="toolbar">
           <button id="attach" class="cbtn attach" title="附件（图片/文本）" aria-label="附件（图片/文本）">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -153,14 +157,28 @@
       </div>
     </div>
 
-    <!-- attachment lightbox + text preview (v19) -->
-    <div id="lightbox" class="overlay hidden"><img id="lightbox-img" class="lightbox-img" alt=""></div>
-    <div id="file-prev" class="overlay hidden">
-      <div class="sheet file-prev">
-        <div class="sheet-title" id="fp-name"></div>
-        <pre id="fp-body" class="fp-body"></pre>
-      </div>
+    <!-- v105 in-app preview page: same-origin http links AND artifact files
+         (render / source) open here full-screen instead of leaving the PWA -->
+    <div id="html-prev" class="page hidden">
+      <header class="bar">
+        <button id="hp-back" class="icon-btn" aria-label="返回">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
+        </button>
+        <div id="hp-title" class="hp-title"></div>
+        <div id="hp-tabs" class="fp-tabs hidden">
+          <button id="hp-tab-run" class="fp-tab on" type="button">渲染</button>
+          <button id="hp-tab-src" class="fp-tab" type="button">源码</button>
+        </div>
+        <span class="chip">沙箱预览</span>
+      </header>
+      <main>
+        <iframe id="hp-frame" class="hp-frame" sandbox="allow-scripts" title="页面预览"></iframe>
+        <pre id="hp-src" class="hp-src hidden"></pre>
+      </main>
     </div>
+
+    <!-- attachment lightbox (v19) -->
+    <div id="lightbox" class="overlay hidden"><img id="lightbox-img" class="lightbox-img" alt=""></div>
     <input id="attach-input" type="file" multiple class="hidden"
       accept="image/*,.txt,.md,.log,.json,.csv,.js,.ts,.py,.ps1,.yml,.yaml,.xml,.html,.css">
 
@@ -193,6 +211,19 @@
         <div class="ctx-bar" id="ctx-bar" role="img" aria-label="上下文构成"></div>
         <div class="ctx-cats" id="ctx-cats"></div>
         <p class="sheet-note" id="ctx-note">口径与桌面端一致：已用 = 最近一次请求的输入 tokens（含缓存）</p>
+      </div>
+    </div>
+
+    <!-- v112 子代理执行全文气泡（方案A）：活态节点直播行 / 完成态 chip 的入口 -->
+    <div id="agent-sheet" class="overlay bub hidden">
+      <div class="sheet bubble agent-bub">
+        <div class="ag-head">
+          <span class="lamp" id="ag-lamp" data-st="idle"></span>
+          <span class="ag-title" id="ag-title">子代理</span>
+          <span class="ag-st mono" id="ag-st"></span>
+          <button id="ag-close" class="ag-x" type="button" aria-label="关闭">✕</button>
+        </div>
+        <div class="ag-body" id="ag-body"></div>
       </div>
     </div>
 
@@ -295,6 +326,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=102"></script>
+  <script type="module" src="/app.js?v=114"></script>
 </body>
 </html>

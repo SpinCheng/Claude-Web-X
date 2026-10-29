@@ -89,3 +89,37 @@ export function linkifyPaths(el, text, onOpen) {
   }
   el.appendChild(document.createTextNode(text.slice(last)));
 }
+
+/* v106: DOM-walking variant for markdown-rendered containers (conclusion
+   text). linkifyPaths() rebuilds an element from raw text - unusable once
+   miniMd has formatted the node; this walks text nodes and splices the same
+   .flink anchors in place, skipping anchors/code/pre. */
+export function linkifyDom(root, onOpen) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const targets = [];
+  while (walker.nextNode()) {
+    const n = walker.currentNode;
+    const p = n.parentElement;
+    if (p && p.closest('a, code, pre')) continue;
+    if (n.nodeValue && n.nodeValue.match(ART_PATH_RE)) targets.push(n);
+  }
+  for (const n of targets) {
+    const s = n.nodeValue;
+    const frag = document.createDocumentFragment();
+    let last = 0, mm;
+    ART_PATH_RE.lastIndex = 0;
+    while ((mm = ART_PATH_RE.exec(s))) {
+      const raw = mm[0];
+      if (mm.index > last) frag.appendChild(document.createTextNode(s.slice(last, mm.index)));
+      const a = document.createElement('a');
+      a.className = 'flink';
+      a.textContent = raw;
+      a.href = '#';
+      a.onclick = (e) => { e.preventDefault(); onOpen(raw.replace(/\\\\/g, '\\')); };
+      frag.appendChild(a);
+      last = mm.index + raw.length;
+    }
+    if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+    n.parentNode.replaceChild(frag, n);
+  }
+}

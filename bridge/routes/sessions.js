@@ -5,6 +5,7 @@ import { authOk, readBody } from '../lib/auth.js';
 import { PREVIEW_MIME } from '../lib/mime.js';
 import { readModelCatalog } from '../lib/models.js';
 import { CI_PATHS } from '../lib/platform.js';
+import { collectCommands } from '../lib/commands.js';
 
 export function register(router, ctx) {
   const { cfg, store, adapter, runner, ctxprobe, hub } = ctx;
@@ -18,6 +19,18 @@ export function register(router, ctx) {
 
   router.get('/api/models', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { models: readModelCatalog() }); });
 
+  // v109 slash-command menu: built-in whitelist + custom commands discovered
+  // from ~/.claude/commands and <cwd>/.claude/commands (scanned per request;
+  // dirs are small). No cwd -> builtins only.
+  router.get('/api/sessions/:id/commands', (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    const rec = store.get(r.params.id);
+    if (!rec) { json(res, 404, { error: 'not found' }); return; }
+    let commands;
+    try { commands = collectCommands(rec.cwd); } catch { commands = collectCommands(null); }
+    json(res, 200, { commands });
+  });
+
   router.get('/api/ping', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { ok: true, version: '0.1.0' }); });
 
   router.get('/api/sessions', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { sessions: hub.mergedSessions() }); });
@@ -27,6 +40,18 @@ export function register(router, ctx) {
     const before = parseInt(r.url.searchParams.get('before') || '0', 10) || 0;
     const out = adapter.readTranscript(r.params.id, 400, before);
     if (!out) { json(res, 404, { error: 'not found' }); return; }
+    // v112: agent summaries ride along (seeds finished agent nodes' 全文)
+    out.agents = adapter.agents.summariesFor(r.params.id);
+    json(res, 200, out);
+  });
+
+  // v112: one subagent's full display events (the 方案A bubble). Same applyLine
+  // parsing as the parent transcript; api-request* blob lines never surface.
+  router.get('/api/sessions/:id/agents/:agentId/events', (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    if (!store.get(r.params.id)) { json(res, 404, { error: 'not found' }); return; }
+    const out = adapter.agents.readEvents(r.params.id, r.params.agentId);
+    if (!out) { json(res, 404, { error: 'no agent transcript' }); return; }
     json(res, 200, out);
   });
 
@@ -64,12 +89,22 @@ export function register(router, ctx) {
     if (!ci(abs).startsWith(ci(root) + path.sep)) {
       json(res, 403, { error: 'outside project dir' }); return;
     }
-    const mt = PREVIEW_MIME[path.extname(abs).toLowerCase()];
+    const ext = path.extname(abs).toLowerCase();
+    const mt = PREVIEW_MIME[ext];
     if (!mt) { json(res, 415, { error: 'not previewable' }); return; }
     let st; try { st = fs.statSync(abs); } catch { json(res, 404, { error: 'not found' }); return; }
     if (!st.isFile()) { json(res, 404, { error: 'not found' }); return; }
     if (st.size > 2 * 1024 * 1024) { json(res, 413, { error: 'too large' }); return; }
-    res.writeHead(200, { 'Content-Type': mt, 'Cache-Control': 'no-cache' });
+    // render=1 (v103): .html only — served as markup behind a CSP sandbox so
+    // even direct navigation runs it in an opaque origin; every other request
+    // (and every other extension) keeps the inert text/plain default
+    const heads = { 'Content-Type': mt, 'Cache-Control': 'no-cache' };
+    if (r.url.searchParams.get('render') === '1' && (ext === '.html' || ext === '.htm')) {
+      heads['Content-Type'] = 'text/html; charset=utf-8';
+      heads['Content-Security-Policy'] = 'sandbox allow-scripts';
+      heads['X-Content-Type-Options'] = 'nosniff';
+    }
+    res.writeHead(200, heads);
     fs.readFile(abs, (err, data) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       res.end(data);

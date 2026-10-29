@@ -30,6 +30,7 @@ function openDetail(id) {
   $('list').classList.add('hidden');
   $('detail').classList.remove('hidden');
   $('chat').innerHTML = '';
+  state.agentView = null; // v112: the agent bubble never crosses a session switch
   renderMeta();
   refreshDriver();
   ensureModels(); // context-window lookup for the ring
@@ -38,6 +39,9 @@ function openDetail(id) {
     .then((r) => r.json())
     .then((d) => {
       if (state.currentId !== id) return;
+      // v112: agent summaries seed the agent nodes BEFORE the first render -
+      // finished agents get their 全文 entry without ever seeing a live frame
+      if (d.agents) for (const a of d.agents) if (a.toolUseId) state.agents[a.toolUseId] = a;
       buildTurns(d.events || []);
       renderAllTurns();
       // v64: new-session race - the transcript user line lands within
@@ -81,6 +85,8 @@ function closeDetail() { // via the ← button only
   state.turns = [];
   state.histBefore = 0; state.histTotal = 0; state.histLoading = false;
   state.orphanToolRes.clear();
+  state.agentView = null; // v112
+  $('agent-sheet').classList.add('hidden');
   const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
   $('detail').classList.add('hidden');
   $('list').classList.remove('hidden');

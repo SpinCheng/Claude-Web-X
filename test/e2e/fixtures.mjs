@@ -36,6 +36,12 @@ export const slashCommand = (i, name, args = '') =>
   ({ type: 'user', timestamp: ts(i), cwd: 'D:\\e2e', origin: { kind: 'human' },
      message: { role: 'user', content: `<command-message>${name}</command-message>\n<command-name>/${name}</command-name>\n<command-args>${args}</command-args>` } });
 
+// v110: the CLI writes <local-command-caveat> as its OWN user line right
+// before the command envelope; the parser folds it out (strip -> empty)
+export const caveatLine = (i) =>
+  ({ type: 'user', timestamp: ts(i), cwd: 'D:\\e2e', origin: { kind: 'human' },
+     message: { role: 'user', content: '<local-command-caveat>The command below was run directly in Claude Code, not sent to you as a request, and its output goes straight to the user. It\'s recorded here as context for later messages.</local-command-caveat>' } });
+
 // scenario: chronological timeline with tool result pairing; a second turn
 // carries an Edit so the conclusion-card file rollup (v45 fsum) is exercised
 export function timelineLines() {
@@ -83,6 +89,7 @@ export function mdLines() {
 // scenario: fold markers (compaction + skill + slash command)
 export function foldsLines() {
   return [
+    caveatLine(0),
     slashCommand(1, 'goal', '请进行优化'),
     assistant(2, [text('第一答')]),
     compactSummary(3),
@@ -104,3 +111,14 @@ export function previewLines(dir, fileName) {
     stop(5),
   ];
 }
+// v111: full command execution block as the CLI really writes it
+// (caveat line -> envelope -> stdout line; /goal also writes a system
+// local_command stdout line + a Stop-hook injection user line)
+export const cmdStdoutUser = (i, out) =>
+  ({ type: 'user', timestamp: ts(i), cwd: 'D:\\e2e',
+     message: { role: 'user', content: '<local-command-stdout>' + out + '</local-command-stdout>' } });
+export const cmdOutSystem = (i, out) =>
+  ({ type: 'system', subtype: 'local_command', timestamp: ts(i), content: '<local-command-stdout>' + out + '</local-command-stdout>' });
+export const goalHookLine = (i, cond) =>
+  ({ type: 'user', timestamp: ts(i), cwd: 'D:\\e2e',
+     message: { role: 'user', content: 'A session-scoped Stop hook is now active with condition: "' + cond + '". Briefly acknowledge the goal.' } });

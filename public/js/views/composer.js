@@ -260,6 +260,9 @@ function saveDraft() {
   try { if (v) localStorage.setItem(draftKey(id), v); else localStorage.removeItem(draftKey(id)); } catch { /* quota */ }
 }
 function setDraft(id) {
+  clearCmdChip();
+  hideCmdMenu();
+  cmdList = null; cmdListFor = null; state.cmdNames = null;
   let v = '';
   try { v = localStorage.getItem(draftKey(id)) || ''; } catch { /* */ }
   const input = $('msg-input');
@@ -284,12 +287,14 @@ function updateComposer() {
   $('send').classList.toggle('hidden', !showSend);
   $('send').classList.toggle('queue', running && typed);
   $('stop').classList.toggle('hidden', !running || typed);
-  $('msg-input').placeholder = running ? '继续输入以排队后续修改' : '提出后续修改要求';
+  $('msg-input').placeholder = running ? '继续输入以排队后续修改'
+    : (cmdChip ? ('/' + cmdChip.name + (cmdChip.argHint ? ' ' + cmdChip.argHint : '') + ' · 输入参数或说明后发送') : '提出后续修改要求');
   renderDriverChip();
 }
 function sendMessage(force) {
   const input = $('msg-input');
-  const text = input.value.trim();
+  let text = input.value.trim();
+  if (cmdChip) text = ('/' + cmdChip.name + (text ? ' ' + text : '')).trim();
   if (!text) return;
   if (!state.currentId) { if (state.provisional) toast('会话创建中，稍候再发'); return; }
   if (state.armedBranch === state.currentId) { sendFork(text, input.value); return; }
@@ -345,13 +350,14 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
   // retry passes its attachments back in; first attempt takes them from state
   const atts = attsOverride || state.attach.splice(0);
   if (!attsOverride) renderAttachChips();
+  const sentChip = cmdChip;
   clearComposer();
   // optimistic bubble (v21): at TAP time, not after the round-trip — on slow
   // links the POST latency is the same dead-tap window v18 closed for the
   // composer. Retracted by every refusal path unless the transcript already
   // folded into it (then it is a real message and stays).
   if (!shownTurn && state.currentId) shownTurn = pushOptimisticUser(text);
-  const fail = () => { restoreComposer(rawInput, atts); retractOptimisticUser(shownTurn); };
+  const fail = () => { restoreComposer(rawInput, atts); retractOptimisticUser(shownTurn); if (sentChip) setCmdChip(sentChip); };
   api('/api/sessions/' + encodeURIComponent(state.currentId) + '/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -391,11 +397,111 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
     })
     .catch(() => { toast('网络错误'); fail(); });
 }
+/* ---------- v109 slash-command menu + chip ---------- */
+// 单选 chip（v2 裁定）：点选 -> dock 内标签；重开选单点选 = 替换；✕/空框退格删除。
+// 菜单 = 锚定气泡（无 scrim，点外部即收，不动 history）。命令来源 = 桥端
+// /api/sessions/:id/commands（内置白名单 + 自定义命令发现）。
+let cmdChip = null;
+let cmdList = null;
+let cmdListFor = null;
+function ensureCmdList() {
+  const id = state.currentId;
+  if (!id) return Promise.resolve([]);
+  if (cmdList && cmdListFor === id) return Promise.resolve(cmdList);
+  cmdListFor = id; cmdList = null;
+  return api('/api/sessions/' + encodeURIComponent(id) + '/commands')
+    .then((r) => r.json())
+    .then((j) => {
+      cmdList = j.commands || [];
+      state.cmdNames = new Set(cmdList.map((c) => c.name.toLowerCase()));
+      return cmdList;
+    })
+    .catch(() => { cmdList = []; return []; });
+}
+function hideCmdMenu() { $('cmd-menu').classList.add('hidden'); }
+function renderCmdMenu(q) {
+  const listEl = $('cmd-menu-list');
+  listEl.innerHTML = '';
+  const ql = (q || '').toLowerCase();
+  const hits = (cmdList || []).filter((c) => !ql || c.name.toLowerCase().startsWith(ql) || c.name.toLowerCase().includes(ql) || (c.desc || '').toLowerCase().includes(ql));
+  if (!hits.length) {
+    const e = document.createElement('div'); e.className = 'cm-empty';
+    e.textContent = '无匹配命令 — 直接发送将作为普通文本';
+    listEl.appendChild(e);
+  }
+  for (const c of hits.slice(0, 30)) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cm-row';
+    const nm = document.createElement('span'); nm.className = 'cm-name';
+    const full = '/' + c.name;
+    const at = ql ? c.name.toLowerCase().indexOf(ql) : -1;
+    if (at >= 0) {
+      nm.appendChild(document.createTextNode(full.slice(0, at + 1)));
+      const hb = document.createElement('b'); hb.textContent = full.slice(at + 1, at + 1 + ql.length);
+      nm.appendChild(hb);
+      nm.appendChild(document.createTextNode(full.slice(at + 1 + ql.length)));
+    } else nm.textContent = full;
+    const de = document.createElement('span'); de.className = 'cm-desc'; de.textContent = c.desc || '';
+    const sr = document.createElement('span'); sr.className = 'cm-src'; sr.textContent = c.src;
+    b.append(nm, de, sr);
+    b.addEventListener('click', () => {
+      if ($('msg-input').value.startsWith('/')) $('msg-input').value = '';
+      setCmdChip(c);
+      hideCmdMenu();
+      autoGrow();
+      updateComposer();
+      $('msg-input').focus();
+    });
+    listEl.appendChild(b);
+  }
+  $('cmd-menu').classList.remove('hidden');
+}
+function setCmdChip(c) {
+  cmdChip = c;
+  const row = $('cmd-chips');
+  row.innerHTML = '';
+  const tag = document.createElement('span'); tag.className = 'cmd-tag';
+  tag.title = '点选替换命令';
+  tag.addEventListener('click', () => { ensureCmdList().then(() => renderCmdMenu('')); });
+  const nm = document.createElement('b'); nm.textContent = '/' + c.name;
+  tag.appendChild(nm);
+  if (c.argHint) { const h = document.createElement('span'); h.className = 'hint'; h.textContent = c.argHint; tag.appendChild(h); }
+  const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
+  x.addEventListener('click', (e) => { e.stopPropagation(); clearCmdChip(); updateComposer(); });
+  tag.appendChild(x);
+  row.appendChild(tag);
+  row.classList.remove('hidden');
+}
+function clearCmdChip() {
+  cmdChip = null;
+  const row = $('cmd-chips');
+  if (row) { row.innerHTML = ''; row.classList.add('hidden'); }
+}
+$('msg-input').addEventListener('input', () => {
+  const v = $('msg-input').value;
+  if (!cmdChip && v.startsWith('/')) {
+    ensureCmdList().then(() => {
+      const cur = $('msg-input').value;
+      if (!cmdChip && cur.startsWith('/')) renderCmdMenu(cur.slice(1));
+      else hideCmdMenu();
+    });
+  } else hideCmdMenu();
+});
+$('msg-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace' && $('msg-input').value === '' && cmdChip) { e.preventDefault(); clearCmdChip(); updateComposer(); }
+});
+document.addEventListener('click', (e) => {
+  if ($('cmd-menu').classList.contains('hidden')) return;
+  if (e.target.closest('#cmd-menu') || e.target.id === 'msg-input') return;
+  hideCmdMenu();
+});
+
 function clearComposer() {
+  clearCmdChip(); // v110: a sent message consumes its chip too (fail paths re-set it)
   const input = $('msg-input');
   input.value = '';
   try { if (state.currentId) localStorage.removeItem(draftKey(state.currentId)); } catch { /* */ }
   autoGrow();       // collapse the grown height back to one line
+  hideCmdMenu();    // sending or clearing dismisses the completion menu
   updateComposer(); // re-evaluate the button: running+empty => stop, not amber queue-send
 }
 function restoreComposer(text, atts) {

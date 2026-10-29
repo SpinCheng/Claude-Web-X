@@ -47,7 +47,7 @@ button { font-family: inherit; }
 .lamp[data-st="waiting"] { background: var(--acc); box-shadow: 0 0 8px rgba(217, 119, 87, .5); animation: breathe 1.6s ease-in-out infinite; }
 .st-word[data-st="waiting"] { color: var(--acc-strong); }
 @keyframes breathe { 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .pgroup-ico[data-st="running"], .pgroup-ico[data-st="waiting"], .caret, .timeline, .node-body { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .pgroup-ico[data-st="running"], .pgroup-ico[data-st="waiting"], .caret, .timeline, .node-body, .al-pulse, .dot-tool.on { animation: none !important; } }
 
 /* ---------- brand（v84 终稿：官方标记 + P2 小徽章 + T4 词标 + PERSONAL 下标） ---------- */
 .brand { display: flex; align-items: center; gap: 9px; }
@@ -289,6 +289,30 @@ button { font-family: inherit; }
 .tool-out.capped { max-height: 34dvh; overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; }
 .flink { color: var(--acc); text-decoration: none; border-bottom: 1px dashed rgba(217, 119, 87, .45); overflow-wrap: anywhere; }
 .flink:active { opacity: .7; }
+
+/* ---------- v112 子代理活态节点 + 全文气泡（方案A） ---------- */
+/* 直播行：节点头下、折叠体外（默认收起时也可见）；整行点击开气泡 */
+.agent-live { display: flex; align-items: center; gap: 7px; margin: -2px 0 6px; padding: 2px 2px 0; font: 11.5px/1.4 var(--mono); color: var(--dim); cursor: pointer; }
+.agent-live:active { color: var(--fg); }
+.agent-live .al-pulse { width: 6px; height: 6px; border-radius: 2px; background: var(--acc); flex: none; animation: breathe 1.6s ease-in-out infinite; }
+.agent-live.done .al-pulse { animation: none; background: var(--ok); }
+.agent-live .al-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-live .al-step { flex: none; color: var(--faint); font-variant-numeric: tabular-nums; }
+.agent-live .al-full { margin-left: auto; flex: none; color: var(--acc-strong); }
+/* 后台徽章（meta.requestShape=background） */
+.ag-bgtag { flex: none; font: 9px var(--mono); color: var(--dim); background: var(--panel2); border: 1px solid var(--raise); border-radius: 3px; padding: 0 4px; }
+/* 代理节点标题截断（.t 只有代理节点用） */
+.node-head .t { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 活态代理的工具点呼吸（光晕扩散；reduced-motion 静态珊瑚点） */
+.dot-tool.on { animation: dotOn 1.6s ease-in-out infinite; }
+@keyframes dotOn { 0%, 100% { box-shadow: 0 0 0 3px var(--acc-tint); } 50% { box-shadow: 0 0 0 5px var(--acc-tint); opacity: .6; } }
+/* 全文气泡：头（灯+标题+状态）+ 自滚动体（嵌套滚动器 overscroll auto——链条移交） */
+.agent-bub .ag-head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; min-width: 0; }
+.agent-bub .ag-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-bub .ag-st { flex: none; font-size: 10.5px; color: var(--warn); font-variant-numeric: tabular-nums; }
+.agent-bub .ag-st:empty { display: none; }
+.agent-bub .ag-x { margin-left: auto; flex: none; border: 0; background: none; color: var(--faint); font-size: 15px; line-height: 1; padding: 4px 6px; cursor: pointer; }
+.agent-bub .ag-body { max-height: 58dvh; overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
 .final { font-size: 15px; line-height: 1.55; font-weight: 600; }
 /* markdown blocks in conclusion cards (v25) - one style set for BOTH
@@ -478,8 +502,18 @@ button { font-family: inherit; }
    grammar - images sat glued to the screen bottom. Center this one. */
 #lightbox { align-items: center; }
 .lightbox-img { max-width: 94vw; max-height: 88dvh; border-radius: 12px; }
-.file-prev { width: auto; flex: 1 1 auto; margin: 0 12px calc(30px + env(safe-area-inset-bottom)); max-width: 640px; }
-.fp-body { max-height: 62dvh; overflow: auto; overscroll-behavior-y: auto; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; margin: 0; }
+
+/* v105 previews unified into the fullscreen #html-prev page (sheet retired) */
+.fp-tabs { display: flex; gap: 6px; }
+.fp-tab { font: 12px var(--sans); color: var(--dim); background: var(--panel2); border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; touch-action: manipulation; }
+.fp-tab.on { background: var(--acc-tint); color: var(--acc-strong); font-weight: 600; }
+
+/* ---------- v104/v105 in-app preview page ---------- */
+#html-prev { position: fixed; inset: 0; z-index: 15; } /* MUST be fixed: nested in #detail (flex+overflow-hidden), static clips it to leftover space; fixed also makes z-index apply (above composer, below overlays) */
+.hp-title { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#html-prev main { display: flex; min-height: 0; }
+.hp-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
+.hp-src { flex: 1; width: 100%; margin: 0; padding: 12px 14px; overflow: auto; overscroll-behavior-y: auto; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; }
 
 /* ---------- 弹层 ---------- */
 .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(10, 9, 7, .6); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
@@ -640,3 +674,25 @@ button { font-family: inherit; }
 .fsum .frow .fd { font-size: 11px; flex: none; }
 .fsum .fname { font-size: 11.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fsum .fmore { border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; padding: 7px 0 8px; }
+
+/* ---------- v109 slash-command menu + chip ---------- */
+.cmd-menu { background: var(--panel); border-radius: 16px; padding: 6px; margin-bottom: 6px; box-shadow: 0 -6px 28px rgba(12, 10, 8, .45), 0 14px 44px rgba(0, 0, 0, .55), inset 0 1px 0 var(--ink-hi); }
+.cmd-menu-list { max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; }
+.cm-row { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 44px; padding: 9px 10px; border: 0; border-radius: 10px; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; }
+.cm-row:active { background: var(--panel2); }
+.cm-name { font-family: var(--mono); font-size: 13.5px; font-weight: 600; flex: none; }
+.cm-desc { flex: 1; min-width: 0; font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-src { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 2px 8px; letter-spacing: .05em; }
+.cm-empty { padding: 16px 12px; text-align: center; font-size: 12px; color: var(--faint); }
+.cmd-chips { display: flex; align-items: center; gap: 8px; padding: 6px 0 2px; }
+.cmd-tag { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 4px 6px 4px 11px; line-height: 1.4; cursor: pointer; }
+.cmd-tag .hint { font-family: var(--mono); font-size: 10px; color: var(--faint); font-weight: 400; }
+.cmd-tag .x { color: var(--faint); font-weight: 400; padding: 0 3px; font-size: 13px; cursor: pointer; }
+.b-tag { display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 2px 9px; margin-right: 2px; vertical-align: 1px; }
+.cm-name b { color: var(--acc-strong); }
+/* v111: command chip sits INLINE with the input (same row, not above) */
+.input-line { display: flex; align-items: flex-start; gap: 8px; }
+.input-line .cmd-chips { display: flex; flex: none; padding: 9px 0 0; gap: 8px; }
+.input-line textarea { flex: 1; min-width: 0; }
+/* v111: executed-command stdout panel - right side, under the command bubble */
+.cmdout { max-width: 86%; width: fit-content; background: var(--panel2); border-radius: 4px 12px 12px 12px; padding: 8px 12px; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; margin-top: 4px; }

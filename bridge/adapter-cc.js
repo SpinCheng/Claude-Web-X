@@ -16,6 +16,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { EventEmitter } from 'node:events';
 import { Tailer } from './tailer.js';
+import { AgentTracker } from './agents.js';
 import { applyLine, fenceTitle } from './parsers-cc.js';
 
 const ACTIVE_WINDOW_MS = 120_000;
@@ -37,16 +38,26 @@ export class CcAdapter extends EventEmitter {
     } catch { /* corrupt file -> start empty */ }
     this.tailers = new Map(); // transcriptPath -> { tailer, id }
     this.archived = new Set(); // transcriptPaths deleted via archiveSession (tombstones)
+    // v112: subagent transcripts (<sid>/subagents/agent-*.jsonl) - same
+    // recursive watcher, different consumer; NOT sessions
+    this.agents = new AgentTracker();
+    this.agents.on('agent', (f) => this.emit('agent', f));
     this._pending = new Set();
     this._drainTimer = null;
   }
 
   start() {
     this.rescan();
+    try { this.agents.scanAll(this.root); } catch { /* non-fatal */ }
     try {
       this.watcher = fs.watch(this.root, { recursive: true }, (evt, file) => {
         if (!file) return;
-        const p = path.join(this.root, file.split(/[\\/]/).join(path.sep));
+        const rel = file.split(/[\\/]/);
+        const p = path.join(this.root, ...rel);
+        // v112: nested agent transcripts route to the tracker - registering
+        // them as sessions created ghost rows (single-level rescan never saw
+        // the file -> evicted ~20s later -> list flicker)
+        if (rel.includes('subagents')) { this.agents.touch(p); return; }
         if (p.endsWith('.jsonl')) this._scheduleDrain(p);
       });
     } catch {
@@ -96,6 +107,7 @@ export class CcAdapter extends EventEmitter {
 
   _ensureSession(transcriptPath, projectDirName) {
     if (this.tailers.has(transcriptPath) || this.archived.has(transcriptPath)) return;
+    if (transcriptPath.split(path.sep).includes('subagents')) return; // agent transcript, not a session
     const id = path.basename(transcriptPath, '.jsonl');
     this.tailers.set(transcriptPath, { tailer: new Tailer(transcriptPath), id });
     let st = { mtimeMs: 0, size: 0 };
@@ -162,6 +174,9 @@ export class CcAdapter extends EventEmitter {
     if (after && after.status === 'active' && Date.now() - after.lastActive > ACTIVE_WINDOW_MS) {
       this.store.upsert({ id: entry.id, status: 'idle' });
     }
+    // v112: parent transcript feeds the agent tracker (Agent tool_use spawns
+    // + tool_result completions); boot replays are net-zero for finished pairs
+    if (events.length) this.agents.onParentEvents(entry.id, events);
     if (emitAppends && events.length > 0) {
       this.emit('append', { id: entry.id, events });
     }

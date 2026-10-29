@@ -44,6 +44,49 @@ test('slash-command envelope normalizes to /name args', () => {
   assert.equal(events[0].text, '/goal do it');
 });
 
+test('local-command-caveat line folds out; caveat prefix is stripped (v110)', () => {
+  const CAVEAT = '<local-command-caveat>The command below was run directly in Claude Code, not sent to you as a request. It' + String.fromCharCode(39) + 's recorded here as context.</local-command-caveat>';
+  const a = run([user({ message: { role: 'user', content: CAVEAT } })]);
+  assert.equal(a.events.length, 0, 'caveat-only line folds out entirely');
+  const b = run([user({ message: { role: 'user', content: CAVEAT + 'real text' } })]);
+  assert.equal(b.events[0].text, 'real text', 'caveat stripped when real text follows');
+});
+
+test('command stdout surfaces as cmdout; goal hook injection folds (v111)', () => {
+  const a = run([user({ message: { role: 'user', content: '<local-command-stdout>Set model to ' + String.fromCharCode(96) + 'x' + String.fromCharCode(96) + '</local-command-stdout>' } })]);
+  assert.equal(a.events[0].k, 'cmdout', 'user-line stdout carrier -> cmdout');
+  assert.equal(a.events[0].text, 'Set model to ' + String.fromCharCode(96) + 'x' + String.fromCharCode(96));
+  const b = run([{ type: 'system', subtype: 'local_command', timestamp: '2026-10-29T00:00:00.000Z', content: '<local-command-stdout>Goal set: do it</local-command-stdout>' }]);
+  assert.equal(b.events[0].k, 'cmdout', 'system/local_command carrier -> cmdout');
+  assert.equal(b.events[0].text, 'Goal set: do it');
+  const c = run([user({ message: { role: 'user', content: 'A session-scoped Stop hook is now active with condition: "ok". Acknowledge.' } })]);
+  assert.equal(c.events.length, 0, 'hook injection line never a human bubble');
+});
+
+test('prompt-type command expand body folds; local stdout disarms (v114)', () => {
+  const ENV = '<command-message>x</command-message>\n<command-name>/x</command-name>\n<command-args></command-args>';
+  const um = (t) => user({ timestamp: t, message: { role: 'user', content: t === 't2a' ? 'Say exactly: RAN' : t === 't2b' ? '<local-command-stdout>Set model to x</local-command-stdout>' : 'human msg ' + t } });
+  // prompt-type (custom .md / init): envelope -> expanded template body
+  const rec = {};
+  const a = applyLine('s', user({ timestamp: 't1', message: { role: 'user', content: ENV } }), {}, [], rec);
+  assert.equal(a.text, '/x', 'envelope normalized');
+  assert.equal(rec._cmdEnv, true, 'armed');
+  assert.equal(applyLine('s', um('t2a'), {}, [], rec), null, 'expanded body folds');
+  assert.equal(applyLine('s', um('t3'), {}, [], rec).text, 'human msg t3', 'next human message survives');
+  // local-type via USER stdout carrier (/model shape): stdout disarms
+  const rec2 = {};
+  applyLine('s', user({ timestamp: 't1', message: { role: 'user', content: ENV } }), {}, [], rec2);
+  const so = applyLine('s', um('t2b'), {}, [], rec2);
+  assert.equal(so.k, 'cmdout', 'stdout still surfaces');
+  assert.equal(rec2._cmdEnv, false, 'stdout disarms the fold');
+  assert.equal(applyLine('s', um('t3'), {}, [], rec2).text, 'human msg t3', 'human message not swallowed');
+  // assistant also disarms
+  const rec3 = {};
+  applyLine('s', user({ timestamp: 't1', message: { role: 'user', content: ENV } }), {}, [], rec3);
+  applyLine('s', assistant([{ type: 'text', text: 'done' }]), {}, [], rec3);
+  assert.equal(applyLine('s', um('t9'), {}, [], rec3).text, 'human msg t9', 'assistant disarms');
+});
+
 test('CLI-injected [Image: source] turn is folded out', () => {
   const { events } = run([user({ message: { role: 'user', content: '[Image: source: C:\\t\\x.png]' } })]);
   assert.equal(events.length, 0);

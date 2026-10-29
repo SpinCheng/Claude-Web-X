@@ -14,8 +14,9 @@ export function createHub({ cfg, store, runner }) {
     const raw = JSON.stringify(obj);
     for (const ws of clients) {
       if (ws.readyState !== 1) continue;
-      // append events only go to the subscriber of that session
-      if (obj.type === 'append' && ws.subId !== obj.id) continue;
+      // append events only go to the subscriber of that session; v112 agent
+      // summary frames follow the same per-session routing
+      if ((obj.type === 'append' || obj.type === 'agent') && ws.subId !== obj.id) continue;
       ws.send(raw);
     }
   }

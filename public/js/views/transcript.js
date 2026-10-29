@@ -6,8 +6,12 @@
 
 import { $, fmtTs } from '../util.js';
 import { state } from '../state.js';
-import { miniMd, linkifyPaths } from '../md.js';
-import { openLightbox, previewArtifact } from './overlays.js';
+import { miniMd, linkifyPaths, linkifyDom } from '../md.js';
+import { openLightbox, previewArtifact, openHtmlPreview } from './overlays.js';
+// v112 function-level cycle (same pattern as composer<->detail): the agent
+// live-line/chip open the bubble; agentview imports the node renderers back.
+// Zero cross-calls at module-evaluation time.
+import { openAgentView } from './agentview.js';
 
 /* ---------------- turn model ---------------- */
 function sessionLive(id) {
@@ -82,6 +86,10 @@ function applyEventToTurns(ev) {
     // tool results arrive as later user lines; pair each back to its tool_use
     // step by id (search recent bot turns from the tail)
     return pairToolResults(T, ev, state.orphanToolRes); // re-render from this turn so the output shows up
+  } else if (ev.k === 'cmdout') {
+    // v111: the executed command's stdout - its own right-aligned panel right
+    // under the command bubble (never merges into a bot turn)
+    T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
   } else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') {
     T.push(sysMarkerTurn(ev));
   } else if (ev.k === 'title') { /* meta only */ }
@@ -259,11 +267,14 @@ function nodeEl(kind, head, bodyBuilder, open) {
   const h = document.createElement(plain ? 'div' : 'button');
   h.className = 'node-head';
   h.innerHTML = '<span class="badge"></span>' +
+    (head.bg ? '<span class="ag-bgtag">后台</span>' : '') +
+    (head.title ? '<span class="t"></span>' : '') +
     (head.meta ? '<span class="dur"></span>' : '') +
     (head.link ? '<span class="lnk"></span>' : '') +
     (head.diff ? '<span class="diffbadge"><span class="add"></span><span class="del"></span></span>' : '') +
     (plain ? '' : '<span class="chev">' + CHEV_S + '</span>');
   h.querySelector('.badge').textContent = head.badge;
+  if (head.title) h.querySelector('.t').textContent = head.title;
   if (head.meta) h.querySelector('.dur').textContent = '· ' + head.meta;
   if (head.link) h.querySelector('.lnk').textContent = head.link;
   if (head.diff) {
@@ -343,10 +354,230 @@ function fileChanges(t) {
   return [...byKey.values()];
 }
 
+// v112: render one turn's steps into a .timeline container. Shared by the
+// main view (renderTurn) and the subagent bubble (agentview.js) - the agent
+// node branch below is therefore written ONCE.
+const AGENT_TOOLS = { Agent: 1, Task: 1 };
+function renderStepsInto(tl, steps, live) {
+  const textSteps = steps.filter((s) => s.t === 'text');
+  const concl = textSteps.length ? textSteps[textSteps.length - 1].v : '';
+  for (const s of steps) {
+    if (s.t === 'think') {
+      tl.appendChild(nodeEl('think', { badge: '思考' }, (b) => {
+        const d = document.createElement('div');
+        d.className = 'think';
+        d.textContent = s.v;
+        b.appendChild(d);
+      }, live));
+    } else if (s.t === 'tool') {
+      const tool = s.tool;
+      const isAgent = AGENT_TOOLS[tool.name] === 1;
+      const ag = isAgent ? (state.agents[tool.id] || null) : null;
+      const agRunning = !!(ag && !ag.finished && !tool.out);
+      const isEdit = !isAgent && (tool.name === 'Edit' || tool.name === 'Write' || tool.name === 'MultiEdit');
+      const diff = isEdit ? toolDiff(tool) : null;
+      const node = nodeEl('tool', {
+        badge: isAgent ? '代理' : (isEdit ? '修改' : '工具'),
+        bg: isAgent && ag && ag.bg,
+        title: isAgent ? ((ag && ag.desc) || agentDescOf(tool)) : '',
+        // head dur = elapsed (mockup 方案A), frozen at finish; tool.name is
+        // the fallback when no tracker state exists at all
+        meta: isAgent
+          ? ((ag && ag.startedAt) ? fmtAgentElapsed(ag) : tool.name)
+          : tool.name,
+        link: isAgent ? '' : toolLink(tool),
+        diff,
+      }, (b) => {
+        const c = document.createElement('div');
+        c.className = 'tool-chip';
+        const p = document.createElement('span');
+        p.className = 'p';
+        p.textContent = '⚙ ';
+        c.appendChild(p);
+        if (isAgent) {
+          c.appendChild(document.createTextNode(
+            (ag && ag.finished && !tool.out ? '完成' + (ag.steps ? ' · ' + ag.steps + ' 步' : '') : tool.name) + ' · '));
+          c.appendChild(document.createTextNode((ag && ag.desc) || agentDescOf(tool)));
+          c.style.cursor = 'pointer';
+          c.onclick = () => openAgentView(tool.id);
+        } else {
+          c.appendChild(document.createTextNode(tool.name + ' '));
+          linkifyPaths(c, tool.v || '', previewArtifact);
+        }
+        b.appendChild(c);
+        // the run's actual output, paired back from the tool_result line
+        const out = tool.out;
+        if (out && (out.text || (out.images && out.images.length))) {
+          if (out.text) {
+            const o = document.createElement('pre');
+            o.className = 'tool-out' + (out.err ? ' err' : '');
+            linkifyPaths(o, out.text, previewArtifact);
+            b.appendChild(o);
+          }
+          if (out.images && out.images.length) {
+            const box = document.createElement('div');
+            box.className = 'tool-out-imgs';
+            for (const im of out.images) {
+              const img = document.createElement('img');
+              img.className = 'bubble-img';
+              img.alt = '工具输出图片';
+              img.src = 'data:' + im.mt + ';base64,' + im.data;
+              img.onclick = () => openLightbox(img.src);
+              box.appendChild(img);
+            }
+            b.appendChild(box);
+          }
+        }
+      }, live || agRunning);
+      if (isAgent) {
+        node.dataset.agent = tool.id;
+        if (agRunning || (ag && ag.finished && !tool.out)) {
+          node.insertBefore(agentLiveLine(tool.id, ag), node.querySelector('.node-body'));
+        }
+        if (agRunning) {
+          const dot = node.querySelector('.dot-tool');
+          if (dot) dot.classList.add('on');
+        }
+      }
+      tl.appendChild(node);
+    } else { // text step: mid-run output, or the conclusion (last one)
+      const isConcl = s === textSteps[textSteps.length - 1];
+      if (isConcl && concl && !live) {
+        tl.appendChild(nodeEl('final', { badge: '结论' }, (b) => {
+          const d = document.createElement('div');
+          d.className = 'final';
+          d.innerHTML = miniMd(concl);
+          linkifyDom(d, previewArtifact);
+          b.appendChild(d);
+        }));
+      } else {
+        tl.appendChild(nodeEl('mid', { badge: '输出' }, (b) => {
+          const d = document.createElement('div');
+          d.className = 'mid';
+          linkifyPaths(d, s.v, previewArtifact);
+          b.appendChild(d);
+        }));
+      }
+    }
+  }
+}
+
+// description from the Agent tool_use input - v is briefJson({description,
+// prompt}) truncated at 300 chars, so a JSON.parse can fail mid-string; a
+// regex on the raw text survives truncation
+function agentDescOf(tool) {
+  const m = /"description"\s*:\s*"((?:[^"\\]|\\.){0,80})/.exec(tool.v || '');
+  if (m) { try { return JSON.parse('"' + m[1] + '"'); } catch { return m[1]; } }
+  return tool.name;
+}
+
+// v112: the live-line under an agent node's head - OUTSIDE .node-body so it
+// stays visible while the node is folded (直播行不属于折叠体). Mockup 方案A:
+// ↳ <act> · 第 N 步 … <elapsed> <全文 ›>
+function agentLiveLine(toolUseId, ag) {
+  const d = document.createElement('div');
+  d.className = 'agent-live' + (ag && ag.finished ? ' done' : '');
+  const pulse = document.createElement('span');
+  pulse.className = 'al-pulse';
+  const txt = document.createElement('span');
+  txt.className = 'al-txt';
+  txt.textContent = agentLiveText(ag);
+  const st = document.createElement('span');
+  st.className = 'al-step';
+  if (ag && !ag.finished && ag.startedAt) st.textContent = fmtAgentElapsed(ag);
+  const full = document.createElement('span');
+  full.className = 'al-full';
+  full.textContent = '全文 ›';
+  d.append(pulse, txt, st, full);
+  d.title = '查看子代理执行全文';
+  d.onclick = () => openAgentView(toolUseId);
+  return d;
+}
+function agentLiveText(ag) {
+  if (!ag) return '↳ 启动中';
+  if (ag.finished) return '已完成 · ' + (ag.steps || 0) + ' 步';
+  return '↳ ' + (ag.act || '启动中') + (ag.steps ? ' · 第 ' + ag.steps + ' 步' : '');
+}
+// elapsed frozen at finishedAt once the agent completes (v115: the bubble
+// head + node dur used to keep counting past completion)
+function fmtAgentElapsed(a) {
+  if (!a || !a.startedAt) return '';
+  const end = a.finished ? (a.finishedAt || Date.now()) : Date.now();
+  const sec = Math.max(0, Math.floor((end - a.startedAt) / 1000));
+  return Math.floor(sec / 60) + 'm' + String(sec % 60).padStart(2, '0') + 's';
+}
+
+// v112: agent summary frame landed - patch the rendered node in place; never
+// touches state.turns or the chat child list (renderTail's 1:1 invariant and
+// scroll position are untouched)
+function updateAgentNode(d) {
+  const a = state.agents[d.toolUseId];
+  if (!a) return;
+  const sel = (window.CSS && CSS.escape) ? CSS.escape(d.toolUseId) : d.toolUseId;
+  const el = document.querySelector('#chat .node[data-agent="' + sel + '"]');
+  if (!el) return;
+  if (d.state === 'done') {
+    const line = el.querySelector('.agent-live');
+    if (line) {
+      line.classList.add('done');
+      const t = line.querySelector('.al-txt');
+      if (t) t.textContent = agentLiveText(a);
+      const s2 = line.querySelector('.al-step');
+      if (s2) s2.textContent = '';
+    }
+    const dot = el.querySelector('.dot-tool');
+    if (dot) dot.classList.remove('on');
+    // freeze the head dur at the final elapsed
+    const dur = el.querySelector('.node-head .dur');
+    if (dur && a.startedAt) dur.textContent = '· ' + fmtAgentElapsed(a);
+    return;
+  }
+  const line = el.querySelector('.agent-live');
+  if (!line) {
+    // node rendered before its first frame landed (fetch raced the frame):
+    // re-render just the turn that owns this step
+    for (let i = state.turns.length - 1; i >= 0; i--) {
+      const t = state.turns[i];
+      if (t.role === 'bot' && (t.steps || []).some((x) => x.t === 'tool' && x.tool.id === d.toolUseId)) {
+        renderTail(i + 1);
+        break;
+      }
+    }
+    return;
+  }
+  const t = line.querySelector('.al-txt');
+  if (t) t.textContent = agentLiveText(a);
+}
+
+// v112: 1s ticker - head dur + live-line text/elapsed on every visible agent
+// node (frozen ones are written once and left alone)
+function updateAgentClocks() {
+  document.querySelectorAll('#chat .node[data-agent]').forEach((el) => {
+    const id = el.dataset.agent;
+    const a = state.agents[id];
+    if (!a || a.finished || !a.startedAt) return;
+    const dur = el.querySelector('.node-head .dur');
+    if (dur) dur.textContent = '· ' + fmtAgentElapsed(a);
+    const line = el.querySelector('.agent-live');
+    if (!line) return;
+    const t = line.querySelector('.al-txt');
+    if (t) t.textContent = agentLiveText(a);
+    const st = line.querySelector('.al-step');
+    if (st) st.textContent = fmtAgentElapsed(a);
+  });
+}
+
 function renderTurn(t) {
   if (t.role === 'sys') {
     const d = document.createElement('div');
     d.className = 'sysline';
+    d.textContent = t.text;
+    return d;
+  }
+  if (t.role === 'cmdout') {
+    // v111: executed-command stdout - same side as the command bubble
+    const d = document.createElement('div');
+    d.className = 'cmdout';
     d.textContent = t.text;
     return d;
   }
@@ -357,7 +588,17 @@ function renderTurn(t) {
     row.className = 'turn user';
     const d = document.createElement('div');
     d.className = 'bubble user' + (t.optimistic ? ' pending' : '');
-    d.textContent = t.text;
+    // v109: a leading slash-command shows as a tag chip + args text. Known =
+    // the composer's fetched name set; if that never loaded (menu unused),
+    // any leading /token still tags (chip sends are the common case).
+    const cm = /^\/([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?:\s+([\s\S]*))?$/.exec(t.text || '');
+    if (cm && (!state.cmdNames || state.cmdNames.has(cm[1].toLowerCase()))) {
+      const tag = document.createElement('span'); tag.className = 'b-tag'; tag.textContent = '/' + cm[1];
+      d.appendChild(tag);
+      if (cm[2]) d.appendChild(document.createTextNode(' ' + cm[2]));
+    } else {
+      d.textContent = t.text;
+    }
     for (const im of t.images || []) {
       const img = document.createElement('img');
       img.className = 'bubble-img';
@@ -428,82 +669,14 @@ function renderTurn(t) {
 
     const tl = document.createElement('div');
     tl.className = 'timeline';
-    for (const s of steps) {
-      if (s.t === 'think') {
-        tl.appendChild(nodeEl('think', { badge: '思考' }, (b) => {
-          const d = document.createElement('div');
-          d.className = 'think';
-          d.textContent = s.v;
-          b.appendChild(d);
-        }, live));
-      } else if (s.t === 'tool') {
-        const tool = s.tool;
-        const isEdit = tool.name === 'Edit' || tool.name === 'Write' || tool.name === 'MultiEdit';
-        const diff = isEdit ? toolDiff(tool) : null;
-        tl.appendChild(nodeEl('tool', {
-          badge: isEdit ? '修改' : '工具',
-          meta: tool.name,
-          link: toolLink(tool),
-          diff,
-        }, (b) => {
-          const c = document.createElement('div');
-          c.className = 'tool-chip';
-          const p = document.createElement('span');
-          p.className = 'p';
-          p.textContent = '⚙ ';
-          c.appendChild(p);
-          c.appendChild(document.createTextNode(tool.name + ' '));
-          linkifyPaths(c, tool.v || '', previewArtifact);
-          b.appendChild(c);
-          // the run's actual output, paired back from the tool_result line
-          const out = tool.out;
-          if (out && (out.text || (out.images && out.images.length))) {
-            if (out.text) {
-              const o = document.createElement('pre');
-              o.className = 'tool-out' + (out.err ? ' err' : '');
-              linkifyPaths(o, out.text, previewArtifact);
-              b.appendChild(o);
-            }
-            if (out.images && out.images.length) {
-              const box = document.createElement('div');
-              box.className = 'tool-out-imgs';
-              for (const im of out.images) {
-                const img = document.createElement('img');
-                img.className = 'bubble-img';
-                img.alt = '工具输出图片';
-                img.src = 'data:' + im.mt + ';base64,' + im.data;
-                img.onclick = () => openLightbox(img.src);
-                box.appendChild(img);
-              }
-              b.appendChild(box);
-            }
-          }
-        }, live));
-      } else { // text step: mid-run output, or the conclusion (last one)
-        const isConcl = s === textSteps[textSteps.length - 1];
-        if (isConcl && concl && !live) {
-          tl.appendChild(nodeEl('final', { badge: '结论' }, (b) => {
-            const d = document.createElement('div');
-            d.className = 'final';
-            d.innerHTML = miniMd(concl);
-            b.appendChild(d);
-          }));
-        } else {
-          tl.appendChild(nodeEl('mid', { badge: '输出' }, (b) => {
-            const d = document.createElement('div');
-            d.className = 'mid';
-            linkifyPaths(d, s.v, previewArtifact);
-            b.appendChild(d);
-          }));
-        }
-      }
-    }
+    renderStepsInto(tl, steps, live);
     wrap.appendChild(tl);
   }
   if (concl || (live && steps.length === 0)) {
     const b = document.createElement('div');
     b.className = 'final-card';
     if (concl) b.innerHTML = miniMd(concl);
+    if (concl) linkifyDom(b, previewArtifact);
     if (live) appendCaret(b);
     wrap.appendChild(b);
     // v45 (6C+6B): changed-files rollup under the conclusion - one collapsed
@@ -593,6 +766,17 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
   const code = btn.parentElement && btn.parentElement.querySelector('code');  if (!code) return;
   copyText(code.textContent, btn);
+});
+
+/* v104: same-origin links rendered by miniMd open the in-app sandboxed
+   preview page instead of leaving the PWA; cross-origin keeps _blank */
+$('chat').addEventListener('click', (e) => {
+  const a = e.target.closest('a[href]');
+  if (!a || a.classList.contains('flink')) return;
+  let u; try { u = new URL(a.href, location.href); } catch { return; }
+  if (u.origin !== location.origin) return;
+  e.preventDefault();
+  openHtmlPreview({ url: a.href, name: a.textContent });
 });
 function copyText(text, btn) {
   const done = () => {
@@ -714,6 +898,7 @@ function parseOlderTurns(events) {
       turn.ts = turn.ts || ev.ts;
       for (const p of ev.parts || []) addAssistantPart(turn, p);
     } else if (ev.k === 'toolres') pairToolResults(T, ev, state.orphanToolRes);
+    else if (ev.k === 'cmdout') T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
     else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') T.push(sysMarkerTurn(ev));
   }
   return T;
@@ -768,4 +953,6 @@ window.addEventListener('resize', updateJumpFab);
 export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderAllTurns, renderTurn, renderTail, updateJumpFab, scrollBottom,
   pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns, fileChanges,
-  pairToolResults, drainOrphanRes, mergeBotTurns, copyText };
+  pairToolResults, drainOrphanRes, mergeBotTurns, copyText,
+  nodeEl as renderNode, renderStepsInto, newBotTurn, addAssistantPart,
+  updateAgentNode, updateAgentClocks };

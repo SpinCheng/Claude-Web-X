@@ -8,9 +8,11 @@ import { auth, api, tryToken, setUnauthorized } from './js/api.js';
 import { initWs, connectWs, sendWs } from './js/ws.js';
 import { $ } from './js/util.js';
 import { toast } from './js/views/toast.js';
-import { BUBBLES, queueApproval, showApproval, fetchPendingApprovals, showConfirm } from './js/views/overlays.js';
+import { BUBBLES, queueApproval, showApproval, fetchPendingApprovals, showConfirm, closeHtmlPreview } from './js/views/overlays.js';
 import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
-  markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser } from './js/views/transcript.js';
+  markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser,
+  updateAgentNode, updateAgentClocks } from './js/views/transcript.js';
+import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
@@ -82,9 +84,16 @@ window.addEventListener('popstate', (e) => {
   const open = BUBBLES.find((id) => !$(id).classList.contains('hidden'));
   if (open) {
     $(open).classList.add('hidden');
+    if (open === 'agent-sheet') state.agentView = null; // v112 bubble state
     if (state.currentId) history.pushState({ cr: 'detail' }, '', '#s'); // restore the consumed detail entry
     return;
   }
+  // v104/v107: in-app html preview page absorbs back (it pushed its own
+  // entry with a unique #hp/N url so traversal always fires popstate);
+  // a stale htmlprev entry (preview already closed) is a no-op, never a
+  // fall-through to the detail-exit branch
+  if (!$('html-prev').classList.contains('hidden')) { closeHtmlPreview(); return; }
+  if (e.state && e.state.cr === 'htmlprev') return;
   // system back inside detail returns to the list
   if (state.currentId) {
     sendWs({ type: 'unsubscribe' });
@@ -241,7 +250,7 @@ $('back').onclick = () => {
   else closeDetail();
 };
 $('del').onclick = deleteSession;
-setInterval(() => { if (state.currentId) updateRunStatus(); }, 1000);
+setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); } }, 1000);
 
 /* ---------------- wiring: transport <-> semantics ---------------- */
 initWs({
@@ -308,6 +317,22 @@ initWs({
     if (d.sessionId === state.currentId) renderWaitBanner();
   },
   run: handleRunFrame,
+  agent: (d) => {
+    // v112 方案A: subagent summary frame -> state + in-place node patch. The
+    // bubble refresh keys off agentId (works even pre-attribution).
+    if (d.id !== state.currentId || !d.toolUseId) { onAgentFrame(d); return; }
+    const prev = state.agents[d.toolUseId] || {};
+    state.agents[d.toolUseId] = {
+      agentId: d.agentId, desc: d.desc || prev.desc || '', agentType: d.agentType || '',
+      bg: !!d.bg, finished: d.state === 'done' || !!prev.finished, state: d.state,
+      steps: d.steps || prev.steps || 0, act: d.act || '', startedAt: d.startedAt || prev.startedAt || 0,
+      // completion moment freezes every timer (v115); a toolres-done without
+      // a bridge finishedAt still freezes locally at frame time
+      finishedAt: d.finishedAt || prev.finishedAt || (d.state === 'done' ? Date.now() : 0),
+    };
+    updateAgentNode(d);
+    onAgentFrame(d);
+  },
   approval: queueApproval,
   'approval-result': (d) => {
     // a decision landed (this client or another); drop it if still queued
