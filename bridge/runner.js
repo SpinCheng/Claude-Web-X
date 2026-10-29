@@ -39,6 +39,8 @@ export class Runner extends EventEmitter {
     this._qseq = 0;
     this._claudeExe = null;
     this._settingsEnv = null;
+    // v94: hung-CLI janitor (see _watchdog)
+    this._watchdogTimer = setInterval(() => this._watchdog(), 30_000);
   }
 
   // live or recently-finished run record (for approval routing)
@@ -164,6 +166,44 @@ export class Runner extends EventEmitter {
   start(text, cwd, opts = {}) {
     if (!text) return { error: 'bad-request' };
     return this._spawnRun([], text, cwd || os.homedir(), null, opts.perm || 'auto', opts.model || '', opts.effort || '');
+  }
+
+  // v94: a CLI process can linger after finishing its turn when the Stop
+  // hook hangs (curl without a timeout used to hang indefinitely). The
+  // transcript already says the turn is done - a stop-class system line
+  // written AFTER this run started. Force-end such runs: kill the child;
+  // the regular close handler books the outcome and drains the queue.
+  _watchdog() {
+    for (const run of this.runs.values()) {
+      if (run.state !== 'running' || !run.sessionId || run.watchdogFired) continue;
+      const rec = this.store && this.store.get(run.sessionId);
+      const tp = rec && rec.transcriptPath;
+      if (!tp) continue;
+      let st; try { st = fs.statSync(tp); } catch { continue; }
+      if (st.mtimeMs < run.startedAt + 1000) continue; // nothing written since start (cold start / idle)
+      let tail = '';
+      try {
+        const len = Math.min(64 * 1024, st.size);
+        const buf = Buffer.alloc(len);
+        const fd = fs.openSync(tp, 'r');
+        fs.readSync(fd, buf, 0, len, st.size - len);
+        fs.closeSync(fd);
+        tail = buf.toString('utf8');
+      } catch { continue; }
+      const lines = tail.split('\n').filter((l) => l.trim());
+      for (let i = lines.length - 1; i >= 0 && i >= lines.length - 10; i--) {
+        let o; try { o = JSON.parse(lines[i]); } catch { continue; }
+        if (o.type === 'system' && typeof o.subtype === 'string' && o.subtype.startsWith('stop')) {
+          const ts = Date.parse(o.timestamp || '');
+          if (!isNaN(ts) && ts > run.startedAt - 1000) {
+            run.watchdogFired = true;
+            console.log(`[runner] watchdog: run ${run.runId} force-ended (transcript complete, CLI lingering)`);
+            try { run.child.kill(); } catch { /* already gone */ }
+          }
+          break; // only the last stop-class line is relevant
+        }
+      }
+    }
   }
 
   cancel(runId) {
