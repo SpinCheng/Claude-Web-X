@@ -68,7 +68,7 @@ function openRowActions(id) {
   // those surface as the wait banner instead)
   const running = (state.runs[id] || {}).state === 'running' || !!s.running;
   if (running) list.appendChild(actRow(I.stop, '停止运行', '中断这台手机发起的运行', 'warn', () => stopFromList(id)));
-  list.appendChild(actRow(I.copy, '复制名称 / 路径 / ID', '写入剪贴板（三行）', '', () => copySessionInfo(id)));
+  list.appendChild(actRow(I.copy, '复制信息', '复制名称 / 路径 / 会话 ID', '', () => openCopyScope(id)));
   list.appendChild(actRow(I.pencil, '重命名', '修改会话显示名', '', () => openRename(id)));
   list.appendChild(actRow(I.down, '导出 Markdown', '下载完整记录或结论摘要', '', () => openExportScope(id)));
   list.appendChild(actRow(I.trash, '删除会话', '转录移入电脑回收站，可找回', 'danger', () => deleteFromList(id)));
@@ -87,46 +87,52 @@ function actRow(icon, label, sub, tone, fn) {
   return el;
 }
 
-/* ---------------- copy (v95): name / cwd / id in one shot ---------------- */
-function copySessionInfo(id) {
+/* ---------------- copy (v96): export-style second-level picker ------------ */
+// scope swap INSIDE the same bubble, exactly like openExportScope; the 返回
+// row re-runs openRowActions which restores title/sub from the session record.
+function openCopyScope(id) {
   const s = state.sessions.find((x) => x.id === id);
   if (!s) return;
-  const info = [s.title || s.id.slice(0, 8), s.cwd || s.project || '', s.id].join('\n');
+  const sheet = document.querySelector('#row-actions .act-bubble');
+  sheet.querySelector('.act-title').textContent = '复制信息';
+  sheet.querySelector('.act-sub').textContent = s.title || s.id.slice(0, 8);
+  const list = sheet.querySelector('.act-list');
+  list.innerHTML = '';
+  list.appendChild(actRow(I.copy, '复制名称', s.title || s.id.slice(0, 8), '', () => doCopy(id, 'name')));
+  list.appendChild(actRow(I.copy, '复制路径', s.cwd || s.project || '(无路径)', '', () => doCopy(id, 'cwd')));
+  list.appendChild(actRow(I.copy, '复制会话 ID', s.id, '', () => doCopy(id, 'id')));
+  list.appendChild(actRow(I.back, '返回', '回到会话操作', '', () => openRowActions(id)));
+}
+function doCopy(id, what) {
   closeBubble('row-actions');
-  copyText(info);
-  toast('已复制：名称、路径、会话 ID');
+  const s = state.sessions.find((x) => x.id === id) || {};
+  const map = { name: s.title || s.id.slice(0, 8), cwd: s.cwd || s.project || '', id: s.id };
+  const label = { name: '名称', cwd: '路径', id: '会话 ID' }[what];
+  if (!map[what]) { toast('没有可复制的' + label); return; }
+  copyText(map[what]);
+  toast('已复制' + label);
 }
 
 
-/* ---------------- group copy (v95): project name / path ---------------- */
+/* ---------------- group copy (v96): reuses the row-actions bubble shell --- */
 export function openGroupCopy(g) {
-  closeBubble('row-actions');
-  // lightweight inline bubble anchored as a bottom bubble (same overlay
-  // machinery feel); built on the fly, removed on dismissal
-  const ov = document.createElement('div');
-  ov.className = 'overlay bub';
-  ov.id = 'group-copy';
-  const sheet = document.createElement('div');
-  sheet.className = 'sheet bubble act-bubble';
-  const title = document.createElement('div');
-  title.className = 'act-title';
-  title.textContent = g.label;
-  const list = document.createElement('div');
-  list.className = 'act-list';
+  // same shell as session actions (scrim/back/all overlay machinery); the
+  // next openRowActions call restores the shell from the session record
+  const sheet = document.querySelector('#row-actions .act-bubble');
+  sheet.querySelector('.act-title').textContent = g.label;
+  sheet.querySelector('.act-sub').textContent = g.path || '';
+  const list = sheet.querySelector('.act-list');
+  list.innerHTML = '';
   const mk = (label, sub, text) => {
-    const row = actRow(I.copy, label, sub, '', () => {
+    list.appendChild(actRow(I.copy, label, sub, '', () => {
+      closeBubble('row-actions');
       copyText(text);
       toast('已复制：' + label);
-      ov.remove();
-    });
-    list.appendChild(row);
+    }));
   };
   mk('复制项目名称', '目录的显示名', g.label);
   mk('复制完整路径', g.path, g.path);
-  ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
-  sheet.append(title, list);
-  ov.appendChild(sheet);
-  document.body.appendChild(ov);
+  openBubble('row-actions');
 }
 
 /* ---------------- stop ---------------- */
