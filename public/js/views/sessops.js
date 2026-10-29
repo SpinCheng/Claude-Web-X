@@ -99,7 +99,7 @@ function copySessionInfo(id) {
 
 
 /* ---------------- group copy (v95): project name / path ---------------- */
-function openGroupCopy(g) {
+export function openGroupCopy(g) {
   closeBubble('row-actions');
   // lightweight inline bubble anchored as a bottom bubble (same overlay
   // machinery feel); built on the fly, removed on dismissal

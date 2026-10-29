@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../../bridge/store.js';
 import { CcAdapter } from '../../bridge/adapter-cc.js';
@@ -71,10 +72,18 @@ export async function waitSession(sid) {
 
 export async function bootPage(profileDir) {
   if (!EDGE) throw new Error('msedge not found');
-  const edge = spawn(EDGE, ['--headless=new', `--remote-debugging-port=${CDP}`, `--user-data-dir=${path.join(profileDir, 'edgeprof')}`, '--no-first-run', 'about:blank'], { stdio: 'ignore' });
+  // v96: a DYNAMIC debugging port per boot - a crashed earlier run leaves
+  // zombie headless Edge holding the fixed port, and every later browser
+  // scenario then connects to the zombie and times out (api scenarios pass,
+  // browser ones all fail - the v95 commit-run failure mode).
+  const cdp = await new Promise((res) => {
+    const srv = net.createServer();
+    srv.listen(0, '127.0.0.1', () => { const p = srv.address().port; srv.close(() => res(p)); });
+  });
+  const edge = spawn(EDGE, ['--headless=new', `--remote-debugging-port=${cdp}`, `--user-data-dir=${path.join(profileDir, 'edgeprof')}`, '--no-first-run', 'about:blank'], { stdio: 'ignore' });
   let wsUrl = null;
   for (let i = 0; i < 30 && !wsUrl; i++) {
-    try { const l = await (await fetch(`http://127.0.0.1:${CDP}/json`)).json(); wsUrl = (l.find((t) => t.type === 'page') || {}).webSocketDebuggerUrl; } catch { /* booting */ }
+    try { const l = await (await fetch(`http://127.0.0.1:${cdp}/json`)).json(); wsUrl = (l.find((t) => t.type === 'page') || {}).webSocketDebuggerUrl; } catch { /* booting */ }
     if (!wsUrl) await sleep(300);
   }
   if (!wsUrl) { edge.kill(); throw new Error('no CDP target'); }
