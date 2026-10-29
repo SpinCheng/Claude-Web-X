@@ -58,6 +58,20 @@ function fetchSessions() {
       state.waits = {};
       for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
       renderList(); renderMeta(); renderWaitBanner();
+      // v102: an open detail view also refreshes its transcript - a
+      // background turn may have finished while the PWA was suspended
+      const cur = state.currentId;
+      if (cur) {
+        api('/api/sessions/' + encodeURIComponent(cur) + '/messages')
+          .then((r) => r.json())
+          .then((d) => {
+            if (state.currentId !== cur) return;
+            buildTurns(d.events || []);
+            renderAllTurns();
+            if (state.atBottom) scrollBottom();
+          })
+          .catch(() => {});
+      }
     })
     .catch(() => {});
 }
@@ -101,6 +115,28 @@ function doDeleteSession() {
     })
     .catch(() => toast('网络错误'));
 }
+
+/* ---------------- v102: resume-from-background resync ---------------- */
+// Locking the phone suspends the PWA: the WS dies without a close frame, run
+// frames are missed, and on return the UI would show stale running lamps
+// (and a stale transcript) until some unrelated frame arrived. Force a full
+// resync: WS reconnect + sessions/detail refetch; the v100 run-memory
+// reconciliation runs on the fresh sessions frame.
+let lastResume = 0;
+function resyncOnResume() {
+  const now = Date.now();
+  if (now - lastResume < 2000) return; // visibilitychange + pageshow both fire
+  lastResume = now;
+  if (!state.token) return;
+  connectWs(); // closes any dead socket and reconnects with backoff reset
+  fetchSessions();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') resyncOnResume();
+});
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) resyncOnResume(); // bfcache restore
+});
 
 /* ---------------- websocket frame semantics (transport in js/ws.js) ---------------- */
 function handleAppend(d) {
