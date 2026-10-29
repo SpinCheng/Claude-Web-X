@@ -32,6 +32,7 @@ docs/phase0/
 
 # design mockups stay local
 docs/design/
+docs/mockup-*
 
 # debug scratch (session dumps) - never commit
 sess.tmp.json
