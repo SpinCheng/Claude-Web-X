@@ -27,7 +27,7 @@ npm start          # node bridge/index.js，端口 3742
 - **等待横幅**：Notification hook **只认权限类**消息（"waiting for your input" 每轮必发且无清除时机，认了就常驻）；清除双路=该会话任何 append / Stop hook。
 - **上下文探针**：按 (cwd, modelId) 缓存，跑一次性 `-p /context`；**归档在解析判定之前、成败都执行**。
 - **重命名** = 往转录追加原生 `custom-title` 行（行尾无 `\n` 先补；不 bump lastActive）。**write-fence**：改名钉只被**活流**（emitAppends=true 的 drain）解除；boot 重放/readTranscript 无权解钉或夺标题。
-- **列表交互**：行是真 `<button>`，内嵌交互元素必须用 span（嵌 button 会被 fragment 解析器提出去打碎布局）；右键有选区守卫；长按还给文本选择。
+- **列表交互**：行是真 `<button>`，内嵌交互元素必须用 span（嵌 button 会被 fragment 解析器提出去打碎布局）；右键有选区守卫；**列表行长按不选文本**（v97 裁定反转 v35——`.srow/.pgroup-head` user-select:none，输入框除外）。
 - **审批卡**：Edit/Write/MultiEdit/NotebookEdit 渲染 ±diff，其余 JSON；**必须 createElement/textContent 构建**（模型产物拼 HTML 即 XSS 面）；「本次会话始终允许」→ 内存 Map 按会话放行。
 - **历史分页**：`readTranscript(limit, before)` → `{events,total}`（400 条展示切片，盘上全量）；加载行 `#hist-more` 在 header 下、**必须挂 #chat 外**（renderTail 1:1 不变量）；跟手渐显：f=clamp((64−scrollTop)/64) 直驱行高/透明度/内字位移（**勿加 CSS transition**）；`parseOlderTurns` 纯重放（**勿复用 applyEventToTurns**）；切在轮中间时 mergeBotTurns 缝合；跨页 toolres 先进 `state.orphanToolRes` 暂存、prepend 后回填。
 - **确认弹窗**：禁 window.confirm/alert——一律 `showConfirm({title,body,ok,danger,onOk,onCancel})`（底部 sheet 模态；danger=红钮+焦点落取消侧）。
