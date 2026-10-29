@@ -75,7 +75,10 @@ function openDetail(id) {
   fetchQueue(id);
   renderWaitBanner();
   updateRunStatus();
-  history.pushState({ cr: 'detail' }, '', '#s');
+  // unique state+url per entry: adjacent identical detail entries (open A,
+  // back out, open B...) are silently traversed by Chromium - first back dead
+  state.detailSeq++;
+  history.pushState({ cr: 'detail', n: state.detailSeq }, '', '#s/' + state.detailSeq);
 }
 function closeDetail() { // via the ← button only
   state.provisional = false; // adoption auto-opens the real session (v64 seed)

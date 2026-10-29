@@ -13,6 +13,10 @@ export const state = {
   ws: null, wsTimer: null, wsRetry: 1000,
   sessions: [],
   currentId: null,
+  detailSeq: 0,       // monotonic id for detail history entries - every
+                      // pushState({cr:'detail'}) MUST be unique (state AND
+                      // url): adjacent identical entries are silently
+                      // traversed by Chromium and eat a back press
   atBottom: true,
   runs: {},            // sessionId -> {runId, state}
   driver: null,

@@ -308,12 +308,25 @@ async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?
   setHpView(!o.sourceOnly);
   $('html-prev').classList.remove('hidden');
   hpSeq++;
-  history.pushState({ cr: 'htmlprev', n: hpSeq }, '', '#hp/' + hpSeq);
+  // bound the stack to ONE htmlprev entry: if the current entry is already a
+  // (stale) htmlprev, replace it in place instead of pushing another - a
+  // second H below the top would eat a back press via the swallow branch
+  if (history.state && history.state.cr === 'htmlprev') history.replaceState({ cr: 'htmlprev', n: hpSeq }, '', '#hp/' + hpSeq);
+  else history.pushState({ cr: 'htmlprev', n: hpSeq }, '', '#hp/' + hpSeq);
 }
 function closeHtmlPreview() {
   $('html-prev').classList.add('hidden');
   $('hp-frame').srcdoc = '';
   hpSrcText = '';
+  // convert the CURRENT htmlprev entry into a detail entry in place: leaving
+  // it behind as-is means a later #back lands on it and the popstate swallow
+  // branch eats the press (first back dead - the exact v107 family). No
+  // history.back() here - see the ruling below. Guarded: the popstate-close
+  // path calls this AFTER landing on the detail entry (cr already 'detail').
+  if (state.currentId && history.state && history.state.cr === 'htmlprev') {
+    state.detailSeq++;
+    history.replaceState({ cr: 'detail', n: state.detailSeq }, '', '#s/' + state.detailSeq);
+  }
 }
 // direct close only: a fire-and-forget history.back() here races the next
 // open's pushState (the traversal can commit late and pop the NEW entry);

@@ -85,7 +85,10 @@ window.addEventListener('popstate', (e) => {
   if (open) {
     $(open).classList.add('hidden');
     if (open === 'agent-sheet') state.agentView = null; // v112 bubble state
-    if (state.currentId) history.pushState({ cr: 'detail' }, '', '#s'); // restore the consumed detail entry
+    if (state.currentId) { // restore the consumed detail entry (unique state+url: see detail.js)
+      state.detailSeq++;
+      history.pushState({ cr: 'detail', n: state.detailSeq }, '', '#s/' + state.detailSeq);
+    }
     return;
   }
   // v104/v107: in-app html preview page absorbs back (it pushed its own
@@ -246,8 +249,18 @@ function handleRunFrame(d) {
 $('token-save').onclick = saveToken;
 $('token-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveToken(); });
 $('back').onclick = () => {
-  if (history.state && history.state.cr === 'detail') history.back();
-  else closeDetail();
+  if (history.state && history.state.cr === 'detail') {
+    const n0 = history.state.n; // entry identity: the bubble-close branch pushes
+    history.back();             // a NEW restore entry (fresh n) - not a drop
+    // hardening: Chromium can drop a traversal under a poisoned joint-session
+    // stack (pending traversal / deduped entries) - the pointer never moves
+    // and the press looks dead. Fire only when we are still on the SAME entry
+    // with the detail still open; a late popstate after a manual close is a
+    // no-op (currentId already null).
+    setTimeout(() => {
+      if (state.currentId && history.state && history.state.cr === 'detail' && history.state.n === n0) closeDetail();
+    }, 250);
+  } else closeDetail();
 };
 $('del').onclick = deleteSession;
 setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); } }, 1000);
