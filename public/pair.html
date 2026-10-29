@@ -3,86 +3,124 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1F1E1D">
-  <title>claude-remote 配对</title>
+  <meta name="theme-color" content="#1D1C1A">
+  <title>claude-web 配对</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg:#1F1E1D; --panel:#2A2927; --raise:#33312D; --line:#3D3A36;
-      --fg:#F0EEE6; --dim:#A39E94;
-      --acc:#D97757; --ok:#7DAB7E; --warn:#D9A262; --fail:#DB6B5E;
-      --mono: ui-monospace,Consolas,monospace;
+      /* 暖炭分层，与主应用 style.css 同源 */
+      --bg:#1D1C1A; --panel:#26241F; --panel2:#2E2B26; --raise:#36332D;
+      --ink-hi:rgba(255,250,240,.045); --line:#36332D;
+      --fg:#F2EDE3; --dim:#A79F92; --faint:#6E675D;
+      --acc:#D97757; --acc-strong:#E8926F; --acc-tint:rgba(217,119,87,.14);
+      --ok:#8FB98D; --warn:#D9A262; --fail:#DB6B5E;
+      --mono: ui-monospace,"Cascadia Code",Consolas,monospace;
       --sans: -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+      --sh-2: 0 2px 10px rgba(12,10,8,.35), inset 0 1px 0 var(--ink-hi);
     }
     * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:15px/1.6 var(--sans); display:flex; justify-content:center; padding:32px 16px; }
-    .card { width:min(92vw,470px); }
-    .brand { display:flex; align-items:center; gap:10px; }
-    .brand-word { font-family:var(--mono); font-weight:600; font-size:22px; }
-    .brand-dim { color:var(--dim); }
-    .brand-lamp { width:12px; height:12px; border-radius:50%; background:var(--acc); animation:breathe 2.4s ease-in-out infinite; }
-    @keyframes breathe { 50% { opacity:.3 } }
-    @media (prefers-reduced-motion: reduce) { .brand-lamp { animation:none } }
-    .sub { color:var(--dim); font-size:13px; margin:6px 0 0 22px; }
-    .panel { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; margin-top:18px; }
-    .panel h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
-    .panel .note { font-size:12px; color:var(--dim); margin:10px 0 0; word-break:break-all; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:15px/1.6 var(--sans); display:flex; justify-content:center; padding:44px 24px; }
+    .wrap { width:min(94vw, 900px); }
+
+    /* PC：品牌行（主应用同款品牌套件）+ 右侧机注；窄窗回退堆叠 */
+    .head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .brand { display:flex; align-items:center; gap:11px; }
+    .mk { position:relative; display:inline-flex; flex:none; }
+    .mk .mark { display:inline-block; width:26px; height:26px; background:var(--acc);
+      -webkit-mask: url(/brand-mark.png) center/contain no-repeat; mask: url(/brand-mark.png) center/contain no-repeat; }
+    .mk .pb { position:absolute; right:-5px; bottom:-5px; display:inline-flex; align-items:center; justify-content:center;
+      font:700 6px/1 var(--mono); padding:1.5px 3.5px; border-radius:999px;
+      color:var(--acc-strong); background:var(--panel2); border:1px solid var(--acc); box-shadow:0 1px 3px rgba(0,0,0,.45); }
+    .brand-word.t4 { font:300 16px/1 var(--sans); letter-spacing:.22em; text-transform:uppercase; }
+    .brand-word.t4.web { font-weight:600; color:var(--acc-strong); margin-left:.22em; }
+    .cap-en { font:300 9px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase;
+      color:var(--acc-strong); background:var(--acc-tint); border-radius:999px;
+      padding:3px 7px 3px 9px; margin-left:8px; align-self:flex-end; display:inline-flex; align-items:center; }
+    .brand-tag { font:400 13px var(--sans); color:var(--dim); margin-left:8px; }
+    .head-note { color:var(--faint); font:12.5px var(--mono); }
+
+    /* PC 双栏：左 QR 主区 / 右操作栏（等高拉伸） */
+    .deck { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; margin-top:24px; }
+    .side { display:flex; flex-direction:column; gap:16px; }
+    .side .panel { flex:1; }
+    .panel { background:var(--panel); border-radius:16px; padding:18px; box-shadow:var(--sh-2); }
+    .panel h2 { font-size:14px; margin:0 0 12px; font-weight:600; letter-spacing:.01em; }
+    .panel .note { font-size:12px; color:var(--dim); margin:12px 0 0; word-break:break-all; }
+    .qr-panel { display:flex; flex-direction:column; }
+    .qr-panel .note { margin-top:auto; padding-top:12px; }
     .qrbox { display:flex; justify-content:center; padding:14px; background:#fff; border-radius:12px; }
     canvas { display:block; }
-    select { width:100%; padding:11px; border-radius:12px; border:1px solid var(--line); background:var(--raise); color:var(--fg); font:13px var(--mono); margin-top:12px; }
-    .row { display:flex; gap:10px; margin-top:14px; }
-    button { flex:1; padding:13px; border:0; border-radius:13px; font-size:14.5px; font-weight:600; cursor:pointer; }
-    button.primary { background:var(--acc); color:#fff; }
-    button.primary:active { background:#3f78e0; }
-    button.ghost { flex:0 0 auto; background:none; border:1px solid var(--line); color:var(--dim); font-weight:400; }
-    .badge { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; border:1px solid var(--line); border-radius:999px; padding:3px 10px; margin-left:8px; vertical-align:2px; font-weight:400; }
-    .badge .lamp { width:7px; height:7px; border-radius:50%; }
-    .badge.on .lamp { background:var(--ok); animation:breathe 2s ease-in-out infinite; }
-    .badge.off .lamp { background:var(--warn); }
-    .lamp { display:inline-block; }
-    #msg { font-size:13px; margin-top:14px; min-height:20px; font-family:var(--mono); }
-    #msg.ok { color:var(--ok); } #msg.err { color:var(--fail); }
+
+    .conn-row { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+    select { flex:1; min-width:0; height:40px; padding:0 12px; border-radius:11px; border:1px solid var(--line); background:var(--raise); color:var(--fg); font:13px var(--mono); }
+    select:focus-visible { outline:none; border-color:var(--acc); box-shadow:0 0 0 3px var(--acc-tint); }
+
+    .row { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+    button { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 18px; border:0; border-radius:11px; font:600 13.5px/1 var(--sans); cursor:pointer; transition:background .12s, border-color .12s, color .12s, transform .12s; }
+    button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+    button.primary { background:var(--acc); color:#fff; box-shadow:0 2px 10px rgba(217,119,87,.25); }
+    button.primary:hover { background:var(--acc-strong); }
+    button.primary:active { background:var(--acc-strong); transform:translateY(1px); }
+    button.ghost { background:none; border:1px solid var(--line); color:var(--dim); font-weight:500; }
+    button.ghost:hover { background:var(--panel2); border-color:var(--faint); color:var(--fg); }
+
     .status-line { display:flex; align-items:center; gap:9px; font-size:13.5px; margin:0 0 12px; }
     .status-line .lamp { width:9px; height:9px; border-radius:50%; }
     .status-line .lamp.ok { background:var(--ok); box-shadow:0 0 6px var(--ok); }
     .status-line .lamp.warn { background:var(--warn); }
+    #msg { font:12.5px var(--mono); margin-top:18px; min-height:20px; }
+    #msg.ok { color:var(--ok); } #msg.err { color:var(--fail); }
+
+    @media (max-width: 860px) {
+      body { padding:32px 16px; }
+      .wrap { width:min(94vw, 470px); }
+      .head { flex-direction:column; align-items:flex-start; gap:4px; }
+      .deck { grid-template-columns:1fr; margin-top:18px; }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="brand">
-      <span class="brand-lamp"></span>
-      <span class="brand-word">claude<span class="brand-dim">-remote</span> <span class="dim" style="font-size:13px">配对面板</span></span>
-    </div>
-    <p class="sub">仅本机可访问 · 手机扫码即连</p>
-
-    <div class="panel">
-      <h2>手机连接</h2>
-      <div class="qrbox"><canvas id="qr" width="280" height="280"></canvas></div>
-      <select id="url-sel"></select>
-      <div class="row" style="margin-top:10px">
-        <button id="copy-url" class="ghost" style="flex:1">复制完整链接</button>
+  <div class="wrap">
+    <header class="head">
+      <div class="brand">
+        <span class="mk"><span class="mark"></span><span class="pb">P</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal</span>
+        <span class="brand-tag">配对面板</span>
       </div>
-      <p class="note">扫码或点开链接一次即完成配对，token 不变则永久有效。离开家时用 Tailscale 地址。</p>
-    </div>
+      <div class="head-note">仅本机可访问 · 手机扫码即连</div>
+    </header>
 
-    <div class="panel">
-      <h2>token 轮换</h2>
-      <div class="row"><button id="rotate" class="primary">轮换并刷新二维码</button></div>
-      <p class="note">怀疑泄露或想作废旧链接时用。即时生效；hooks 自动同步（先备份）；已连接的手机会被断开，扫新码即可。</p>
-    </div>
+    <div class="deck">
+      <section class="panel qr-panel">
+        <h2>手机连接</h2>
+        <div class="qrbox"><canvas id="qr" width="280" height="280"></canvas></div>
+        <div class="conn-row">
+          <select id="url-sel"></select>
+          <button id="copy-url" class="ghost">复制链接</button>
+        </div>
+        <p class="note">扫码或点开链接一次即完成配对，token 不变则永久有效。离开家时用 Tailscale 地址。</p>
+      </section>
 
-    <div class="panel">
-      <h2>开机自启</h2>
-      <div class="status-line">
-        <span class="lamp warn" id="as-lamp"></span>
-        <span id="as-text">检测中…</span>
+      <div class="side">
+        <section class="panel">
+          <h2>token 轮换</h2>
+          <div class="row"><button id="rotate" class="primary">轮换并刷新二维码</button></div>
+          <p class="note">怀疑泄露或想作废旧链接时用。即时生效；hooks 自动同步（先备份）；已连接的手机会被断开，扫新码即可。</p>
+        </section>
+
+        <section class="panel">
+          <h2>开机自启</h2>
+          <div class="status-line">
+            <span class="lamp warn" id="as-lamp"></span>
+            <span id="as-text">检测中…</span>
+          </div>
+          <div class="row">
+            <button id="autostart" class="primary">安装开机自启</button>
+            <button id="open-startup" class="ghost">启动文件夹</button>
+          </div>
+          <p class="note">把隐藏启动器复制进启动文件夹，登录后 bridge 自动后台运行；重复安装无害。</p>
+        </section>
       </div>
-      <div class="row">
-        <button id="autostart" class="primary">安装开机自启</button>
-        <button id="open-startup" class="ghost">启动文件夹</button>
-      </div>
-      <p class="note">把隐藏启动器复制进启动文件夹，登录后 bridge 自动后台运行；重复安装无害。</p>
     </div>
 
     <div id="msg"></div>
@@ -156,7 +194,7 @@
       btn.style.color = 'var(--ok)';
       btn.style.borderColor = 'var(--ok)';
       setTimeout(() => {
-        btn.textContent = '复制完整链接';
+        btn.textContent = '复制链接';
         btn.style.color = '';
         btn.style.borderColor = '';
       }, 2000);
@@ -196,7 +234,7 @@
     tip.style.margin = '0';
     tip.textContent = '点上面输入框全选，再 Ctrl+C 或长按复制';
     box.append(inp, tip);
-    document.querySelector('#copy-url').closest('.row').after(box);
+    document.querySelector('#copy-url').closest('.conn-row').after(box);
     inp.focus(); inp.select();
     msg('自动复制不可用（预览窗格限制），已列出链接供手动复制', '');
   }
