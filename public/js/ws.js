@@ -12,7 +12,14 @@ function wsUrl() {
 }
 
 export function connectWs() {
-  if (state.ws) { try { state.ws.close(); } catch (e) { /* noop */ } }
+  // detach handlers before closing: a deliberately-closed socket's onclose
+  // must not flip the dot to cream nor schedule a ghost reconnect that would
+  // later kill the healthy replacement (self-perpetuating flicker loop)
+  const old = state.ws;
+  if (old) {
+    old.onopen = old.onmessage = old.onclose = old.onerror = null;
+    try { old.close(); } catch (e) { /* noop */ }
+  }
   // v84: connection state lives IN the brand mark now - cream->coral breath
   // while connecting (reduced-motion: static coral)
   const dot = document.getElementById('conn-dot');
