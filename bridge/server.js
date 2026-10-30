@@ -26,17 +26,20 @@ import * as routesAttachments from './routes/attachments.js';
 import * as routesSessions from './routes/sessions.js';
 import * as routesMessage from './routes/message.js';
 import { TitleGen } from './titlegen.js';
+import { Pins } from './pins.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 export function createServer(cfg, store, adapter, runner, handoff, paths = {}, ctxprobe = null) {
   const UPLOADS_DIR = paths.uploadsDir || path.join(__dirname, 'data', 'uploads');
-  const hub = createHub({ cfg, store, runner });
+  // v125: session pins (bridge/data/pins.json; in-memory when no path - tests)
+  const pins = new Pins(paths.pinsPath);
+  const hub = createHub({ cfg, store, runner, pins });
   // v115: LLM auto-title for phone-created sessions (cfg.titleGen=false off);
   // v121: its suggest() also backs the rename modal's manual ✦ button
   const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false });
-  const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR, titlegen };
+  const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR, titlegen, pins };
 
   const router = createRouter();
   routesPairing.register(router, ctx);     // panel first: same-machine, no token

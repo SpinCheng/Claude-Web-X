@@ -46,6 +46,19 @@ await withEnv(async (h, page) => {
   await page.navigate(`http://127.0.0.1:3799/?token=e2etok`);
   assert(await page.waitFor(`document.querySelector('.srow-title') && document.querySelector('.srow-title').textContent === 'ops 新名字'`), 'rename persisted across reload');
 
+  // v125 pin: menu row -> 置顶 section first -> survives reload -> flips to 取消置顶
+  await page.ev(ctxmenu('.srow'));
+  assert(await page.waitFor(`!!${findAct('置顶')}`), 'pin row present');
+  await page.ev(`${findAct('置顶')}.click()`);
+  assert(await page.waitFor(`!!document.querySelector('.pgroup-ico[data-st="pinned"]')`), 'pinned section appears');
+  assert(await page.waitFor(`document.querySelector('.groups .pgroup .pgroup-ico[data-st="pinned"]') && document.querySelector('.groups .pgroup') === document.querySelector('.pgroup-ico[data-st="pinned"]').closest('.pgroup')`), 'pinned section is first');
+  await page.navigate(`http://127.0.0.1:3799/?token=e2etok`);
+  assert(await page.waitFor(`!!document.querySelector('.pgroup-ico[data-st="pinned"]')`), 'pin survives reload');
+  await page.ev(ctxmenu('.srow'));
+  assert(await page.waitFor(`!!${findAct('取消置顶')}`), 'menu flips to unpin');
+  await page.ev(`${findAct('取消置顶')}.click()`);
+  assert(await page.waitFor(`!document.querySelector('.pgroup-ico[data-st="pinned"]')`), 'unpin removes section');
+
   // v39 fence: Desktop flushes its CACHED (pre-rename) title back into the
   // transcript (metadata bundle: last-prompt + custom-title with sessionId);
   // the pinned rename must survive it. The '6 行' wait proves the drain

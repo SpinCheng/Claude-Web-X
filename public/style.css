@@ -139,6 +139,10 @@ button { font-family: inherit; }
 .pgroup-new { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin: 0 -6px 0 -2px; border-radius: 50%; color: var(--faint); cursor: pointer; transition: background .12s, color .12s; touch-action: manipulation; }
 .pgroup-new:active { background: var(--panel2); color: var(--dim); }
 .pgroup-new:focus-visible { outline: 2px solid rgba(217, 119, 87, .55); outline-offset: -2px; }
+/* v125 置顶: coral pushpin on the section head + a mini one before row titles */
+.pgroup-ico[data-st="pinned"] { color: var(--acc); }
+.pin-mini { color: var(--acc); margin-right: 6px; }
+.pin-mini svg { vertical-align: -1.5px; }
 
 /* ---------- v43 列表搜索 + 批量管理 ---------- */
 .search-row { display: flex; align-items: center; gap: 7px; margin: 4px 14px 2px; padding: 8px 12px; background: var(--panel); border-radius: 12px; color: var(--faint); box-shadow: var(--sh-1); }

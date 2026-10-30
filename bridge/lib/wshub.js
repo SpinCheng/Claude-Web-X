@@ -5,7 +5,7 @@
 import { WebSocketServer } from 'ws';
 import { authOk } from './auth.js';
 
-export function createHub({ cfg, store, runner }) {
+export function createHub({ cfg, store, runner, pins }) {
   const clients = new Set(); // ws sockets; ws.subId = subscribed session id
   const waitings = new Map(); // sessionId -> waiting (permission prompt)
   const approvals = new Map(); // id -> {runId, sessionId, tool, input, resolve, timer}
@@ -27,8 +27,10 @@ export function createHub({ cfg, store, runner }) {
       const out = runner.recallOutcome(s.id);
       // runId rides along so a client that loads mid-run (no run frame seen)
       // can still cancel it - the list-page stop action and the composer
-      // stop button both need it
-      return { ...s, running: !!live, runId: live ? live.runId : null, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
+      // stop button both need it. pinned/pinnedAt (v125) drive the list's
+      // 置顶 section.
+      const pinnedAt = (pins && pins.get(s.id)) || 0;
+      return { ...s, pinned: !!pinnedAt, pinnedAt, running: !!live, runId: live ? live.runId : null, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
     });
   }
 

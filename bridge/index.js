@@ -70,6 +70,7 @@ const paths = {
   settingsPath: path.join(os.homedir(), '.claude', 'settings.json'),
   hookCmd: hookCmdPath(),
   uploadsDir: path.join(DATA_DIR, 'uploads'),
+  pinsPath: path.join(DATA_DIR, 'pins.json'),
 };
 const { server } = createServer(cfg, store, adapter, runner, handoff, paths, ctxprobe);
 

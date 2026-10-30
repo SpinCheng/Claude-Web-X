@@ -21,6 +21,7 @@ import { copyText } from './transcript.js';
 
 const I = {
   stop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+  pin: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14 4v5c0 1.12.37 2.16 1 3H9c.65-.86 1-1.9 1-3V4h4m3-2H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h6.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3V4h1c.55 0 1-.45 1-1s-.45-1-1-1z"/></svg>',
   pencil: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
   trash: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
   down: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
@@ -68,6 +69,8 @@ function openRowActions(id) {
   // those surface as the wait banner instead)
   const running = (state.runs[id] || {}).state === 'running' || !!s.running;
   if (running) list.appendChild(actRow(I.stop, '停止运行', '中断这台手机发起的运行', 'warn', () => stopFromList(id)));
+  list.appendChild(actRow(I.pin, s.pinned ? '取消置顶' : '置顶',
+    s.pinned ? '从列表顶部移除' : '固定到列表最上方，跨项目可见', '', () => togglePin(id, !s.pinned)));
   list.appendChild(actRow(I.copy, '复制信息', '复制名称 / 路径 / 会话 ID', '', () => openCopyScope(id)));
   list.appendChild(actRow(I.pencil, '重命名', '修改会话显示名', '', () => openRename(id)));
   list.appendChild(actRow(I.down, '导出 Markdown', '下载完整记录或结论摘要', '', () => openExportScope(id)));
@@ -143,6 +146,27 @@ function stopFromList(id) {
   if (!runId) { toast('只有手机发起的运行能从手机停止'); return; }
   api('/api/runs/' + encodeURIComponent(runId) + '/cancel', { method: 'POST' })
     .then(() => toast('已发送停止信号'))
+    .catch(() => toast('网络错误'));
+}
+
+/* ---------------- pin (v125) ---------------- */
+// optimistic like rename: bubble closes, the record flips on response and
+// renderList moves the row into/out of the 置顶 section; the sessions frame
+// confirms server-side.
+function togglePin(id, on) {
+  closeBubble('row-actions');
+  api('/api/sessions/' + encodeURIComponent(id) + '/pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pinned: on }),
+  })
+    .then((r) => r.json().catch(() => ({})).then((j) => ({ r, j })))
+    .then(({ r, j }) => {
+      if (!r.ok || !j.ok) { toast('失败：' + (j.error || r.status)); return; }
+      const s = state.sessions.find((x) => x.id === id);
+      if (s) { s.pinned = on; s.pinnedAt = on ? Date.now() : 0; renderList(); }
+      toast(on ? '已置顶' : '已取消置顶');
+    })
     .catch(() => toast('网络错误'));
 }
 

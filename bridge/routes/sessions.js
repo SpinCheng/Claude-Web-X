@@ -147,8 +147,23 @@ export function register(router, ctx) {
     if (runner.activeRunFor(r.params.id)) { json(res, 409, { error: 'busy' }); return; }
     const result = adapter.archiveSession(r.params.id);
     if (!result.ok) { json(res, 404, { error: result.error }); return; }
+    ctx.pins.drop(r.params.id); // a trashed session has no list row to pin
     try { fs.rmSync(path.join(ctx.UPLOADS_DIR, r.params.id), { recursive: true, force: true }); } catch { /* nothing stored */ }
     json(res, 200, result);
+  });
+
+  // v125: pin a session to the list's 置顶 section. Bridge-side pins.json
+  // (renames.json precedent); the pin lives outside the transcript so the
+  // Desktop never sees or reverts it.
+  router.post('/api/sessions/:id/pin', async (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    if (!store.get(r.params.id)) { json(res, 404, { error: 'not found' }); return; }
+    let jsonIn = {};
+    try { jsonIn = JSON.parse(await readBody(req) || '{}'); } catch { /* empty */ }
+    const on = !!jsonIn.pinned;
+    ctx.pins.set(r.params.id, on);
+    json(res, 200, { ok: true, pinned: on });
+    hub.broadcastSessionsSoon(); // list re-renders from the sessions frame
   });
 
   // rename (v34): append a native custom-title line - the same record the

@@ -35,6 +35,15 @@ await withEnv(async (h) => {
   assert((await api('/api/sessions/nope/suggest-title', { method: 'POST' })).status === 404, 'suggest-title unknown 404');
   assert((await api('/api/sessions/api1-empty/suggest-title', { method: 'POST' })).status === 409, 'suggest-title no-content 409');
 
+  // v125: pin round-trip - route guards + sessions-frame stamping + unpin
+  assert((await api('/api/sessions/nope/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"pinned":true}' })).status === 404, 'pin unknown 404');
+  assert((await api('/api/sessions/api1/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"pinned":true}' })).ok, 'pin on');
+  let s1 = ((await (await api('/api/sessions')).json()).sessions || []).find((x) => x.id === 'api1');
+  assert(s1.pinned === true && s1.pinnedAt > 0, 'pinned stamped on sessions frame');
+  assert((await api('/api/sessions/api1/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"pinned":false}' })).ok, 'pin off');
+  s1 = ((await (await api('/api/sessions')).json()).sessions || []).find((x) => x.id === 'api1');
+  assert(!s1.pinned, 'unpin clears the flag');
+
   // waiting state via fake hook payload (permission only - v21 rule)
   const H = '/hooks/notification?token=' + 'e2etok';
   const hook = (body) => fetch('http://127.0.0.1:3799' + H, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
