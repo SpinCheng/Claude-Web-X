@@ -178,9 +178,9 @@ function renderRow(s, inPinSection = false) {
     (st !== 'idle' ? '<span class="st-word" data-st="' + st + '">' + ST_WORD[st] + '</span>' : '');
   el.querySelector('.srow-title').textContent = s.title || s.id.slice(0, 8);
   // v125: rows in the 置顶 section lost their project group - the project
-  // name now leads the info line (marker pin dropped, user decision v126)
+  // name now leads the info line (marker pin dropped, user decision v126).
+  // v130: price left the row (cost panel owns that data).
   const info = inPinSection ? [projectLabel(s), relTime(s.lastActive), (s.lines || 0) + ' 行'] : [relTime(s.lastActive), (s.lines || 0) + ' 行'];
-  if (s.cost && s.cost.usd != null) info.push('$' + Number(s.cost.usd).toFixed(2));
   el.querySelector('.srow-info').textContent = info.join(' · ');
 
   // v43 batch mode: row = selection toggle, no open / no ⋯ bubble

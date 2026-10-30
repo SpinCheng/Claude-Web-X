@@ -45,7 +45,7 @@ button { font-family: inherit; }
 .lamp[data-st="stopped"] { background: var(--warn); opacity: .5; }
 .lamp[data-st="idle"]    { background: var(--faint); }
 .lamp[data-st="waiting"] { background: var(--acc); box-shadow: 0 0 8px rgba(217, 119, 87, .5); animation: breathe 1.6s ease-in-out infinite; }
-.st-word[data-st="waiting"] { color: var(--acc-strong); }
+.st-word[data-st="waiting"] { color: var(--acc-strong); background: var(--acc-tint); }
 @keyframes breathe { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .lamp[data-st="running"], .pgroup-ico[data-st="running"], .pgroup-ico[data-st="waiting"], .caret, .timeline, .node-body, .al-pulse, .dot-tool.on { animation: none !important; } }
 
@@ -185,10 +185,12 @@ button { font-family: inherit; }
 .srow-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .srow-title { font-size: 14.5px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .srow-info { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.st-word { flex: none; margin-left: 8px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; }
-.st-word[data-st="running"] { color: var(--warn); }
-.st-word[data-st="failed"]  { color: var(--err); }
-.st-word[data-st="stopped"] { color: var(--warn); opacity: .8; }
+/* v130: status word wears a same-hue tint pill (tint = state color @ .14,
+   same formula as --acc-tint) */
+.st-word { flex: none; margin-left: 8px; font-family: var(--mono); font-size: 10.5px; line-height: 1; letter-spacing: .04em; padding: 3px 8px; border-radius: 999px; }
+.st-word[data-st="running"] { color: var(--warn); background: rgba(217, 162, 98, .14); }
+.st-word[data-st="failed"]  { color: var(--err); background: rgba(219, 107, 94, .14); }
+.st-word[data-st="stopped"] { color: var(--warn); opacity: .8; background: rgba(217, 162, 98, .14); }
 .st-word[data-st="idle"]    { color: var(--faint); }
 .empty { color: var(--faint); font-size: 13px; text-align: center; padding: 28px 20px; }
 /* empty list state: icon + copy + the screen's single primary CTA */
