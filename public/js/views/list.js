@@ -17,7 +17,6 @@ const CK_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="tru
 // v125 置顶: pushpin in coral (active-state semantics per the palette rules)
 const PIN_PATH = 'M14 4v5c0 1.12.37 2.16 1 3H9c.65-.86 1-1.9 1-3V4h4m3-2H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h6.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3V4h1c.55 0 1-.45 1-1s-.45-1-1-1z';
 const PIN_ICO = '<svg class="pgroup-ico" data-st="pinned" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="' + PIN_PATH + '"/></svg>';
-const PIN_MINI = '<span class="pin-mini"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="' + PIN_PATH + '"/></svg></span>';
 
 function sessState(s) {
   if (s.running || state.runs[s.id]?.state === 'running') return 'running';
@@ -155,12 +154,12 @@ function renderGroup(g, pinSection = false) {
 
   const body = document.createElement('div');
   body.className = 'pgroup-body';
-  for (const s of g.sessions) body.appendChild(renderRow(s));
+  for (const s of g.sessions) body.appendChild(renderRow(s, pinSection));
   wrap.append(head, body);
   return wrap;
 }
 
-function renderRow(s) {
+function renderRow(s, inPinSection = false) {
   const st = sessState(s);
   // real <button>: keyboard reachable + free focus semantics; the whole row
   // is the target, the right slot holds the status word (color + text,
@@ -171,13 +170,14 @@ function renderRow(s) {
   el.innerHTML =
     '<span class="lamp" data-st="' + st + '"></span>' +
     '<span class="srow-main">' +
-      '<span class="srow-title">' + (s.pinned ? PIN_MINI : '') + '</span>' +
+      '<span class="srow-title"></span>' +
       '<span class="srow-info"></span>' +
     '</span>' +
     (st !== 'idle' ? '<span class="st-word" data-st="' + st + '">' + ST_WORD[st] + '</span>' : '');
-  // textNode, not textContent - the pinned marker above must survive
-  el.querySelector('.srow-title').appendChild(document.createTextNode(s.title || s.id.slice(0, 8)));
-  const info = [relTime(s.lastActive), (s.lines || 0) + ' 行'];
+  el.querySelector('.srow-title').textContent = s.title || s.id.slice(0, 8);
+  // v125: rows in the 置顶 section lost their project group - the project
+  // name now leads the info line (marker pin dropped, user decision v126)
+  const info = inPinSection ? [projectLabel(s), relTime(s.lastActive), (s.lines || 0) + ' 行'] : [relTime(s.lastActive), (s.lines || 0) + ' 行'];
   if (s.cost && s.cost.usd != null) info.push('$' + Number(s.cost.usd).toFixed(2));
   el.querySelector('.srow-info').textContent = info.join(' · ');
 
