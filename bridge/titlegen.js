@@ -91,6 +91,14 @@ export class TitleGen {
     this._generate(sessionId, rec, user, bot, model).catch(() => { /* keep fallback */ });
   }
 
+  // v121: suggest WITHOUT writing - the rename modal's ✦ button (user still
+  // confirms via the normal rename route). Deliberately ignores this.enabled
+  // (that gates AUTO-titling only) and this.done (repeatable on demand).
+  // Same one-shot -p machinery, so the ghost transcript is archived in _ask.
+  suggest(user, bot, model, rec) {
+    return this._ask(buildTitlePrompt(user, bot), rec, model);
+  }
+
   async _generate(sessionId, rec, user, bot, model) {
     // sanitize again on this side: _ask already cleans, but anything raw that
     // slips through a future variant must never hit the transcript

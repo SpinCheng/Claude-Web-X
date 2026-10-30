@@ -1,6 +1,6 @@
 // api: core route surface (sessions/messages/queue/hooks-waiting)
 import { withEnv, writeSession, assert, api, waitSession } from '../harness.mjs';
-import { timelineLines } from '../fixtures.mjs';
+import { timelineLines, stop } from '../fixtures.mjs';
 
 await withEnv(async (h) => {
   writeSession(h, 'T--e2e', 'api1', timelineLines());
@@ -28,6 +28,12 @@ await withEnv(async (h) => {
   assert(q.ok && Array.isArray(q.queue) && q.queue.length === 0, 'queue snapshot empty');
   assert((await api('/api/sessions/api1/queue/nope', { method: 'DELETE' })).status === 404, 'queue delete unknown 404');
   assert((await api('/api/sessions/api1/queue/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"order":[]}' })).status === 400, 'reorder empty 400');
+
+  // v121: suggest-title guards (route wiring - the -p spawn itself is not exercised)
+  writeSession(h, 'T--e2e', 'api1-empty', [stop(1)]);
+  assert(await waitSession('api1-empty'), 'empty session visible');
+  assert((await api('/api/sessions/nope/suggest-title', { method: 'POST' })).status === 404, 'suggest-title unknown 404');
+  assert((await api('/api/sessions/api1-empty/suggest-title', { method: 'POST' })).status === 409, 'suggest-title no-content 409');
 
   // waiting state via fake hook payload (permission only - v21 rule)
   const H = '/hooks/notification?token=' + 'e2etok';

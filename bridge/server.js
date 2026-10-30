@@ -33,11 +33,12 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 export function createServer(cfg, store, adapter, runner, handoff, paths = {}, ctxprobe = null) {
   const UPLOADS_DIR = paths.uploadsDir || path.join(__dirname, 'data', 'uploads');
   const hub = createHub({ cfg, store, runner });
-  const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR };
+  // v115: LLM auto-title for phone-created sessions (cfg.titleGen=false off);
+  // v121: its suggest() also backs the rename modal's manual ✦ button
+  const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false });
+  const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR, titlegen };
 
   const router = createRouter();
-  // v115: LLM auto-title for phone-created sessions (cfg.titleGen=false off)
-  const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false });
   routesPairing.register(router, ctx);     // panel first: same-machine, no token
   routesApprovals.register(router, ctx);
   routesHooks.register(router, ctx);

@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=120">
+  <link rel="stylesheet" href="/style.css?v=121">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v120</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v121</span></span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -76,7 +76,12 @@
     <div id="rename-modal" class="overlay hidden">
       <div class="sheet">
         <div class="sheet-title">重命名会话</div>
-        <input id="rename-input" type="text" maxlength="120" placeholder="会话显示名" spellcheck="false" autocomplete="off">
+        <div class="rename-wrap">
+          <input id="rename-input" type="text" maxlength="120" placeholder="会话显示名" spellcheck="false" autocomplete="off">
+          <button id="rename-suggest" class="rename-suggest" type="button" title="根据会话内容生成标题" aria-label="自动生成标题">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.2 5.8 5.8 2.2-5.8 2.2L12 18.4 9.8 12.6 4 10.4l5.8-2.2L12 2.4z"/></svg>
+          </button>
+        </div>
         <p class="sheet-note">只改显示名，随时可再改；不影响会话内容</p>
         <div class="sheet-actions">
           <button id="rename-cancel" class="btn ghost">取消</button>
@@ -326,6 +331,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=120"></script>
+  <script type="module" src="/app.js?v=121"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import { PREVIEW_MIME } from '../lib/mime.js';
 import { readModelCatalog } from '../lib/models.js';
 import { CI_PATHS } from '../lib/platform.js';
 import { collectCommands } from '../lib/commands.js';
+import { pickTitleInputs } from '../titlegen.js';
 
 export function register(router, ctx) {
   const { cfg, store, adapter, runner, ctxprobe, hub } = ctx;
@@ -175,6 +176,23 @@ export function register(router, ctx) {
     // into the transcript and would revert us within seconds otherwise
     adapter.pinRename(r.params.id, title);
     json(res, 200, { ok: true });
+  });
+
+  // v121: suggest a title from the session content - the rename modal's ✦
+  // button. NEVER writes (unlike titlegen auto-title); the user confirms via
+  // the rename route. Same one-shot -p call, ghost transcript archived in
+  // _ask. rec.model is a display label -> map to the catalog id like /context.
+  router.post('/api/sessions/:id/suggest-title', async (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    const rec = store.get(r.params.id);
+    if (!rec || !rec.transcriptPath) { json(res, 404, { error: 'not found' }); return; }
+    const tr = adapter.readTranscript(r.params.id, 400);
+    const { user, bot } = pickTitleInputs(tr ? tr.events : []);
+    if (!user && !bot) { json(res, 409, { error: 'no content' }); return; }
+    const modelId = (readModelCatalog().find((x) => x.label === (rec.model || '')) || {}).id || '';
+    const title = await ctx.titlegen.suggest(user, bot, modelId, rec);
+    if (!title) { json(res, 502, { error: 'generate failed' }); return; }
+    json(res, 200, { ok: true, title });
   });
 }
 

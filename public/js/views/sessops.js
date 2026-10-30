@@ -154,9 +154,35 @@ function openRename(id) {
   closeBubble('row-actions');
   $('rename-input').value = s.title && s.title !== '(loading)' ? s.title : '';
   $('rename-err').textContent = '';
+  // invalidate any in-flight suggestion from a previous open of the modal
+  suggestSeq++;
+  $('rename-suggest').classList.remove('busy');
   $('rename-modal').classList.remove('hidden');
   // focus after the sheet is laid out; select-all so typing replaces
   setTimeout(() => { const i = $('rename-input'); i.focus(); i.select(); }, 60);
+}
+// v121: ✦ button - server summarizes the session into a title, fills the
+// input. Never saves by itself; the user confirms via the normal rename path.
+let suggestSeq = 0;
+function suggestTitle() {
+  const btn = $('rename-suggest');
+  if (!renameId || btn.classList.contains('busy')) return;
+  const id = renameId, seq = ++suggestSeq;
+  btn.classList.add('busy');
+  api('/api/sessions/' + encodeURIComponent(id) + '/suggest-title', { method: 'POST' })
+    .then(async (r) => {
+      const j = await r.json().catch(() => ({}));
+      if (seq !== suggestSeq) return; // modal closed / reopened meanwhile
+      if (r.ok && j.ok && j.title) {
+        $('rename-input').value = j.title;
+        $('rename-err').textContent = '';
+        const i = $('rename-input'); i.focus(); i.select();
+      } else if (r.status === 409) $('rename-err').textContent = '会话还没有内容，无法生成';
+      else if (r.status === 404) $('rename-err').textContent = '会话不存在';
+      else $('rename-err').textContent = '生成失败，请稍后再试';
+    })
+    .catch(() => { if (seq === suggestSeq) $('rename-err').textContent = '网络错误'; })
+    .finally(() => { if (seq === suggestSeq) btn.classList.remove('busy'); });
 }
 function saveRename() {
   const v = $('rename-input').value.trim();
@@ -233,6 +259,7 @@ function deleteFromList(id) {
 /* ---------------- wiring ---------------- */
 $('rename-save').onclick = saveRename;
 $('rename-cancel').onclick = () => $('rename-modal').classList.add('hidden');
+$('rename-suggest').onclick = suggestTitle;
 $('rename-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') saveRename();
   if (e.key === 'Escape') $('rename-modal').classList.add('hidden');
