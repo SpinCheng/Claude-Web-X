@@ -21,6 +21,17 @@ import { findClaudeBinary, bashToolEnv } from './lib/platform.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_CONCURRENT_RUNS = 4;
 
+// The watchdog kills CLIs that finished their turn (transcript stop line
+// already written) but linger past 30s. The kill's exit code is process-
+// manager noise: the task SUCCEEDED, so book a clean end - exitCode 1 here
+// used to reach the phone as 运行异常/退出码 1 and read as an interruption
+// (the false alarms behind the "任务被中断" reports of the 01:50/02:24
+// connectivity tests).
+export function closeExitCode(run, code) {
+  if (code == null) return run.cancelled ? 'cancelled' : 0;
+  return run.watchdogFired ? 0 : code;
+}
+
 export class Runner extends EventEmitter {
   constructor(opts = {}) {
     super();
@@ -205,7 +216,7 @@ export class Runner extends EventEmitter {
           const ts = Date.parse(o.timestamp || '');
           if (!isNaN(ts) && ts > run.startedAt - 1000) {
             run.watchdogFired = true;
-            console.log(`[runner] watchdog: run ${run.runId} force-ended (transcript complete, CLI lingering)`);
+            console.log(`[runner] watchdog: run ${run.runId} (session ${run.sessionId || '?'}) force-ended (transcript complete, CLI lingering)`);
             try { run.child.kill(); } catch { /* already gone */ }
           }
           break; // only the last stop-class line is relevant
@@ -338,7 +349,7 @@ export class Runner extends EventEmitter {
     });
     child.on('close', (code) => {
       run.state = 'end';
-      run.exitCode = code == null ? (run.cancelled ? 'cancelled' : 0) : code;
+      run.exitCode = closeExitCode(run, code);
       this._emit(run);
       if (run.sessionId) {
         this.outcomes.set(run.sessionId, {
