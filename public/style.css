@@ -536,8 +536,8 @@ button { font-family: inherit; }
    equals the input's box and the absolute button centers on it exactly. */
 .rename-wrap { position: relative; margin-bottom: 10px; }
 .sheet .rename-wrap input { margin-bottom: 0; padding-right: 44px; }
-.rename-suggest { position: absolute; right: 6px; top: 0; bottom: 0; width: 36px; border: 0; border-radius: 10px; background: none; color: var(--faint); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: color .12s, background .12s; }
-.rename-suggest:active { color: var(--acc); background: var(--panel2); }
+.rename-suggest { position: absolute; right: 6px; top: 0; bottom: 0; width: 36px; border: 0; border-radius: 10px; background: none; color: var(--acc); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: color .12s, background .12s; }
+.rename-suggest:active { color: var(--acc-strong); background: var(--panel2); }
 .rename-suggest.busy { color: var(--acc); pointer-events: none; }
 .rename-suggest.busy svg { animation: btnSpin .9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .rename-suggest.busy svg { animation: none; } }
