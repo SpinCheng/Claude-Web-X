@@ -1,5 +1,6 @@
-// js/views/agentview.js - v112 方案A: the subagent full-text bubble
-// (#agent-sheet, .overlay.bub + .sheet.bubble - same grammar as ctx-sheet).
+// js/views/agentview.js - v112 方案A: the subagent full-text sheet
+// (#agent-sheet, .overlay + .sheet - full-width bottom modal since v122,
+// not an anchored bubble - reading surface wants modal semantics).
 // Opened from a live agent node's live-line or a finished agent chip.
 // Renders the subagent transcript with the SAME timeline nodes as the main
 // view (renderStepsInto) and live-refreshes while the agent runs: summary

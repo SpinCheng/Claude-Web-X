@@ -308,13 +308,14 @@ button { font-family: inherit; }
 /* 活态代理的工具点呼吸（光晕扩散；reduced-motion 静态珊瑚点） */
 .dot-tool.on { animation: dotOn 1.6s ease-in-out infinite; }
 @keyframes dotOn { 0%, 100% { box-shadow: 0 0 0 3px var(--acc-tint); } 50% { box-shadow: 0 0 0 5px var(--acc-tint); opacity: .6; } }
-/* 全文气泡：头（灯+标题+状态）+ 自滚动体（嵌套滚动器 overscroll auto——链条移交） */
-.agent-bub .ag-head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; min-width: 0; }
-.agent-bub .ag-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 子代理全文底部 sheet（v115 从锚定气泡改全宽 sheet——阅读面贴模态语义）：
+   头（灯+标题+状态）+ 自滚动体（嵌套滚动器 overscroll auto——链条移交） */
+.agent-bub .ag-head { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; min-width: 0; }
+.agent-bub .ag-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .agent-bub .ag-st { flex: none; font-size: 10.5px; color: var(--warn); font-variant-numeric: tabular-nums; }
 .agent-bub .ag-st:empty { display: none; }
 .agent-bub .ag-x { margin-left: auto; flex: none; border: 0; background: none; color: var(--faint); font-size: 15px; line-height: 1; padding: 4px 6px; cursor: pointer; }
-.agent-bub .ag-body { max-height: 58dvh; overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+.agent-bub .ag-body { max-height: 62dvh; overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; margin: 0 -6px; padding: 0 6px; }
 .mid { font-size: 13.5px; line-height: 1.55; color: var(--fg); }
 .final { font-size: 15px; line-height: 1.55; font-weight: 600; }
 /* markdown blocks in conclusion cards (v25) - one style set for BOTH
