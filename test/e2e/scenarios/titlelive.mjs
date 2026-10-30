@@ -44,6 +44,14 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('document.getElementById("d-title").textContent === "配对页改PC双栏布局"', 5000),
     'd-title follows the custom-title live');
 
+  // ---- process capsule shows elapsed (frozen once the turn is done) ----
+  const durSel = `document.querySelector("#chat .turn.bot .trigger .t-dur").textContent`;
+  assert(await page.waitFor(`/·\\s*\\d+(\\.\\d+)?(s|m)/.test(${durSel})`, 5000), 'capsule shows elapsed time');
+  const d1 = await page.ev(durSel);
+  await sleep(1500);
+  const d2 = await page.ev(durSel);
+  assert(d1 === d2, 'elapsed frozen after turn done (' + JSON.stringify(d1) + ' vs ' + JSON.stringify(d2) + ')');
+
   // ---- preview failure reasons + a real open, all against the session cwd ----
   // (cwd rides on any transcript line - the adapter harvests it, switching the
   // record to h.tmp so the preview endpoint resolves there)

@@ -11,7 +11,7 @@ import { toast } from './js/views/toast.js';
 import { BUBBLES, queueApproval, showApproval, fetchPendingApprovals, showConfirm, closeHtmlPreview } from './js/views/overlays.js';
 import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser,
-  updateAgentNode, updateAgentClocks } from './js/views/transcript.js';
+  updateAgentNode, updateAgentClocks, tickTurnDur } from './js/views/transcript.js';
 import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
@@ -268,7 +268,7 @@ $('back').onclick = () => {
   } else closeDetail();
 };
 $('del').onclick = deleteSession;
-setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); } }, 1000);
+setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); tickTurnDur(); } }, 1000);
 
 /* ---------------- wiring: transport <-> semantics ---------------- */
 initWs({

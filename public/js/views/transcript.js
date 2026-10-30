@@ -76,16 +76,24 @@ function applyEventToTurns(ev) {
       return i; // edited an earlier turn: caller must re-render from here
     }
     T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
-    T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '' });
+    // startTs = the question's timestamp: the process capsule's elapsed counts
+    // from the question, not the first assistant line (CLI startup excluded)
+    T.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '', startTs: ev.ts || '' });
   } else if (ev.k === 'assistant') {
-    if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push(newBotTurn(ev.ts));
+    if (T.length === 0 || T[T.length - 1].role !== 'bot') {
+      const prev = T[T.length - 1];
+      T.push(newBotTurn(ev.ts, prev && prev.role === 'user' ? (prev.ts || ev.ts) : ev.ts));
+    }
     const turn = T[T.length - 1];
     turn.ts = turn.ts || ev.ts;
+    if (ev.ts) turn.endTs = ev.ts;
     for (const p of ev.parts || []) addAssistantPart(turn, p);
   } else if (ev.k === 'toolres') {
     // tool results arrive as later user lines; pair each back to its tool_use
     // step by id (search recent bot turns from the tail)
-    return pairToolResults(T, ev, state.orphanToolRes); // re-render from this turn so the output shows up
+    const i = pairToolResults(T, ev, state.orphanToolRes); // re-render from this turn so the output shows up
+    if (i != null && T[i] && T[i].role === 'bot' && ev.ts) T[i].endTs = ev.ts;
+    return i;
   } else if (ev.k === 'cmdout') {
     // v111: the executed command's stdout - its own right-aligned panel right
     // under the command bubble (never merges into a bot turn)
@@ -97,7 +105,7 @@ function applyEventToTurns(ev) {
 // shared turn-shape builders (v44): the history paginator replays older
 // events into a SEPARATE array - same shapes, but no optimistic fold and no
 // live-state flag writes, which is why it cannot call applyEventToTurns.
-function newBotTurn(ts) { return { role: 'bot', think: [], tools: [], texts: [], steps: [], ts: ts || '' }; }
+function newBotTurn(ts, startTs) { return { role: 'bot', think: [], tools: [], texts: [], steps: [], ts: ts || '', startTs: startTs || '' }; }
 function addAssistantPart(turn, p) {
   if (p.t === 'think') { turn.think.push(p.v); turn.steps.push({ t: 'think', v: p.v }); }
   else if (p.t === 'tool') {
@@ -506,6 +514,34 @@ function fmtAgentElapsed(a) {
   const sec = Math.max(0, Math.floor((end - a.startedAt) / 1000));
   return Math.floor(sec / 60) + 'm' + String(sec % 60).padStart(2, '0') + 's';
 }
+// seconds -> "42s" / "3m12s" (no leading 0m - capsule-friendly)
+function fmtDur(sec) {
+  if (sec < 60) return sec + 's';
+  return Math.floor(sec / 60) + 'm' + String(sec % 60).padStart(2, '0') + 's';
+}
+// process-capsule elapsed: start = the question ts (fallback first assistant
+// line), end = last event ts for done turns (missing -> no shown duration),
+// now for live. Frozen by construction once liveTurnOpen flips off.
+function turnDurSec(t, live) {
+  const s = Date.parse(t.startTs || t.ts || '');
+  if (!Number.isFinite(s)) return -1;
+  if (live) return Math.max(0, Math.floor((Date.now() - s) / 1000));
+  const e = Date.parse(t.endTs || '');
+  if (!Number.isFinite(e) || e < s) return -1;
+  return Math.max(0, Math.floor((e - s) / 1000));
+}
+// 1s ticker: patch the live turn's pill duration in place (never a re-render;
+// done turns keep the frozen value renderTurn computed)
+function tickTurnDur() {
+  const T = state.turns;
+  const t = T[T.length - 1];
+  if (!t || t.role !== 'bot' || !(state.liveTurnOpen && t === T[T.length - 1])) return;
+  const chat = $('chat');
+  const el = chat.lastChild && chat.lastChild.querySelector ? chat.lastChild.querySelector('.trigger .t-dur') : null;
+  if (!el) return;
+  const sec = turnDurSec(t, true);
+  if (sec >= 0) el.textContent = '· ' + fmtDur(sec);
+}
 
 // v112: agent summary frame landed - patch the rendered node in place; never
 // touches state.turns or the chat child list (renderTail's 1:1 invariant and
@@ -657,8 +693,12 @@ function renderTurn(t) {
   if (steps.length > 0) {
     const trig = document.createElement('button');
     trig.className = 'trigger';
+    // elapsed rides in a dedicated span (.n style, .t-dur hook) so the 1s
+    // ticker can patch the live turn in place without re-rendering the node
+    const durSec = turnDurSec(t, live);
     trig.innerHTML = '<span class="ic">' + (live ? ICO_CLOCK : ICO_CHECK) + '</span>' +
       '<span class="t">过程</span><span class="n">· ' + steps.length + ' 步</span>' +
+      '<span class="n t-dur">' + (durSec >= 0 ? '· ' + fmtDur(durSec) : '') + '</span>' +
       '<span class="chev">' + CHEV_B + '</span>';
     trig.onclick = () => {
       wrap.classList.toggle('open');
@@ -891,13 +931,20 @@ function parseOlderTurns(events) {
   for (const ev of events) {
     if (ev.k === 'user') {
       T.push({ role: 'user', text: ev.text, ts: ev.ts, images: ev.images || null });
-      T.push(newBotTurn(''));
+      T.push(newBotTurn('', ev.ts));
     } else if (ev.k === 'assistant') {
-      if (T.length === 0 || T[T.length - 1].role !== 'bot') T.push(newBotTurn(ev.ts));
+      if (T.length === 0 || T[T.length - 1].role !== 'bot') {
+        const prev = T[T.length - 1];
+        T.push(newBotTurn(ev.ts, prev && prev.role === 'user' ? (prev.ts || ev.ts) : ev.ts));
+      }
       const turn = T[T.length - 1];
       turn.ts = turn.ts || ev.ts;
+      if (ev.ts) turn.endTs = ev.ts;
       for (const p of ev.parts || []) addAssistantPart(turn, p);
-    } else if (ev.k === 'toolres') pairToolResults(T, ev, state.orphanToolRes);
+    } else if (ev.k === 'toolres') {
+      const i = pairToolResults(T, ev, state.orphanToolRes);
+      if (i != null && T[i] && T[i].role === 'bot' && ev.ts) T[i].endTs = ev.ts;
+    }
     else if (ev.k === 'cmdout') T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
     else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') T.push(sysMarkerTurn(ev));
   }
@@ -910,7 +957,8 @@ function parseOlderTurns(events) {
 // them into a single turn and re-render it: one process capsule per talk.
 function mergeBotTurns(a, b) {
   return { role: 'bot', think: a.think.concat(b.think), tools: a.tools.concat(b.tools),
-    texts: a.texts.concat(b.texts), steps: a.steps.concat(b.steps), ts: a.ts || b.ts };
+    texts: a.texts.concat(b.texts), steps: a.steps.concat(b.steps), ts: a.ts || b.ts,
+    startTs: a.startTs || b.startTs, endTs: b.endTs || a.endTs };
 }
 // prepend an older page: unshift turns AND insert children in equal measure,
 // then shift scrollTop by the height delta so the viewport stays anchored on
@@ -955,4 +1003,4 @@ export { sessionLive, buildTurns, applyEventToTurns, markLiveTurn, closeLiveTurn
   pushOptimisticUser, retractOptimisticUser, parseOlderTurns, prependTurns, fileChanges,
   pairToolResults, drainOrphanRes, mergeBotTurns, copyText,
   nodeEl as renderNode, renderStepsInto, newBotTurn, addAssistantPart,
-  updateAgentNode, updateAgentClocks };
+  updateAgentNode, updateAgentClocks, tickTurnDur };
