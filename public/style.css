@@ -56,9 +56,11 @@ button { font-family: inherit; }
    the old green/red lamp semantics are retired) */
 .mk { position: relative; display: inline-flex; flex: none; }
 .mk .mark { display: inline-block; width: 22px; height: 22px; flex: none; background: var(--fg);
+  transition: background .4s ease;
   -webkit-mask: url(/brand-mark.png) center/contain no-repeat; mask: url(/brand-mark.png) center/contain no-repeat; }
 .mk .mark.on { background: var(--acc); }
-.mk .mark.conn { animation: markConn 1.6s ease-in-out infinite; }
+/* -0.8s starts the 1.6s breath at its coral (50%) phase so .on->.conn doesn't cut */
+.mk .mark.conn { animation: markConn 1.6s ease-in-out -0.8s infinite; }
 @keyframes markConn { 0%, 100% { background: var(--fg); } 50% { background: var(--acc); } }
 @media (prefers-reduced-motion: reduce) { .mk .mark.conn { animation: none; background: var(--acc); } }
 /* P2s: P2 badge (panel2 bg + coral border) shrunk, overlapped onto the
