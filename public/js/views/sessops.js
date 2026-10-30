@@ -179,6 +179,7 @@ function suggestTitle() {
         const i = $('rename-input'); i.focus(); i.select();
       } else if (r.status === 409) $('rename-err').textContent = '会话还没有内容，无法生成';
       else if (r.status === 404) $('rename-err').textContent = '会话不存在';
+      else if (r.status === 405) $('rename-err').textContent = '桥版本较旧，重启桥后可用';
       else $('rename-err').textContent = '生成失败，请稍后再试';
     })
     .catch(() => { if (seq === suggestSeq) $('rename-err').textContent = '网络错误'; })

@@ -30,6 +30,13 @@ await withEnv(async (h, page) => {
   await page.ev(`${findAct('重命名')}.click()`);
   assert(await page.waitFor(`!document.getElementById('rename-modal').classList.contains('hidden')`), 'rename modal open');
   assert(await page.waitFor(`document.getElementById('row-actions').classList.contains('hidden')`), 'bubble closed by modal');
+  // v121: the ✦ button floats vertically centered on the input's right edge
+  assert(await page.waitFor(`(() => {
+    const i = document.getElementById('rename-input').getBoundingClientRect();
+    const b = document.getElementById('rename-suggest').getBoundingClientRect();
+    return Math.abs((b.top + b.bottom) / 2 - (i.top + i.bottom) / 2) < 2
+      && b.left > i.left && b.right <= i.right && b.width > 0;
+  })()`), 'suggest button centered on input');
   await page.ev(`document.getElementById('rename-input').value = 'ops 新名字'`);
   await page.ev(`document.getElementById('rename-save').click()`);
   assert(await page.waitFor(`document.querySelector('.srow-title').textContent === 'ops 新名字'`), 'row title updated');
