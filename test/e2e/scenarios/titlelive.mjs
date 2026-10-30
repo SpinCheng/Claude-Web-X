@@ -52,6 +52,42 @@ await withEnv(async (h, page) => {
   const d2 = await page.ev(durSel);
   assert(d1 === d2, 'elapsed frozen after turn done (' + JSON.stringify(d1) + ' vs ' + JSON.stringify(d2) + ')');
 
+  // ---- draft refill auto-grows: type multiline, leave, come back ----
+  await page.ev(`(function(){
+    const i = document.getElementById("msg-input");
+    i.value = "第一行\\n第二行\\n第三行\\n第四行";
+    i.dispatchEvent(new Event("input"));
+  })()`);
+  await sleep(400); // draft save debounce
+  await page.ev('document.getElementById("back").click()');
+  assert(await page.waitFor('document.getElementById("detail").classList.contains("hidden")', 3000), 'left detail');
+  await page.ev('document.querySelectorAll(".srow")[0].click()');
+  assert(await page.waitFor('!document.getElementById("detail").classList.contains("hidden")', 3000), 're-entered detail');
+  assert(await page.waitFor('document.getElementById("msg-input").value.indexOf("第四行") >= 0', 3000), 'draft refilled');
+  const grown = await page.ev(`(function(){
+    const i = document.getElementById("msg-input");
+    return { h: i.getBoundingClientRect().height, need: i.scrollHeight };
+  })()`);
+  assert(grown.h > 60 && Math.abs(grown.h - grown.need) <= 2,
+    'refilled draft auto-grew (h=' + grown.h + ' scrollHeight=' + grown.need + ')');
+
+  // ---- agent bubble clamps to the phone viewport even with wide content ----
+  await page.ev(`(function(){
+    const b = document.getElementById("ag-body");
+    b.innerHTML = '';
+    const pre = document.createElement("pre");
+    pre.style.cssText = "white-space:pre";
+    pre.textContent = "x".repeat(2000);
+    b.appendChild(pre);
+    document.getElementById("agent-sheet").classList.remove("hidden");
+  })()`);
+  await sleep(200);
+  const w = await page.ev(`(function(){
+    return { bub: document.querySelector("#agent-sheet .agent-bub").getBoundingClientRect().width, vw: window.innerWidth };
+  })()`);
+  assert(w.bub <= w.vw - 23, 'agent bubble clamped to viewport margins (bub=' + w.bub + ' vw=' + w.vw + ')');
+  await page.ev('document.getElementById("ag-close").click()');
+
   // ---- preview failure reasons + a real open, all against the session cwd ----
   // (cwd rides on any transcript line - the adapter harvests it, switching the
   // record to h.tmp so the preview endpoint resolves there)

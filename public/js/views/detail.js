@@ -26,9 +26,11 @@ function openDetail(id) {
   state.attach = [];
   renderAttachChips();
   disarmFork(); // branch arming never crosses a session switch
-  setDraft(id); // v40: refill this session's unsent draft
   $('list').classList.add('hidden');
   $('detail').classList.remove('hidden');
+  // setDraft AFTER the page is visible: its autoGrow measures scrollHeight,
+  // which is 0 under display:none - refilled drafts used to collapse to 0px
+  setDraft(id);
   $('chat').innerHTML = '';
   state.agentView = null; // v112: the agent bubble never crosses a session switch
   renderMeta();
