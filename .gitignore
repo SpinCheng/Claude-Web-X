@@ -27,6 +27,7 @@ Thumbs.db
 
 # process docs stay local (not part of the open-source repo)
 docs/history.md
+docs/prepush-checklist.md
 docs/方案-v2.md
 docs/phase0/
 
