@@ -69,7 +69,7 @@ button { font-family: inherit; }
 .mk .pb { position: absolute; display: inline-flex; align-items: center; justify-content: center;
   font: 700 5.5px/1 var(--mono); width: 10px; height: 10px; border-radius: 50%;
   color: var(--acc-strong); background: #2E2B26; border: 1px solid var(--acc); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
-.mk .pb { right: -5px; bottom: -5px; }
+.mk .pb { right: -1px; bottom: -1px; }
 /* T4 wordmark: light weight, wide tracking, uppercase; Web picks up coral */
 .brand-word.t4 { font: 300 13px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; }
 .brand-word.t4.web { font-weight: 600; color: var(--acc-strong); margin-left: .22em; }
@@ -87,12 +87,12 @@ button { font-family: inherit; }
 .bar .brand-word.t4 { letter-spacing: .12em; }
 .bar .brand-word.t4.web { margin-left: .12em; }
 .bar .mk .mark { width: 22px; height: 22px; }
-.bar .mk .pb { right: -5px; bottom: -5px; }
+.bar .mk .pb { right: -1px; bottom: -1px; }
 .bar .cap-en { letter-spacing: .1em; padding: 2.5px 5px 2.5px 6px; margin-left: 4px; }
 .cap-sep { color: var(--faint); margin: 0 3px; font-weight: 400; }
 .cap-en #build { font: 400 8.5px/1 var(--mono); color: var(--fg); opacity: .75; letter-spacing: 0; }
 .gate .mk .mark { width: 34px; height: 34px; }
-.gate .mk .pb { font-size: 6px; width: 11px; height: 11px; right: -6.5px; bottom: -6.5px; }
+.gate .mk .pb { font-size: 6px; width: 11px; height: 11px; right: -2.5px; bottom: -2.5px; }
 .gate .brand-word.t4 { font-size: 17px; }
 .gate .cap-en { font-size: 9.5px; padding: 3px 7px 3px 9px; }
 .gate .brand { gap: 11px; }
