@@ -18,15 +18,20 @@ export const MIME = {
 };
 
 // previewable mid-run artifacts (v23): images inline; everything textual as
-// text/plain - html/svg are deliberately NOT served as markup (kills any
-// XSS vector from a model-written file), unknown extensions are refused
+// text/plain - html/svg are deliberately NEVER served as markup from the
+// bridge (kills any XSS vector from a model-written file; svg reaches the
+// client lightbox by a client-side blob re-type into an <img>, where svg
+// scripts never run), unknown extensions are refused
 export const PREVIEW_MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp',
   '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
   '.log': 'text/plain; charset=utf-8', '.json': 'text/plain; charset=utf-8',
-  '.csv': 'text/plain; charset=utf-8', '.yml': 'text/plain; charset=utf-8',
-  '.yaml': 'text/plain; charset=utf-8', '.xml': 'text/plain; charset=utf-8',
+  '.csv': 'text/plain; charset=utf-8', '.tsv': 'text/plain; charset=utf-8',
+  '.yml': 'text/plain; charset=utf-8', '.yaml': 'text/plain; charset=utf-8',
+  '.xml': 'text/plain; charset=utf-8',
+  '.diff': 'text/plain; charset=utf-8', '.patch': 'text/plain; charset=utf-8',
+  '.svg': 'text/plain; charset=utf-8',
   '.html': 'text/plain; charset=utf-8', '.htm': 'text/plain; charset=utf-8',
   '.css': 'text/plain; charset=utf-8', '.js': 'text/plain; charset=utf-8',
   '.mjs': 'text/plain; charset=utf-8', '.cjs': 'text/plain; charset=utf-8',

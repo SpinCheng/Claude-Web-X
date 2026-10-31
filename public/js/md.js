@@ -1,6 +1,7 @@
 // js/md.js - pure text/DOM helpers for transcript rendering: markdown
 // (conclusion cards, v25) + file-path linkify (artifact preview, v23) +
-// md file render preview (frontmatter strip + standalone srcdoc doc, v139).
+// preview doc builders (md v139; csv/json/diff v142). All builders share one
+// discipline: escape first, standalone styled doc for the #hp-frame srcdoc.
 // No app state lives here; linkifyPaths takes the open-callback as a param.
 
 /* safe markdown: escape first, then block-level (fences / headings / hr /
@@ -78,40 +79,135 @@ export function mdFrontmatter(src) {
   return yamlish ? String(src).slice(m[0].length) : String(src);
 }
 
-/* v139: wrap miniMd output in a standalone doc for the #hp-frame srcdoc
-   (opaque-origin iframe - parent CSS vars don't reach it, so the tokens are
-   inlined to mirror the conclusion-card styles). Content is miniMd's
-   escape-first output: raw HTML/<script> arrive as text, links are https?
-   only. Links open in new tabs (the md iframe rides allow-popups). */
-export function mdDoc(src) {
-  const body = miniMd(mdFrontmatter(src));
+/* shared standalone-doc envelope for the #hp-frame srcdoc (opaque-origin
+   iframe - parent CSS vars don't reach it, so the conclusion-card tokens are
+   inlined). Content across ALL builders is escape-first: raw HTML/<script>
+   arrive as text, md links are https? only. extraCss rides after the shared
+   set (same specificity, later wins). */
+const ESC = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const DOC_CSS =
+  ':root{color-scheme:dark}' +
+  'body{margin:0;padding:14px 16px 44px;background:#1D1C1A;color:#F2EDE3;' +
+  'font:15px/1.55 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}' +
+  'p{margin:7px 0}b{font-weight:700}' +
+  'pre{background:#171613;border-radius:9px;padding:9px;overflow-x:auto;font-size:12px}' +
+  'code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px;background:rgba(255,250,240,.07);border-radius:5px;padding:1.5px 5px;overflow-wrap:anywhere}' +
+  'pre code{background:none;padding:0;border-radius:0;overflow-wrap:normal;font-weight:400}' +
+  '.mdh1{font-size:19px;font-weight:700;margin:15px 0 7px}.mdh2{font-size:17px;font-weight:650;margin:13px 0 6px}' +
+  '.mdh3{font-size:15px;font-weight:650;margin:11px 0 5px}.mdh4{font-size:13.5px;font-weight:600;color:#A79F92;margin:11px 0 5px}' +
+  'ul,ol{margin:7px 0;padding-left:20px;font-weight:400}li{margin:3px 0}' +
+  'blockquote{margin:8px 0;padding:2px 0 2px 11px;border-left:2px solid rgba(255,255,255,.16);color:#A79F92;font-weight:400}' +
+  'hr{border:0;height:1px;background:rgba(255,255,255,.1);margin:11px 0}' +
+  'table{border-collapse:collapse;margin:8px 0;font-size:12.5px;display:block;overflow-x:auto;max-width:100%}' +
+  'th,td{padding:5px 12px 5px 0;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-variant-numeric:tabular-nums;font-weight:400}' +
+  'th{color:#A79F92;font-weight:600;white-space:nowrap}' +
+  'a{color:#D97757;text-decoration:none;border-bottom:1px dashed rgba(217,119,87,.45);overflow-wrap:anywhere}' +
+  '.note{font-size:12px;color:#A79F92;margin:10px 0}';
+export function docShell(body, extraCss) {
   return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<style>' +
-    ':root{color-scheme:dark}' +
-    'body{margin:0;padding:14px 16px 44px;background:#1D1C1A;color:#F2EDE3;' +
-    'font:15px/1.55 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}' +
-    'p{margin:7px 0}b{font-weight:700}' +
-    'pre{background:#171613;border-radius:9px;padding:9px;overflow-x:auto;font-size:12px}' +
-    'code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px;background:rgba(255,250,240,.07);border-radius:5px;padding:1.5px 5px;overflow-wrap:anywhere}' +
-    'pre code{background:none;padding:0;border-radius:0;overflow-wrap:normal;font-weight:400}' +
-    '.mdh1{font-size:19px;font-weight:700;margin:15px 0 7px}.mdh2{font-size:17px;font-weight:650;margin:13px 0 6px}' +
-    '.mdh3{font-size:15px;font-weight:650;margin:11px 0 5px}.mdh4{font-size:13.5px;font-weight:600;color:#A79F92;margin:11px 0 5px}' +
-    'ul,ol{margin:7px 0;padding-left:20px;font-weight:400}li{margin:3px 0}' +
-    'blockquote{margin:8px 0;padding:2px 0 2px 11px;border-left:2px solid rgba(255,255,255,.16);color:#A79F92;font-weight:400}' +
-    'hr{border:0;height:1px;background:rgba(255,255,255,.1);margin:11px 0}' +
-    'table{border-collapse:collapse;margin:8px 0;font-size:12.5px;display:block;overflow-x:auto;max-width:100%}' +
-    'th,td{padding:5px 12px 5px 0;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-variant-numeric:tabular-nums;font-weight:400}' +
-    'th{color:#A79F92;font-weight:600;white-space:nowrap}' +
-    'a{color:#D97757;text-decoration:none;border-bottom:1px dashed rgba(217,119,87,.45);overflow-wrap:anywhere}' +
-    '</style></head><body>' + body + '</body></html>';
+    '<style>' + DOC_CSS + (extraCss || '') + '</style></head><body>' + body + '</body></html>';
+}
+
+/* v139: md render - frontmatter strip + miniMd into the shared shell. Links
+   open in new tabs (the md iframe rides allow-popups). */
+export function mdDoc(src) {
+  return docShell(miniMd(mdFrontmatter(src)));
+}
+
+/* v142 csv/tsv render - RFC4180 fields (quoted delimiters/quotes/newlines),
+   first row as header, 500-row cap (huge dumps would explode the DOM). The
+   table flows the page (display:table) so the sticky header tracks the body
+   scroll instead of a nested overflow box. */
+const CSV_MAX_ROWS = 500;
+export function csvDoc(src, delim) {
+  const text = String(src).replace(/^﻿/, '');
+  const d = delim === '\t' ? '\t' : ',';
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"' && !field) inQ = true;
+    else if (ch === d) { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++; // CRLF is one break
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return docShell('<p class="note">（空文件）</p>');
+  const shown = rows.slice(0, CSV_MAX_ROWS);
+  let html = '<table><thead><tr>' + shown[0].map((h) => '<th>' + ESC(h) + '</th>').join('') + '</tr></thead><tbody>';
+  for (let r = 1; r < shown.length; r++) html += '<tr>' + shown[r].map((c) => '<td>' + ESC(c) + '</td>').join('') + '</tr>';
+  html += '</tbody></table>';
+  if (rows.length > CSV_MAX_ROWS) html += '<p class="note">共 ' + rows.length + ' 行，仅显示前 ' + CSV_MAX_ROWS + ' 行</p>';
+  return docShell(html,
+    'table{display:table;width:100%;max-width:none;font-size:13px}' +
+    'thead th{position:sticky;top:0;background:#1D1C1A;box-shadow:0 1px 0 rgba(255,255,255,.14);white-space:normal}' +
+    'th,td{padding:6px 14px 6px 0;white-space:pre-wrap;overflow-wrap:anywhere}');
+}
+
+/* v142 json render - pretty print + token colors. Coloring runs on the
+   ESCAPED text (quotes stay literal so the string regex sees real
+   delimiters; entities inside strings survive untouched inside their span).
+   Unparseable files degrade to a noted raw view instead of an empty tab. */
+export function jsonDoc(src) {
+  const text = String(src).replace(/^﻿/, '').trim();
+  let pretty;
+  try { pretty = JSON.stringify(JSON.parse(text), null, 2); }
+  catch { return docShell('<p class="note">JSON 解析失败，原样显示</p><pre>' + ESC(text.slice(0, 128 * 1024)) + '</pre>'); }
+  let note = '';
+  if (pretty.length > 256 * 1024) { pretty = pretty.slice(0, 256 * 1024); note = '<p class="note">… 超过 256KB 已截断，完整内容见源码</p>'; }
+  const colored = ESC(pretty).replace(
+    /("(?:[^"\\]|\\[\s\S])*")(\s*:)|("(?:[^"\\]|\\[\s\S])*")|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b|\btrue\b|\bfalse\b|\bnull\b/g,
+    (m, k, colon, str) =>
+      k ? '<span class="jk">' + k + '</span>' + colon
+        : str ? '<span class="jstr">' + str + '</span>'
+          : (m === 'true' || m === 'false' || m === 'null') ? '<span class="jlit">' + m + '</span>'
+            : '<span class="jnum">' + m + '</span>'
+  );
+  return docShell(note + '<pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + colored + '</pre>',
+    '.jk{color:#A79F92}.jstr{color:#8FB98D}.jnum{color:#D9A262}.jlit{color:#E8926F}');
+}
+
+/* v142 diff/patch render - unified-diff line grammar (---/+++ file lines,
+   @@ hunks, +/- adds/dels) with a ±N stats header, same visual language as
+   the approval cards. 2000-line cap keeps monster patches cheap. */
+const DIFF_MAX_ROWS = 2000;
+export function diffDoc(src) {
+  const lines = String(src).replace(/^﻿/, '').split('\n');
+  if (lines.length && lines[lines.length - 1] === '') lines.pop();
+  let adds = 0, dels = 0, shown = 0, body = '';
+  for (const ln of lines) {
+    if (shown >= DIFF_MAX_ROWS) {
+      body += '<div class="dl hunk">… 其余 ' + (lines.length - DIFF_MAX_ROWS) + ' 行已省略</div>';
+      break;
+    }
+    shown++;
+    const t = ESC(ln) || '&#8203;'; // keep empty context lines one row tall
+    if (/^--- /.test(ln) || /^\+\+\+ /.test(ln)) body += '<div class="dl dfile">' + t + '</div>';
+    else if (/^@@/.test(ln)) body += '<div class="dl hunk">' + t + '</div>';
+    else if (ln.startsWith('-')) { dels++; body += '<div class="dl del">' + t + '</div>'; }
+    else if (ln.startsWith('+')) { adds++; body += '<div class="dl add">' + t + '</div>'; }
+    else body += '<div class="dl ctx">' + t + '</div>';
+  }
+  return docShell('<p class="dstats"><span class="ins">+' + adds + '</span> <span class="dele">−' + dels + '</span></p><div class="dlist">' + body + '</div>',
+    '.dstats{margin:2px 0 10px;font-size:12.5px}.dstats .ins{color:#8FB98D}.dstats .dele{color:#DB6B5E}' +
+    '.dlist{font:11.5px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;background:#171613;border-radius:10px;overflow:hidden}' +
+    '.dl{padding:2.5px 10px;white-space:pre-wrap;overflow-wrap:anywhere}' +
+    '.dl.dfile{color:#A79F92;padding-top:8px}.dl.hunk{color:#E8926F;background:rgba(217,119,87,.08)}' +
+    '.dl.add{background:rgba(143,185,141,.10)}.dl.del{background:rgba(219,107,94,.10)}.dl.ctx{color:#C9C2B6}');
 }
 
 /* artifact linkify: absolute file paths (Windows drives + POSIX /) in tool
    text become links; separators tolerate the JSON-doubled backslashes shown
    in tool chips; only whitelisted extensions linkify (avoids mangling
    ordinary sentences); the lookbehind keeps URLs (//) and relative paths out */
-export const ART_IMG = /\.(png|jpe?g|webp|gif|bmp)$/i;
-const ART_PATH_RE = /(?<![\w/])(?:[A-Za-z]:[\\/]{1,2}|\/)(?:[^\s"'<>|:*?\\/]+[\\/]{1,2})*[^\s"'<>|:*?\\/]*\.(?:png|jpe?g|webp|gif|bmp|txt|md|log|json|csv|ya?ml|xml|html?|css|mjs|cjs|js|ts|py|ps1|sh|ini|toml)\b/gi;
+export const ART_IMG = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
+const ART_PATH_RE = /(?<![\w/])(?:[A-Za-z]:[\\/]{1,2}|\/)(?:[^\s"'<>|:*?\\/]+[\\/]{1,2})*[^\s"'<>|:*?\\/]*\.(?:png|jpe?g|webp|gif|bmp|svg|txt|md|log|json|csv|tsv|ya?ml|xml|html?|css|mjs|cjs|js|ts|py|ps1|sh|ini|toml|diff|patch)\b/gi;
 export function linkifyPaths(el, text, onOpen) {
   if (!text) return;
   let last = 0, mm;

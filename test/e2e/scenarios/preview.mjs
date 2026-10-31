@@ -135,5 +135,44 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'html reopened');
   assert((await page.ev('document.getElementById("hp-frame").getAttribute("sandbox")')) === 'allow-scripts', 'sandbox resets to allow-scripts for html');
   await page.ev('document.getElementById("hp-back").click()');
+  assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), 'html preview closed');
+
+  // v142 structured renderers: csv table (rfc4180), json coloring, diff
+  // ±stats - all ride the same dual-tab srcdoc path; svg goes through the
+  // image lightbox via a client-side blob re-type (img context never runs
+  // svg scripts)
+  fs.writeFileSync(path.join(h.tmp, 'data.csv'), 'name,desc\nalpha,"hello, ""x"""\nbeta,plain\n');
+  fs.writeFileSync(path.join(h.tmp, 'pkg.json'), '{"name":"e2e","v":2,"ok":true,"none":null}');
+  fs.writeFileSync(path.join(h.tmp, 'change.diff'), '--- a/x\n+++ b/x\n@@ -1,2 +1,2 @@\n-old line\n+new line\n ctx\n');
+  fs.writeFileSync(path.join(h.tmp, 'dot.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/><script>alert(1)</script></svg>');
+  const renderCases = [
+    ['pv6', 'data.csv', 'data\\.csv', (d) => d.indexOf('<th>name</th>') >= 0 && d.indexOf('hello, "x"') >= 0, 'csv table + quoted cell'],
+    ['pv7', 'pkg.json', 'pkg\\.json', (d) => d.indexOf('<span class="jk">"name"</span>') >= 0 && d.indexOf('<span class="jlit">true</span>') >= 0, 'json keys + literals colored'],
+    ['pv8', 'change.diff', 'change\\.diff', (d) => d.indexOf('class="dl add"') >= 0 && d.indexOf('class="dl del"') >= 0 && d.indexOf('+1</span>') >= 0, 'diff add/del rows + stats'],
+  ];
+  for (const [sid, fname, mark, check, label] of renderCases) {
+    writeSession(h, 'T--e2e', sid, previewLines(h.tmp, fname));
+    assert(await waitSession(sid), sid + ' visible');
+    await page.open(sid);
+    assert(await page.waitFor('document.querySelectorAll(".flink").length >= 1'), sid + ' flink ready');
+    await page.ev('(function(){var a=[].slice.call(document.querySelectorAll(".flink")).find(function(x){return /' + mark + '$/i.test(x.textContent)}); a && a.click(); return true;})()');
+    // container assert (starts hidden): the hp-frame assert would pass
+    // vacuously on the static default while the async fetch is still in
+    // flight and srcdoc is still empty
+    assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), sid + ' opens the preview page');
+    assert(await page.waitFor('!document.getElementById("hp-frame").classList.contains("hidden")'), sid + ' opens on the render tab');
+    const attr = await page.ev('document.getElementById("hp-frame").getAttribute("srcdoc") || ""');
+    assert(check(attr), label);
+    await page.ev('document.getElementById("hp-back").click()');
+    assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), sid + ' closed');
+  }
+  writeSession(h, 'T--e2e', 'pv9', previewLines(h.tmp, 'dot.svg'));
+  assert(await waitSession('pv9'), 'svg session visible');
+  await page.open('pv9');
+  assert(await page.waitFor('document.querySelectorAll(".flink").length >= 1'), 'svg path linkified');
+  await page.ev('(function(){var a=[].slice.call(document.querySelectorAll(".flink")).find(function(x){return /dot\\.svg$/i.test(x.textContent)}); a && a.click(); return true;})()');
+  assert(await page.waitFor('!document.getElementById("lightbox").classList.contains("hidden")'), 'svg opens the lightbox');
+  assert((await page.ev('document.getElementById("lightbox-img").src.slice(0,5)')) === 'blob:', 'svg rides a blob url (client re-type)');
+  await page.ev('document.getElementById("lightbox").click()');
   assert(true, 'done');
 });

@@ -6,7 +6,7 @@
 import { $ } from '../util.js';
 import { state } from '../state.js';
 import { auth, api } from '../api.js';
-import { ART_IMG, mdDoc } from '../md.js';
+import { ART_IMG, mdDoc, csvDoc, jsonDoc, diffDoc } from '../md.js';
 import { toast } from './toast.js';
 
 /* ---------- bubble popups (v15 E): anchored above the dock ---------- */
@@ -40,17 +40,30 @@ function openFilePreview(a) {
   if (!a.file) return;
   fetch('/files/' + a.file.split('/').map(encodeURIComponent).join('/'), { headers: auth() })
     .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    // v139: .md attachments render like md artifacts (dual tab); other text
-    // stays source-only
-    .then((t) => /\.md$/i.test(a.name || '')
-      ? openHtmlPreview({ name: a.name, text: mdDoc(t), srcText: t, popups: true })
-      : openHtmlPreview({ name: a.name, srcText: t, sourceOnly: true }))
+    .then((t) => openTextPreview(a.name, t))
     .catch(() => toast('读取失败'));
 }
 
 /* ---------- artifact preview (v23) ---------- */
 const ART_HTML = /\.html?$/i;
-const ART_MD = /\.md$/i;
+const ART_SVG = /\.svg$/i;
+// v142 structured renderers: ext -> doc builder, all standalone styled docs
+// into the srcdoc frame; popups only for md (link-heavy READMEs). html keeps
+// its raw-doc dual tab (v103), everything else falls back to source-only.
+const ART_DOCS = [
+  [/\.md$/i, (t) => mdDoc(t), true],
+  [/\.(csv|tsv)$/i, (t, name) => csvDoc(t, /\.tsv$/i.test(name) ? '\t' : ','), false],
+  [/\.json$/i, (t) => jsonDoc(t), false],
+  [/\.(diff|patch)$/i, (t) => diffDoc(t), false],
+];
+function openTextPreview(name, text) {
+  const srcText = text.slice(0, 128 * 1024);
+  if (ART_HTML.test(name)) { openHtmlPreview({ name, text, srcText }); return; }
+  for (const [re, build, popups] of ART_DOCS) {
+    if (re.test(name)) { openHtmlPreview({ name, text: build(text, name), srcText, popups }); return; }
+  }
+  openHtmlPreview({ name, srcText, sourceOnly: true });
+}
 let artPreviewUrl = '';
 async function previewArtifact(winPath) {
   const url = '/api/sessions/' + encodeURIComponent(state.currentId) + '/preview?p=' + encodeURIComponent(winPath);
@@ -59,19 +72,17 @@ async function previewArtifact(winPath) {
     if (!r.ok) { const err = new Error('HTTP ' + r.status); err.status = r.status; throw err; }
     const name = winPath.split(/[\\/]/).pop();
     if (ART_IMG.test(winPath)) {
-      const blob = await r.blob();
+      let blob = await r.blob();
+      // svg: retype the blob client-side - the bridge deliberately serves
+      // model files inert (text/plain) and the <img> context never runs svg
+      // scripts, so this stays inside the preview security model
+      if (ART_SVG.test(winPath)) blob = blob.slice(0, blob.size, 'image/svg+xml');
       if (artPreviewUrl) URL.revokeObjectURL(artPreviewUrl);
       artPreviewUrl = URL.createObjectURL(blob);
       openLightbox(artPreviewUrl);
     } else {
       const text = await r.text();
-      // v105/v107: html renders fullscreen in-app (srcdoc, opaque origin);
-      // v139: md gets the same dual-tab treatment via miniMd (popups enabled
-      // - md docs are link-heavy READMEs and the doc is escaped-only markup);
-      // everything else opens the page in source mode
-      if (ART_HTML.test(winPath)) openHtmlPreview({ name, text, srcText: text.slice(0, 128 * 1024) });
-      else if (ART_MD.test(winPath)) openHtmlPreview({ name, text: mdDoc(text), srcText: text.slice(0, 128 * 1024), popups: true });
-      else openHtmlPreview({ name, srcText: text.slice(0, 128 * 1024), sourceOnly: true });
+      openTextPreview(name, text);
     }
   } catch (e) {
     // status-specific reasons - "HTTP 403" tells the user nothing about WHY
