@@ -173,15 +173,21 @@ export function jsonDoc(src) {
     '.jk{color:#A79F92}.jstr{color:#8FB98D}.jnum{color:#D9A262}.jlit{color:#E8926F}');
 }
 
-/* v143 diff/patch render - parse the unified grammar into a PAIRED row
+/* v143/v144 diff/patch render - parse the unified grammar into a PAIRED row
    model, then render BOTH layouts into one doc: stacked (default, the v142
-   look) and side-by-side, switched by a CSS-only checkbox (no script runs in
-   the sandbox). Inside each hunk context lines pair naturally (same order on
+   look) and side-by-side, switched by a CSS-only checkbox (no script for
+   small diffs). Inside each hunk context lines pair naturally (same order on
    both sides); del/add runs pair index-wise and the longer side spills into
    one-sided rows - hunk sizes are small, no LCS needed. Patch metadata
    (From / diff --git / index / the bare --- separator / diffstat block)
-   renders as full-width prose rows. 2000-line cap keeps patches cheap. */
-const DIFF_MAX_ROWS = 2000;
+   renders as full-width prose rows. v144: only the FIRST chunk (2000 rows)
+   renders upfront; the rest rides as a JSON payload of prebuilt [stacked,
+   split] html pairs and a tiny OWN inline script appends chunks on demand -
+   model content was ESC'd when the pairs were built, the script never
+   touches raw text. Hard ceiling 10000 rows (beyond: pointer to the source
+   tab) keeps monster patches from sinking the phone. */
+const DIFF_CHUNK = 2000;
+const DIFF_HARD = 10000;
 export function diffRows(src) {
   const all = String(src).replace(/^﻿/, '').split('\n');
   if (all.length && all[all.length - 1] === '') all.pop();
@@ -208,8 +214,7 @@ export function diffRows(src) {
     }
     oldS = newS = null;
   };
-  const lines = all.length > DIFF_MAX_ROWS ? all.slice(0, DIFF_MAX_ROWS) : all;
-  for (const ln of lines) {
+  for (const ln of all) {
     if (/^--- /.test(ln) || ln === '---' || /^\+\+\+ /.test(ln)) { flush(); rows.push({ k: 'file', l: ln }); continue; }
     if (/^@@/.test(ln)) { flush(); rows.push({ k: 'hunk', l: ln }); oldS = []; newS = []; continue; }
     // only true section delimiters force a flush; From/Date/Subject/index
@@ -223,48 +228,69 @@ export function diffRows(src) {
     } else rows.push({ k: 'text', l: ln });
   }
   flush();
-  if (all.length > DIFF_MAX_ROWS) rows.push({ k: 'text', l: '… 其余 ' + (all.length - DIFF_MAX_ROWS) + ' 行已省略' });
   return rows;
 }
 export function diffDoc(src) {
-  const rows = diffRows(src);
-  let adds = 0, dels = 0, un = '', sp = '';
+  const all = diffRows(src);
+  const rows = all.length > DIFF_HARD ? all.slice(0, DIFF_HARD) : all;
+  if (all.length > rows.length) rows.push({ k: 'text', l: '… 共 ' + all.length + ' 行，仅渲染前 ' + DIFF_HARD + ' 行，完整内容见源码' });
+  let adds = 0, dels = 0;
   for (const r of rows) {
     if (r.k === 'mod') { adds++; dels++; }
     else if (r.k === 'add') adds++;
     else if (r.k === 'del') dels++;
   }
-  const cell = (s, cls) => '<div class="dc ' + cls + '">' + (ESC(s) || '&#8203;') + '</div>';
-  const GAP = '<div class="dc gap">&#8203;</div>';
-  const row = (l, r) => '<div class="drow">' + l + r + '</div>';
-  const full = (s, cls) => '<div class="drow full">' + cell(s, cls) + '</div>';
-  for (const r of rows) {
-    const t = (s) => ESC(s) || '&#8203;'; // keep empty lines one row tall
-    if (r.k === 'file') { un += '<div class="dl dfile">' + t(r.l) + '</div>'; sp += full(r.l, 'dfile'); }
-    else if (r.k === 'hunk') { un += '<div class="dl hunk">' + t(r.l) + '</div>'; sp += full(r.l, 'hunk'); }
-    else if (r.k === 'text') { un += '<div class="dl ctx">' + t(r.l) + '</div>'; sp += full(r.l, 'ctx'); }
-    else if (r.k === 'ctx') { un += '<div class="dl ctx">' + t(r.l) + '</div>'; sp += row(cell(r.l, 'ctx'), cell(r.r, 'ctx')); }
-    else if (r.k === 'del') { un += '<div class="dl del">' + t(r.l) + '</div>'; sp += row(cell(r.l, 'del'), GAP); }
-    else if (r.k === 'add') { un += '<div class="dl add">' + t(r.r) + '</div>'; sp += row(GAP, cell(r.r, 'add')); }
-    else { // mod: stacked in unified, side-by-side pair in split
-      un += '<div class="dl del">' + t(r.l) + '</div><div class="dl add">' + t(r.r) + '</div>';
-      sp += row(cell(r.l, 'del'), cell(r.r, 'add'));
-    }
+  // one builder per row -> [stacked html, split html]; reused for the first
+  // chunk AND the lazy payload so the two can never drift apart
+  const ZWSP = '&#8203;'; // keep empty lines one row tall
+  const cell = (s, cls) => '<div class="dc ' + cls + '">' + (ESC(s) || ZWSP) + '</div>';
+  const GAP = '<div class="dc gap">' + ZWSP + '</div>';
+  const rowHtml = (r) => {
+    const t = (s) => ESC(s) || ZWSP;
+    if (r.k === 'file') return ['<div class="dl dfile">' + t(r.l) + '</div>', '<div class="drow full">' + cell(r.l, 'dfile') + '</div>'];
+    if (r.k === 'hunk') return ['<div class="dl hunk">' + t(r.l) + '</div>', '<div class="drow full">' + cell(r.l, 'hunk') + '</div>'];
+    if (r.k === 'text') return ['<div class="dl ctx">' + t(r.l) + '</div>', '<div class="drow full">' + cell(r.l, 'ctx') + '</div>'];
+    if (r.k === 'ctx') return ['<div class="dl ctx">' + t(r.l) + '</div>', '<div class="drow">' + cell(r.l, 'ctx') + cell(r.r, 'ctx') + '</div>'];
+    if (r.k === 'del') return ['<div class="dl del">' + t(r.l) + '</div>', '<div class="drow">' + cell(r.l, 'del') + GAP + '</div>'];
+    if (r.k === 'add') return ['<div class="dl add">' + t(r.r) + '</div>', '<div class="drow">' + GAP + cell(r.r, 'add') + '</div>'];
+    return ['<div class="dl del">' + t(r.l) + '</div><div class="dl add">' + t(r.r) + '</div>',
+      '<div class="drow">' + cell(r.l, 'del') + cell(r.r, 'add') + '</div>']; // mod: stacked vs pair
+  };
+  let un = '', sp = '';
+  const first = rows.slice(0, DIFF_CHUNK).map(rowHtml);
+  for (const [u, s] of first) { un += u; sp += s; }
+  const rest = rows.slice(DIFF_CHUNK);
+  let more = '';
+  if (rest.length) {
+    // < is escaped to < INSIDE the JSON string so no payload content can
+    // ever close the host <script> tag; JSON.parse turns it back into <
+    const payload = JSON.stringify(rest.map(rowHtml)).replace(/</g, '\\u003c');
+    more = '<script type="application/json" id="dpay">' + payload + '</script>' +
+      '<button id="dmore" class="dmore" type="button">加载更多（还有 ' + rest.length + ' 行）</button>' +
+      '<scr' + 'ipt>(function(){var P=JSON.parse(document.getElementById("dpay").textContent),i=0,b=document.getElementById("dmore");' +
+      'b.addEventListener("click",function(){var n=Math.min(' + DIFF_CHUNK + ',P.length-i),u="",s="";' +
+      'for(var k=0;k<n;k++){u+=P[i][0];s+=P[i][1];i++;}' +
+      'document.querySelector(".dlist").insertAdjacentHTML("beforeend",u);' +
+      'document.querySelector(".dsplit").insertAdjacentHTML("beforeend",s);' +
+      'if(i>=P.length){b.parentNode.removeChild(b);}else{b.textContent="加载更多（还有 "+(P.length-i)+" 行）";}});})();</scr' + 'ipt>';
   }
-  // the checkbox precedes everything it toggles; label doubles as a segmented
-  // control (上下/并排) whose active pill also keys off the checkbox state
+  // the checkbox precedes everything it toggles; the label doubles as a
+  // segmented control whose active pill also keys off the checkbox state.
+  // v144: stats and pills share one 22px box (line-height/flex centers) so
+  // the two sides align regardless of device font metrics.
   return docShell(
     '<input id="dmode" type="checkbox" class="dm-cb">' +
     '<div class="dtools"><p class="dstats"><span class="ins">+' + adds + '</span> <span class="dele">−' + dels + '</span></p>' +
     '<label class="dseg" for="dmode"><span class="a">上下</span><span class="b">并排</span></label></div>' +
-    '<div class="dlist">' + un + '</div><div class="dsplit">' + sp + '</div>',
+    '<div class="dlist">' + un + '</div><div class="dsplit">' + sp + '</div>' + more,
     '.dm-cb{position:absolute;opacity:0;pointer-events:none}' +
     '.dm-cb:checked ~ .dlist{display:none}.dm-cb:not(:checked) ~ .dsplit{display:none}' +
     '.dtools{display:flex;align-items:center;justify-content:space-between;margin:2px 0 10px}' +
-    '.dstats{margin:0;font-size:12.5px}.dstats .ins{color:#8FB98D}.dstats .dele{color:#DB6B5E}' +
-    '.dseg{display:inline-flex;border-radius:999px;background:#2E2B26;font-size:11px;line-height:1;cursor:pointer;overflow:hidden;user-select:none;-webkit-user-select:none}' +
-    '.dseg span{padding:5px 12px;color:#A79F92}' +
+    '.dstats{margin:0;font-size:12.5px;line-height:22px}.dstats .ins{color:#8FB98D}.dstats .dele{color:#DB6B5E}' +
+    '.dseg{display:inline-flex;align-items:center;height:22px;border-radius:999px;background:#2E2B26;font-size:11px;line-height:1;cursor:pointer;overflow:hidden;user-select:none;-webkit-user-select:none}' +
+    '.dseg span{display:flex;align-items:center;height:100%;padding:0 12px;color:#A79F92}' +
     '.dm-cb:not(:checked) ~ .dtools .dseg .a,.dm-cb:checked ~ .dtools .dseg .b{background:rgba(217,119,87,.18);color:#E8926F;font-weight:600}' +
+    '.dmore{display:block;width:100%;margin:10px 0 0;padding:10px;border:0;border-radius:10px;background:#2E2B26;color:#E8926F;font:600 12.5px -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;cursor:pointer}' +
     '.dlist{font:11.5px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;background:#171613;border-radius:10px;overflow:hidden}' +
     '.dl{padding:2.5px 10px;white-space:pre-wrap;overflow-wrap:anywhere}' +
     '.dl.dfile{color:#A79F92;padding-top:8px}.dl.hunk{color:#E8926F;background:rgba(217,119,87,.08)}' +

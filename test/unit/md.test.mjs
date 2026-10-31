@@ -135,5 +135,25 @@ test('diffDoc: dual layouts + CSS-only toggle ride the doc', () => {
   assert.ok(doc.includes('class="dlist"') && doc.includes('class="dsplit"'), 'both layouts rendered');
   assert.ok(doc.includes('class="drow"'), 'split grid rows present');
   assert.ok(doc.includes('.dm-cb:checked ~ .dlist{display:none}'), 'toggle CSS keys off the checkbox');
-  assert.ok(!doc.includes('<script'), 'no script in the sandbox doc');
+  assert.ok(!doc.includes('<script'), 'no script for small diffs');
+});
+
+test('diffDoc: beyond the first chunk the payload + load-more button ride the doc', () => {
+  const lines = ['--- a/x', '+++ b/x', '@@ -1,2500 +1,2500 @@'];
+  for (let i = 0; i < 2500; i++) { lines.push('-old' + i); lines.push('+new' + i); }
+  const doc = diffDoc(lines.join('\n'));
+  assert.ok(doc.includes('id="dpay"'), 'payload embedded');
+  assert.ok(doc.includes('id="dmore"'), 'load-more button present');
+  assert.ok(doc.includes('还有 503 行'), 'remaining count on the button (2503 rows - 2000 first)');
+  assert.ok(doc.indexOf('\\u003c') >= 0, 'payload < escaped - no content can close the host script tag');
+  // loader script appends prebuilt pairs to BOTH layouts
+  assert.ok(doc.includes('insertAdjacentHTML'), 'loader appends');
+});
+
+test('diffDoc: hard cap 10000 rows points to the source tab', () => {
+  const lines = ['@@ -1,12000 +1,12000 @@'];
+  for (let i = 0; i < 11000; i++) { lines.push('-old' + i); lines.push('+new' + i); }
+  const doc = diffDoc(lines.join('\n'));
+  assert.ok(doc.includes('仅渲染前 10000 行'), 'hard-cap note');
+  assert.ok(doc.includes('完整内容见源码'), 'points at the source tab');
 });
