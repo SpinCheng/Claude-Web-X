@@ -39,6 +39,35 @@ export function pickTitleInputs(events) {
   return { user, bot };
 }
 
+// Pure: v134 suggest-title input - the user's own prompts only, no assistant
+// conclusions (user decision). Each clipped to 100 chars, the whole set
+// within ~2000 chars (oldest first, stop before crossing the budget).
+export function pickUserPrompts(events) {
+  const out = [];
+  let total = 0;
+  for (const ev of events || []) {
+    if (ev.k !== 'user' || !ev.text) continue;
+    const t = String(ev.text).slice(0, 100);
+    if (total + t.length + (out.length ? 1 : 0) > 2000) break; // newline counts toward budget
+    out.push(t);
+    total += t.length;
+  }
+  return out.join('\n');
+}
+
+export function buildSuggestPrompt(prompts) {
+  return [
+    '为下面的会话生成一个标题。要求：',
+    '- 语言与会话内容一致；中文不超过 14 个字，英文不超过 8 个词',
+    '- 概括会话的目标与主题，不要照抄开头',
+    '- 以下是用户在这个会话里发过的全部消息（每条独立，可能被截断）',
+    '- 不调用任何工具；只输出标题本身，不带引号、编号或任何说明',
+    '',
+    '[用户消息]',
+    prompts,
+  ].join('\n');
+}
+
 export function buildTitlePrompt(user, bot) {
   const L = [
     '为下面的任务生成一个会话标题。要求：',
@@ -95,8 +124,9 @@ export class TitleGen {
   // confirms via the normal rename route). Deliberately ignores this.enabled
   // (that gates AUTO-titling only) and this.done (repeatable on demand).
   // Same one-shot -p machinery, so the ghost transcript is archived in _ask.
-  suggest(user, bot, model, rec) {
-    return this._ask(buildTitlePrompt(user, bot), rec, model);
+  // v134: the caller builds the prompt (user prompts only, its own budget).
+  suggest(prompt, model, rec) {
+    return this._ask(prompt, rec, model);
   }
 
   async _generate(sessionId, rec, user, bot, model) {

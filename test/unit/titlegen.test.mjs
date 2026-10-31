@@ -3,7 +3,7 @@
 // truncation fallback; once per id; disabled via cfg).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pickTitleInputs, buildTitlePrompt, sanitizeTitle, TitleGen } from '../../bridge/titlegen.js';
+import { pickTitleInputs, buildTitlePrompt, pickUserPrompts, buildSuggestPrompt, sanitizeTitle, TitleGen } from '../../bridge/titlegen.js';
 
 test('pickTitleInputs: first human bubble + LAST assistant text (not the first)', () => {
   const events = [
@@ -108,4 +108,33 @@ test('_ask passes the run model through (shape of argv is covered live; here: no
   tg._ask = async (prompt, rec, model) => ({ prompt, rec, model });
   const out = await tg._ask('p', { cwd: 'D:\\w' }, 'opus-x');
   assert.equal(out.model, 'opus-x');
+});
+
+test('pickUserPrompts: user messages only, 100-char clip, \n-joined, oldest first', () => {
+  const events = [
+    { k: 'user', text: 'x'.repeat(150) },
+    { k: 'assistant', parts: [{ t: 'text', v: '结论' }] },
+    { k: 'user', images: [{}] },               // image-only: skipped
+    { k: 'user', text: 'y'.repeat(50) },
+    { k: 'compact', n: 3 },
+    { k: 'user', text: 'z' },
+  ];
+  const r = pickUserPrompts(events);
+  assert.ok(r.includes('x'.repeat(100)) && !r.includes('x'.repeat(101)));
+  assert.ok(!r.includes('结论'));
+  assert.equal(r, 'x'.repeat(100) + '\n' + 'y'.repeat(50) + '\nz');
+});
+
+test('pickUserPrompts: ~2000 budget stops before crossing', () => {
+  const events = [];
+  for (let i = 0; i < 30; i++) events.push({ k: 'user', text: 'm'.repeat(100) });
+  const r = pickUserPrompts(events);
+  assert.equal(r.split('\n').length, 19);
+  assert.ok(r.length <= 2000);
+});
+
+test('buildSuggestPrompt: carries prompts + no-tools rule', () => {
+  const p = buildSuggestPrompt('修登录页\n优化查询');
+  assert.ok(p.includes('修登录页') && p.includes('优化查询'));
+  assert.ok(p.includes('不调用任何工具'));
 });
