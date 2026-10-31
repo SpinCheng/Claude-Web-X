@@ -97,7 +97,7 @@ npm start          # node bridge/index.js，端口 3742
 3. 密钥/token 永不写日志；`bridge/data/` 永不入库。
 4. 静态服务只允许 `public/`（路径穿越防护）；响应 no-cache+ETag 304。
 5. Node ≥ 20 ESM；fs.watch(recursive) 不可用时自动降级轮询。
-6. 手机驱动的开发会话长在 bridge 进程树里：会话内脚本杀 bridge=杀掉本会话；重启桥一律从 PC 侧做（会话内重启接受当前 turn 被切断）。
+6. 手机驱动的开发会话长在 bridge 进程树里：会话内脚本杀 bridge 切断的是当前 turn 的输出管道——CLI 子进程不死、转录为准、可被新桥按 `--resume` 接管；重启桥一律从 PC 侧做，例外=用户同意后走 detached 看护脚本自重启（缓冲→杀→等端口→startup vbs→HTTP 验版本，v151 实测全程 ~9s）。
 
 ## 路线图
 
