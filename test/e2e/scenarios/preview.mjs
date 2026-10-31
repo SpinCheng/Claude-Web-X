@@ -148,7 +148,7 @@ await withEnv(async (h, page) => {
   const renderCases = [
     ['pv6', 'data.csv', 'data\\.csv', (d) => d.indexOf('<th>name</th>') >= 0 && d.indexOf('hello, "x"') >= 0, 'csv table + quoted cell'],
     ['pv7', 'pkg.json', 'pkg\\.json', (d) => d.indexOf('<span class="jk">"name"</span>') >= 0 && d.indexOf('<span class="jlit">true</span>') >= 0, 'json keys + literals colored'],
-    ['pv8', 'change.diff', 'change\\.diff', (d) => d.indexOf('class="dl add"') >= 0 && d.indexOf('class="dl del"') >= 0 && d.indexOf('+1</span>') >= 0, 'diff add/del rows + stats'],
+    ['pv8', 'change.diff', 'change\\.diff', (d) => d.indexOf('class="dl add"') >= 0 && d.indexOf('class="dl del"') >= 0 && d.indexOf('+1</span>') >= 0 && d.indexOf('id="dmode"') >= 0 && d.indexOf('class="dsplit"') >= 0, 'diff rows + stats + split-mode toggle'],
   ];
   for (const [sid, fname, mark, check, label] of renderCases) {
     writeSession(h, 'T--e2e', sid, previewLines(h.tmp, fname));

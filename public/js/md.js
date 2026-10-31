@@ -173,33 +173,109 @@ export function jsonDoc(src) {
     '.jk{color:#A79F92}.jstr{color:#8FB98D}.jnum{color:#D9A262}.jlit{color:#E8926F}');
 }
 
-/* v142 diff/patch render - unified-diff line grammar (---/+++ file lines,
-   @@ hunks, +/- adds/dels) with a ±N stats header, same visual language as
-   the approval cards. 2000-line cap keeps monster patches cheap. */
+/* v143 diff/patch render - parse the unified grammar into a PAIRED row
+   model, then render BOTH layouts into one doc: stacked (default, the v142
+   look) and side-by-side, switched by a CSS-only checkbox (no script runs in
+   the sandbox). Inside each hunk context lines pair naturally (same order on
+   both sides); del/add runs pair index-wise and the longer side spills into
+   one-sided rows - hunk sizes are small, no LCS needed. Patch metadata
+   (From / diff --git / index / the bare --- separator / diffstat block)
+   renders as full-width prose rows. 2000-line cap keeps patches cheap. */
 const DIFF_MAX_ROWS = 2000;
-export function diffDoc(src) {
-  const lines = String(src).replace(/^﻿/, '').split('\n');
-  if (lines.length && lines[lines.length - 1] === '') lines.pop();
-  let adds = 0, dels = 0, shown = 0, body = '';
-  for (const ln of lines) {
-    if (shown >= DIFF_MAX_ROWS) {
-      body += '<div class="dl hunk">… 其余 ' + (lines.length - DIFF_MAX_ROWS) + ' 行已省略</div>';
-      break;
+export function diffRows(src) {
+  const all = String(src).replace(/^﻿/, '').split('\n');
+  if (all.length && all[all.length - 1] === '') all.pop();
+  const rows = [];
+  let oldS = null, newS = null; // null = outside a hunk (headers/prose)
+  const flush = () => {
+    if (!oldS) return;
+    let i = 0, j = 0;
+    while (i < oldS.length || j < newS.length) {
+      if (i < oldS.length && j < newS.length && oldS[i].t === 'ctx' && newS[j].t === 'ctx') {
+        rows.push({ k: 'ctx', l: oldS[i].s, r: newS[j].s }); i++; j++; continue;
+      }
+      let di = i, dj = j;
+      while (di < oldS.length && oldS[di].t !== 'ctx') di++;
+      while (dj < newS.length && newS[dj].t !== 'ctx') dj++;
+      if (di === i && dj === j) { i++; j++; continue; } // paranoia: never stall
+      const ds = oldS.slice(i, di), as = newS.slice(j, dj);
+      for (let x = 0; x < Math.max(ds.length, as.length); x++) {
+        if (ds[x] && as[x]) rows.push({ k: 'mod', l: ds[x].s, r: as[x].s });
+        else if (ds[x]) rows.push({ k: 'del', l: ds[x].s });
+        else rows.push({ k: 'add', r: as[x].s });
+      }
+      i = di; j = dj;
     }
-    shown++;
-    const t = ESC(ln) || '&#8203;'; // keep empty context lines one row tall
-    if (/^--- /.test(ln) || /^\+\+\+ /.test(ln)) body += '<div class="dl dfile">' + t + '</div>';
-    else if (/^@@/.test(ln)) body += '<div class="dl hunk">' + t + '</div>';
-    else if (ln.startsWith('-')) { dels++; body += '<div class="dl del">' + t + '</div>'; }
-    else if (ln.startsWith('+')) { adds++; body += '<div class="dl add">' + t + '</div>'; }
-    else body += '<div class="dl ctx">' + t + '</div>';
+    oldS = newS = null;
+  };
+  const lines = all.length > DIFF_MAX_ROWS ? all.slice(0, DIFF_MAX_ROWS) : all;
+  for (const ln of lines) {
+    if (/^--- /.test(ln) || ln === '---' || /^\+\+\+ /.test(ln)) { flush(); rows.push({ k: 'file', l: ln }); continue; }
+    if (/^@@/.test(ln)) { flush(); rows.push({ k: 'hunk', l: ln }); oldS = []; newS = []; continue; }
+    // only true section delimiters force a flush; From/Date/Subject/index
+    // prose needs no special case - outside hunks everything is text anyway,
+    // and recognizing them inside hunks would misfire on patched code lines
+    if (/^diff --git |^-- $/.test(ln)) { flush(); rows.push({ k: 'text', l: ln }); continue; }
+    if (oldS) {
+      if (ln.startsWith('-')) oldS.push({ t: 'del', s: ln });
+      else if (ln.startsWith('+')) newS.push({ t: 'add', s: ln });
+      else { oldS.push({ t: 'ctx', s: ln }); newS.push({ t: 'ctx', s: ln }); }
+    } else rows.push({ k: 'text', l: ln });
   }
-  return docShell('<p class="dstats"><span class="ins">+' + adds + '</span> <span class="dele">−' + dels + '</span></p><div class="dlist">' + body + '</div>',
-    '.dstats{margin:2px 0 10px;font-size:12.5px}.dstats .ins{color:#8FB98D}.dstats .dele{color:#DB6B5E}' +
+  flush();
+  if (all.length > DIFF_MAX_ROWS) rows.push({ k: 'text', l: '… 其余 ' + (all.length - DIFF_MAX_ROWS) + ' 行已省略' });
+  return rows;
+}
+export function diffDoc(src) {
+  const rows = diffRows(src);
+  let adds = 0, dels = 0, un = '', sp = '';
+  for (const r of rows) {
+    if (r.k === 'mod') { adds++; dels++; }
+    else if (r.k === 'add') adds++;
+    else if (r.k === 'del') dels++;
+  }
+  const cell = (s, cls) => '<div class="dc ' + cls + '">' + (ESC(s) || '&#8203;') + '</div>';
+  const GAP = '<div class="dc gap">&#8203;</div>';
+  const row = (l, r) => '<div class="drow">' + l + r + '</div>';
+  const full = (s, cls) => '<div class="drow full">' + cell(s, cls) + '</div>';
+  for (const r of rows) {
+    const t = (s) => ESC(s) || '&#8203;'; // keep empty lines one row tall
+    if (r.k === 'file') { un += '<div class="dl dfile">' + t(r.l) + '</div>'; sp += full(r.l, 'dfile'); }
+    else if (r.k === 'hunk') { un += '<div class="dl hunk">' + t(r.l) + '</div>'; sp += full(r.l, 'hunk'); }
+    else if (r.k === 'text') { un += '<div class="dl ctx">' + t(r.l) + '</div>'; sp += full(r.l, 'ctx'); }
+    else if (r.k === 'ctx') { un += '<div class="dl ctx">' + t(r.l) + '</div>'; sp += row(cell(r.l, 'ctx'), cell(r.r, 'ctx')); }
+    else if (r.k === 'del') { un += '<div class="dl del">' + t(r.l) + '</div>'; sp += row(cell(r.l, 'del'), GAP); }
+    else if (r.k === 'add') { un += '<div class="dl add">' + t(r.r) + '</div>'; sp += row(GAP, cell(r.r, 'add')); }
+    else { // mod: stacked in unified, side-by-side pair in split
+      un += '<div class="dl del">' + t(r.l) + '</div><div class="dl add">' + t(r.r) + '</div>';
+      sp += row(cell(r.l, 'del'), cell(r.r, 'add'));
+    }
+  }
+  // the checkbox precedes everything it toggles; label doubles as a segmented
+  // control (上下/并排) whose active pill also keys off the checkbox state
+  return docShell(
+    '<input id="dmode" type="checkbox" class="dm-cb">' +
+    '<div class="dtools"><p class="dstats"><span class="ins">+' + adds + '</span> <span class="dele">−' + dels + '</span></p>' +
+    '<label class="dseg" for="dmode"><span class="a">上下</span><span class="b">并排</span></label></div>' +
+    '<div class="dlist">' + un + '</div><div class="dsplit">' + sp + '</div>',
+    '.dm-cb{position:absolute;opacity:0;pointer-events:none}' +
+    '.dm-cb:checked ~ .dlist{display:none}.dm-cb:not(:checked) ~ .dsplit{display:none}' +
+    '.dtools{display:flex;align-items:center;justify-content:space-between;margin:2px 0 10px}' +
+    '.dstats{margin:0;font-size:12.5px}.dstats .ins{color:#8FB98D}.dstats .dele{color:#DB6B5E}' +
+    '.dseg{display:inline-flex;border-radius:999px;background:#2E2B26;font-size:11px;line-height:1;cursor:pointer;overflow:hidden;user-select:none;-webkit-user-select:none}' +
+    '.dseg span{padding:5px 12px;color:#A79F92}' +
+    '.dm-cb:not(:checked) ~ .dtools .dseg .a,.dm-cb:checked ~ .dtools .dseg .b{background:rgba(217,119,87,.18);color:#E8926F;font-weight:600}' +
     '.dlist{font:11.5px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;background:#171613;border-radius:10px;overflow:hidden}' +
     '.dl{padding:2.5px 10px;white-space:pre-wrap;overflow-wrap:anywhere}' +
     '.dl.dfile{color:#A79F92;padding-top:8px}.dl.hunk{color:#E8926F;background:rgba(217,119,87,.08)}' +
-    '.dl.add{background:rgba(143,185,141,.10)}.dl.del{background:rgba(219,107,94,.10)}.dl.ctx{color:#C9C2B6}');
+    '.dl.add{background:rgba(143,185,141,.10)}.dl.del{background:rgba(219,107,94,.10)}.dl.ctx{color:#C9C2B6}' +
+    '.dsplit{font:11.5px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;background:#171613;border-radius:10px;overflow:hidden}' +
+    '.drow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}' +
+    '.drow.full{grid-template-columns:1fr}' +
+    '.dc{padding:2.5px 8px;white-space:pre-wrap;overflow-wrap:anywhere;color:#C9C2B6}' +
+    '.drow .dc + .dc{border-left:1px solid rgba(255,255,255,.07)}' +
+    '.dc.dfile{color:#A79F92;padding-top:8px}.dc.hunk{color:#E8926F;background:rgba(217,119,87,.08)}' +
+    '.dc.add{background:rgba(143,185,141,.10)}.dc.del{background:rgba(219,107,94,.10)}.dc.gap{color:#C9C2B6}');
 }
 
 /* artifact linkify: absolute file paths (Windows drives + POSIX /) in tool

@@ -4,7 +4,7 @@
 // output); here we assert the file-preview-specific behavior.
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { mdFrontmatter, mdDoc, csvDoc, jsonDoc, diffDoc } from '../../public/js/md.js';
+import { mdFrontmatter, mdDoc, csvDoc, jsonDoc, diffDoc, diffRows } from '../../public/js/md.js';
 
 test('mdFrontmatter strips a yamlish leading block', () => {
   const src = '---\ntitle: x\ndraft: false\n---\n\n# Head\n';
@@ -80,4 +80,60 @@ test('diffDoc: line classes, ±stats, escaping', () => {
   assert.ok(doc.includes('class="dl del"') && doc.includes('class="dl add"'), 'del/add rows');
   assert.ok(doc.includes('+1</span>') && doc.includes('−1</span>'), 'stats');
   assert.ok(doc.includes('&lt;b&gt;'), 'context/add payloads escaped');
+});
+
+test('diffRows: ctx pairs naturally, del/add runs pair index-wise with spill', () => {
+  const src = [
+    '@@ -1,5 +1,5 @@',
+    ' keep1',
+    '-gone1',
+    '-gone2',
+    '+fresh1',
+    ' keep2',
+    '+fresh2',
+    '+fresh3',
+  ].join('\n');
+  const kinds = diffRows(src).filter((r) => r.k !== 'hunk').map((r) => r.k + (r.k === 'ctx' ? ':' + r.l : ''));
+  assert.deepEqual(kinds, ['ctx: keep1', 'mod', 'del', 'ctx: keep2', 'add', 'add'], 'pairing + spill');
+  const rows = diffRows(src);
+  assert.equal(rows.find((r) => r.k === 'mod').l, '-gone1');
+  assert.equal(rows.find((r) => r.k === 'mod').r, '+fresh1');
+  assert.ok(rows.some((r) => r.k === 'del' && r.l === '-gone2'), 'longer del run spills one-sided');
+});
+
+test('diffRows: git patch prose (From/index/diffstat/bare ---) stays full-width, never a del', () => {
+  const src = [
+    'From 0000000 Mon Sep 17 00:00:00 2001',
+    'From: mini',
+    'Subject: [PATCH] feat',
+    '---',
+    ' bridge/x.js | 2 ++',
+    ' 1 file changed, 2 insertions(+)',
+    'diff --git a/x.js b/x.js',
+    'index 111..222 100644',
+    '--- a/x.js',
+    '+++ b/x.js',
+    '@@ -1,2 +1,3 @@',
+    ' old',
+    '-x',
+    '+new',
+    '+new2',
+    '-- ',
+    '2.1.308.windows',
+  ].join('\n');
+  const rows = diffRows(src);
+  const prose = rows.filter((r) => r.k === 'text' || r.k === 'file').map((r) => r.l);
+  assert.ok(prose.includes('From: mini') && prose.includes('index 111..222 100644'), 'prose rows kept');
+  assert.ok(prose.includes('---') && prose.includes('-- '), 'git separator + signature not dels');
+  assert.ok(rows.some((r) => r.k === 'mod'), 'hunk still pairs');
+  assert.ok(!rows.some((r) => r.k === 'del' && r.l === '-- '), 'signature never classified del');
+});
+
+test('diffDoc: dual layouts + CSS-only toggle ride the doc', () => {
+  const doc = diffDoc('@@ -1,1 +1,1 @@\n-a\n+b\n');
+  assert.ok(doc.includes('id="dmode"'), 'toggle checkbox present');
+  assert.ok(doc.includes('class="dlist"') && doc.includes('class="dsplit"'), 'both layouts rendered');
+  assert.ok(doc.includes('class="drow"'), 'split grid rows present');
+  assert.ok(doc.includes('.dm-cb:checked ~ .dlist{display:none}'), 'toggle CSS keys off the checkbox');
+  assert.ok(!doc.includes('<script'), 'no script in the sandbox doc');
 });
