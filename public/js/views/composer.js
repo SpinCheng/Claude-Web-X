@@ -367,8 +367,8 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
     }),
   })
     .then(async (r) => {
+      const j = await r.json().catch(() => ({}));
       if (r.status === 409) {
-        const j = await r.json().catch(() => ({}));
         if (j.error === 'recent-local-write') {
           const ago = j.sinceMs != null ? Math.round(j.sinceMs / 1000) + ' 秒' : '刚刚';
           showConfirm({ title: '电脑端可能正在使用', body: '电脑端 ' + ago + '前刚在写这个会话（电脑窗口需重开才能看到手机的新消息）。仍然发送？', ok: '仍然发送',
@@ -382,8 +382,7 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
         }
         if (j.error === 'busy') { toast('本会话已有消息在运行，等它结束或点停止'); fail(); return; }
       }
-      if (!r.ok) { toast('发送失败（' + r.status + '）'); fail(); return; }
-      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { toast('发送失败：' + (j.error || ('HTTP ' + r.status))); fail(); return; }
       if (j.queued) {
         // v37: queued = not on the transcript yet - pull the optimistic
         // bubble back out; it goes on screen when the dispatch really
@@ -392,6 +391,13 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
         // turn, optimistic=false makes it a no-op.
         retractOptimisticUser(shownTurn);
         toast('已排队（第 ' + j.position + ' 条）· 本轮结束后自动发出');
+      } else if (/^\/clear(\s|$)/.test(text)) {
+        // v150: /clear resets the CLI into a NEW session file; the runner
+        // re-emits the run under the adopted id and app.js jumps to it.
+        // Queued /clears stay put (no arming once the dispatch detaches
+        // from this send).
+        state.pendingClear = true;
+        state.pendingClearRun = j.runId || null;
       }
       state.atBottom = true;
     })

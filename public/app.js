@@ -196,6 +196,12 @@ function handleRunFrame(d) {
     return;
   }
   state.runs[d.sessionId] = { runId: d.runId, state: d.state, startedAt: d.startedAt };
+  // v150: a run that switched sessions mid-flight (/clear reset) would leave
+  // its old key stuck on 'running' (the end frame only names the new id) -
+  // re-key the map so reopening the old session shows idle right away
+  for (const sid of Object.keys(state.runs)) {
+    if (sid !== d.sessionId && state.runs[sid].runId === d.runId) delete state.runs[sid];
+  }
   // v88: a run that ends with an unconfirmed optimistic twin (stopped before
   // the CLI wrote the user line) flips its dot red+static instead of
   // breathing forever; the twin stays foldable if the line lands later
@@ -247,6 +253,21 @@ function handleRunFrame(d) {
     state.pendingBranch = false;
     state.pendingBranchRun = null;
     openDetail(d.sessionId);
+  }
+  // v150 /clear adoption: the reset lands in a NEW session file and the
+  // runner re-emits the same run under the adopted id (probe 2026-10-31) -
+  // follow it like a fork. Disarm when that run ends without ever switching
+  // (command not recognized => plain reply in place), so a later new-session
+  // frame can't false-jump.
+  if (state.pendingClear && d.state === 'running' && d.sessionId && d.sessionId !== state.currentId &&
+      (!state.pendingClearRun || state.pendingClearRun === d.runId)) {
+    state.pendingClear = false;
+    state.pendingClearRun = null;
+    openDetail(d.sessionId);
+  }
+  if (state.pendingClearRun && d.runId === state.pendingClearRun && (d.state === 'end' || d.state === 'error')) {
+    state.pendingClear = false;
+    state.pendingClearRun = null;
   }
 }
 
