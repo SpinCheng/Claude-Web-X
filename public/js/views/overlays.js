@@ -320,13 +320,19 @@ async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?
   $('hp-tabs').classList.toggle('hidden', !!o.sourceOnly);
   const f = $('hp-frame');
   f.removeAttribute('src');
-  // v139: sandbox is allow-scripts for every caller; md render passes popups
+  f.srcdoc = ''; // drop the previous preview while still hidden (no stale flash)
+  // v140: reveal the page BEFORE navigating the frame. Assigning srcdoc while
+  // the container is display:none leaves the frame never-laid-out and mobile
+  // Chromium builds no compositor layer for it - the render tab stays blank
+  // until a display toggle (src-tab round-trip) forces one.
+  setHpView(!o.sourceOnly);
+  $('html-prev').classList.remove('hidden');
+  void f.offsetWidth; // force a synchronous layout so the frame owns a box first
+  // sandbox is allow-scripts for every caller; md render passes popups
   // so escaped-only docs can open their (https-only) links in new tabs. html
   // keeps the strict set - never same-origin.
   f.setAttribute('sandbox', 'allow-scripts' + (o.popups ? ' allow-popups' : ''));
   f.srcdoc = o.text !== undefined ? o.text : '';
-  setHpView(!o.sourceOnly);
-  $('html-prev').classList.remove('hidden');
   hpSeq++;
   // bound the stack to ONE htmlprev entry: if the current entry is already a
   // (stale) htmlprev, replace it in place instead of pushing another - a

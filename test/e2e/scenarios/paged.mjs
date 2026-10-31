@@ -8,8 +8,10 @@ await withEnv(async (h, page) => {
   await page.open('pg1');
   assert(await page.waitFor('!!document.querySelector(".final-card")'), 'detail rendered');
 
-  // away from the top: loader hidden; first page = events 21..420 = 266 turns
-  assert(!(await page.ev('document.getElementById("hist-more").classList.contains("show")')), 'loader hidden away from top');
+  // away from the top: loader hidden; first page = events 21..420 = 266 turns.
+  // waitFor the settled state - the instant check raced scrollBottom (the
+  // loader legitimately shows while the chat still sits at scrollTop 0)
+  assert(await page.waitFor('!document.getElementById("hist-more").classList.contains("show")'), 'loader hidden away from top');
   const first = await page.ev('document.getElementById("chat").childNodes.length');
   assert(first === 266, 'first page turns (got ' + first + ')');
 
