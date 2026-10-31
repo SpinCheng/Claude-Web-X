@@ -207,8 +207,9 @@ export function register(router, ctx) {
     const prompts = pickUserPrompts(tr ? tr.events : []);
     if (!prompts) { json(res, 409, { error: 'no content' }); return; }
     const modelId = (readModelCatalog().find((x) => x.label === (rec.model || '')) || {}).id || '';
-    const title = await ctx.titlegen.suggest(buildSuggestPrompt(prompts), modelId, rec);
+    let title = await ctx.titlegen.suggest(buildSuggestPrompt(prompts), modelId, rec);
     if (!title) { json(res, 502, { error: 'generate failed' }); return; }
+    title = title.slice(0, 15).trim(); // hard cap on top of the prompt cap
     json(res, 200, { ok: true, title });
   });
 }

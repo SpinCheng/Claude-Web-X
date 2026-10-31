@@ -58,7 +58,7 @@ export function pickUserPrompts(events) {
 export function buildSuggestPrompt(prompts) {
   return [
     '为下面的会话生成一个标题。要求：',
-    '- 语言与会话内容一致；中文不超过 14 个字，英文不超过 8 个词',
+    '- 语言与会话内容一致；标题不超过 15 个字',
     '- 概括会话的目标与主题，不要照抄开头',
     '- 以下是用户在这个会话里发过的全部消息（每条独立，可能被截断）',
     '- 不调用任何工具；只输出标题本身，不带引号、编号或任何说明',
