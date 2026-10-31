@@ -35,9 +35,42 @@ npm start          # node bridge/index.js, port 3742
 2. Scan it from a phone on the same Wi-Fi → paired, permanent
 3. Optionally install autostart from the pair page (Windows only)
 
-Linux/macOS: same commands (hooks use `bridge/hook-post.sh`). Two verified pitfalls: the CLI refuses `--dangerously-skip-permissions` under root/sudo — use a normal user; write `~/.claude/settings.json` (with your relay credentials in the `env` block) **before** starting the bridge.
+Linux/macOS: same commands (hooks use `bridge/hook-post.sh`). Two verified pitfalls: the CLI refuses `--dangerously-skip-permissions` under root/sudo — use a normal user (root sends get a clear refusal); write `~/.claude/settings.json` (relay credentials in the `env` block) before use (a missing block fails runs with "not logged in" — it self-heals once the file appears, no bridge restart). Server deployment: next section.
 
 Requires a working Claude Code CLI (any distribution — npm global or the copy bundled with a desktop client; auto-discovered). Documentation is Chinese-first; an auto-translated read is usually enough for the code, which has English comments throughout.
+
+## Deploying on a Linux server
+
+Verified on a RHEL-compatible x64 box (CLI 2.1.197); macOS is untested — try the quick start first.
+
+1. **Run as a normal user**: the CLI hard-refuses `--dangerously-skip-permissions` under root/sudo. Root sends are refused before spawn with a readable error; switch users, or send that message in approval mode.
+2. **Install the CLI**: `npm i -g @anthropic-ai/claude-code` (other local CLI copies are auto-discovered too).
+3. **Auth env block must be reachable from the server itself**: the `env` block's base URL in `~/.claude/settings.json` is dialed from the server — a `127.0.0.1` relay on your PC is unreachable from a cloud box (verify with an `ssh -R` reverse tunnel). A missing block fails runs with "not logged in"; it self-heals once the file appears.
+4. **First pairing** (the pair page is localhost-only): `ssh -L 3742:127.0.0.1:3742 <server>`, then open `http://localhost:3742/pair` locally.
+5. **systemd user service**:
+
+```ini
+# ~/.config/systemd/user/claude-bridge.service
+[Unit]
+Description=claude-web bridge
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/claude-web
+ExecStart=/usr/bin/node bridge/index.js
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+loginctl enable-linger $USER        # start at boot without a login session
+systemctl --user enable --now claude-bridge
+journalctl --user -u claude-bridge -f    # pairing URL lives in the startup log
+```
+
+6. **Access plane**: Tailscale is the cleanest cross-network option (~50ms via DERP relay, measured); exposing 3742 publicly demands a strong token, and don't put a proxy exit IP in any source-IP allowlist.
 
 ## Architecture & message flow
 

@@ -37,10 +37,42 @@ npm start          # node bridge/index.js，端口 3742
 2. 手机（连同一 Wi-Fi）扫码 → 自动配对并进入会话列表，之后永久有效
 3. 在 pair 页点 **安装开机自启**（仅 Windows），登录后 bridge 自动后台运行（双开保护）
 
-Linux / macOS：`npm install && npm start` 同样适用（hooks 走 `bridge/hook-post.sh`）。
-两个实测坑：**CLI 拒绝 root/sudo** 跑跳过权限模式——用普通用户；**先写好 `~/.claude/settings.json` 再起桥**（env 块缺失会被缓存锁死）。
+Linux / macOS：`npm install && npm start` 同样适用（hooks 走 `bridge/hook-post.sh`）。两个实测坑：**CLI 拒绝 root/sudo** 跑跳过权限模式——用普通用户（root 下发会收到明确报错）；**先写好 `~/.claude/settings.json`** 再用（env 块缺失时 run 报未登录；补上后自动生效，无需重启桥）。服务器部署见下一节。
 
 前提：本机装有可用的 Claude Code CLI 并完成登录（第三方客户端内置的 CLI 亦可，runner 自动发现）；API 凭证按你环境的惯例放在 `~/.claude/settings.json` 的 `env` 块，spawn 时由 bridge 显式注入子进程。
+
+## Linux 服务器部署
+
+实机口径：RHEL 兼容系 x64（CLI 2.1.197 实测）；macOS 未实机验证，先按快速开始试。bridge 从精简上下文启动也能让子会话的 Bash 落座（Windows 专属问题，Linux 无此坑）。
+
+1. **普通用户运行**：CLI 硬性拒绝 root/sudo 跑跳过权限模式（yolo）。root 下发消息，bridge 会在 spawn 前直接报错提示；换普通用户，或该消息改用逐条审批。
+2. **装 CLI**：`npm i -g @anthropic-ai/claude-code`（bridge 也会自动发现本机其他 CLI 副本）。
+3. **认证 env 块直连可达**：`~/.claude/settings.json` 的 `env` 块里 base URL 必须从**服务器本身**可达——本机 `127.0.0.1` 的中转在云上够不着，可用 `ssh -R` 反向隧道验证连通后再固化。文件缺失时 run 报未登录，补上即自动生效。
+4. **首次配对**（pair 页仅同机可访问）：`ssh -L 3742:127.0.0.1:3742 <服务器>` 后在本地浏览器开 `http://localhost:3742/pair`。
+5. **systemd 用户服务**：
+
+```ini
+# ~/.config/systemd/user/claude-bridge.service
+[Unit]
+Description=claude-web bridge
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/claude-web
+ExecStart=/usr/bin/node bridge/index.js
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+loginctl enable-linger $USER        # 不登录也随开机启动
+systemctl --user enable --now claude-bridge
+journalctl --user -u claude-bridge -f    # 启动日志里有配对 URL
+```
+
+6. **访问面**：跨网最干净是 Tailscale（手机经 DERP 中继实测 ~50ms）；公网放行 3742 则 token 必须够强，且源 IP 白名单别填代理出口 IP。
 
 ## 架构与消息流
 
