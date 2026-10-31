@@ -64,7 +64,11 @@ await withEnv(async (h, page) => {
   fs.writeFileSync(path.join(h.tmp, 'pay.diff'), DIFF);
   writeSession(h, 'T--e2e', 'md1', previewLines(h.tmp, 'deploy.md'));
   writeSession(h, 'T--e2e', 'df1', previewLines(h.tmp, 'pay.diff'));
-  await page.resize(390, 800);
+  // DPR 3.75 capture: 390x800 CSS -> 1463x3000 physical. README shots must
+  // rasterize at retina density or they look blurry on modern displays; the
+  // user's reference device renders at 3.75x (e.g. 1440x3200 class screens).
+  // The harness resize() pins deviceScaleFactor 1 - override it here.
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 3.75, mobile: true });
 
   // 1. list page (two project groups, synthetic data only)
   await page.navigate('http://127.0.0.1:3799/?token=e2etok');
