@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>✦ 生成中动效 · 5 版对比（待拍板）</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #1D1C1A; --panel: #26241F; --panel2: #2E2B26; --raise: #36332D;
+  --ink-hi: rgba(255, 250, 240, .045);
+  --fg: #F2EDE3; --dim: #A79F92; --faint: #6E675D; --line: #36332D;
+  --acc: #D97757; --acc-strong: #E8926F; --acc-tint: rgba(217, 119, 87, .14);
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; background: #141210; color: var(--fg); font: 14px/1.6 var(--sans); padding: 28px 26px 60px; }
+.intro { max-width: 1100px; margin: 0 auto 26px; }
+.intro h1 { font-size: 19px; margin: 0 0 6px; }
+.intro h1 .tag { font: 11px var(--mono); color: var(--acc-strong); border: 1px solid var(--acc-tint); border-radius: 4px; padding: 1px 6px; vertical-align: 2px; margin-left: 8px; }
+.intro p.sub { color: var(--dim); margin: 0; font-size: 13px; }
+.intro p.sub b { color: var(--fg); }
+
+.grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.card { background: var(--panel); border-radius: 16px; padding: 16px 18px 14px; box-shadow: 0 1px 2px rgba(12,10,8,.3), inset 0 1px 0 var(--ink-hi); }
+.card h3 { font-size: 14px; margin: 0 0 2px; }
+.card h3 .rec { color: var(--ok); font: 11px var(--mono); margin-left: 8px; }
+.card .desc { color: var(--dim); font-size: 12px; margin: 0 0 14px; min-height: 36px; }
+
+/* ---- 真机同款输入框场景 ---- */
+.demo-wrap { position: relative; }
+.demo-wrap input { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 44px 12px 13px; font: 14px var(--sans); outline: none; }
+.suggest { position: absolute; right: 6px; top: 0; bottom: 0; width: 36px; border: 0; border-radius: 10px; background: none; color: var(--acc); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.suggest svg { display: block; }
+
+/* ---- A 原位旋转（路径修复后） ---- */
+.v-a svg { animation: a-spin .9s linear infinite; }
+@keyframes a-spin { to { transform: rotate(360deg); } }
+.v-a.slow svg { animation-duration: 1.8s; }
+
+/* ---- B 呼吸脉冲 ---- */
+.v-b svg { animation: b-breathe 1.15s ease-in-out infinite; }
+@keyframes b-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.22); opacity: .5; } }
+
+/* ---- C 光点环绕 ---- */
+.v-c { position: relative; }
+.v-c .orbit { position: relative; width: 20px; height: 20px; display: block; }
+.v-c .orbit .core { position: absolute; inset: 3px; color: var(--acc); opacity: .9; }
+.v-c .orbit .dot { position: absolute; inset: 0; border-radius: 50%; animation: a-spin 1.25s linear infinite; }
+.v-c .orbit .dot::before { content: ""; position: absolute; top: -1.5px; left: 50%; width: 4.5px; height: 4.5px; margin-left: -2.25px; border-radius: 50%; background: var(--acc); }
+
+/* ---- D 进度环 ---- */
+.v-d .ring { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(217, 119, 87, .25); border-top-color: var(--acc); animation: a-spin .8s linear infinite; }
+
+/* ---- E 星光摇曳 ---- */
+.v-e svg { animation: e-sway 1s ease-in-out infinite; }
+@keyframes e-sway { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; } 50% { transform: scale(.8) rotate(14deg); opacity: .55; } }
+
+.mono-note { font: 10.5px var(--mono); color: var(--faint); margin-top: 10px; letter-spacing: .04em; }
+
+/* ---- reduced motion 展示 ---- */
+.rm .suggest svg { animation: none !important; }
+
+.decide { max-width: 1100px; margin: 26px auto 0; background: var(--panel); border-radius: 14px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(12,10,8,.3), inset 0 1px 0 var(--ink-hi); }
+.decide h2 { font-size: 15px; margin: 0 0 10px; }
+.decide ul { margin: 0; padding-left: 20px; color: var(--dim); font-size: 13px; display: flex; flex-direction: column; gap: 5px; }
+.decide .rec { color: var(--ok); font-family: var(--mono); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>✦ 生成中动效 · 5 版对比 <span class="tag">待拍板</span></h1>
+  <p class="sub"><b>偏摆原因</b>：现线路径顶点 y=2.4 / 底点 y=18.4，几何中心 (12, 10.4) 与旋转中心 (12,12) 不重合——转起来必然画圈。<b>A 版已重绘为严格 90° 旋转对称的路径</b>，其余各版不依赖旋转，先天无此问题。背景：建议标题可能要等 10-45 秒，动效宜沉稳不宜急促。</p>
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <h3>A · 原位旋转（路径已修）<span class="rec">基线</span></h3>
+    <p class="desc">现有交互原样，只修对称性。90° 对称四角星，绕几何中心匀速转。下方慢速档为 1.8s，更适合长等待。</p>
+    <div class="demo-wrap">
+      <input value="正在生成标题…" readonly>
+      <button class="suggest v-a" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z"/></svg></button>
+    </div>
+    <div class="demo-wrap" style="margin-top:8px">
+      <input value="慢速档 · 1.8s/圈" readonly>
+      <button class="suggest v-a slow" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z"/></svg></button>
+    </div>
+    <p class="mono-note">transform: rotate · linear · 元素级旋转，正方形盒无偏摆</p>
+  </div>
+
+  <div class="card">
+    <h3>B · 呼吸脉冲<span class="rec">推荐（长等待）</span></h3>
+    <p class="desc">星星不转，原地缩放 + 透明度呼吸（1.15s ease-in-out）。无旋转语义负担，等待越久越不焦躁；"思考/生成"语义贴切。</p>
+    <div class="demo-wrap">
+      <input value="正在生成标题…" readonly>
+      <button class="suggest v-b" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z"/></svg></button>
+    </div>
+    <p class="mono-note">transform+opacity · ease-in-out · 仅两个属性，性能无忧</p>
+  </div>
+
+  <div class="card">
+    <h3>C · 光点环绕</h3>
+    <p class="desc">星星静止（微透明），一颗珊瑚小点绕其公转（1.25s）。"处理中"语义最直白，双层结构略复杂。</p>
+    <div class="demo-wrap">
+      <input value="正在生成标题…" readonly>
+      <button class="suggest v-c" type="button"><span class="orbit">
+        <svg class="core" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z"/></svg>
+        <i class="dot"></i>
+      </span></button>
+    </div>
+    <p class="mono-note">公转点用 rotate 轨道 · 星星保持可辨识</p>
+  </div>
+
+  <div class="card">
+    <h3>D · 进度环</h3>
+    <p class="desc">忙时星星退场，换成常规细环 spinner（0.8s）。"加载"语义最通用、最不会误读；代价是失去 ✦ 的品牌个性。</p>
+    <div class="demo-wrap">
+      <input value="正在生成标题…" readonly>
+      <button class="suggest v-d" type="button"><span class="ring"></span></button>
+    </div>
+    <p class="mono-note">border 环 + border-top 高亮 · 与 .btn.loading 同语言</p>
+  </div>
+
+  <div class="card">
+    <h3>E · 星光摇曳</h3>
+    <p class="desc">小角度摆动 + 缩放（1s），像星光闪烁。最有"AI 魔法感"，但语义最弱——不知道的人不知道它在忙。</p>
+    <div class="demo-wrap">
+      <input value="正在生成标题…" readonly>
+      <button class="suggest v-e" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z"/></svg></button>
+    </div>
+    <p class="mono-note">sway ±14° · ease-in-out · 摆动幅度小，无偏摆</p>
+  </div>
+
+  <div class="card rm">
+    <h3>reduced-motion 兜底（现行）</h3>
+    <p class="desc">系统减弱动效时：静止珊瑚色，无任何动画。五个方案共用此兜底，不变。</p>
+    <div class="demo-wrap">
+      <input value="正在生成标题…" readonly>
+      <button class="suggest v-a" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z"/></svg></button>
+    </div>
+    <p class="mono-note">@media (prefers-reduced-motion: reduce) → 静态珊瑚</p>
+  </div>
+
+</div>
+
+<div class="decide">
+  <h2>待拍板</h2>
+  <ul>
+    <li><b>方案</b>：A 修路径原地转（改动最小）/ B 呼吸脉冲 / C 光点环绕 / D 进度环 / E 星光摇曳 <span class="rec">推荐 B——等待可达数十秒，呼吸最耐看；次选 A 慢速档 1.8s</span></li>
+    <li><b>共性修复</b>：无论选哪版，四角星路径都会换成 90° 对称版（偏摆根因）</li>
+    <li><b>速度</b>：若选 A，建议 1.8s/圈（0.9s 对几十秒的等待偏急躁）</li>
+  </ul>
+</div>
+
+</body>
+</html>
