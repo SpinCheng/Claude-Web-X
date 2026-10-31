@@ -5,7 +5,7 @@ import { authOk, readBody } from '../lib/auth.js';
 import { PREVIEW_MIME } from '../lib/mime.js';
 import { readModelCatalog } from '../lib/models.js';
 import { CI_PATHS } from '../lib/platform.js';
-import { collectCommands } from '../lib/commands.js';
+import { collectCommands, collectSkills } from '../lib/commands.js';
 import { pickUserPrompts, buildSuggestPrompt } from '../titlegen.js';
 
 export function register(router, ctx) {
@@ -29,7 +29,15 @@ export function register(router, ctx) {
     if (!rec) { json(res, 404, { error: 'not found' }); return; }
     let commands;
     try { commands = collectCommands(rec.cwd); } catch { commands = collectCommands(null); }
-    json(res, 200, { commands });
+    // v135: skills ride the same menu - kind field drives the 技能/命令 chip
+    let skills = [];
+    try { skills = collectSkills(rec.cwd); } catch { skills = []; }
+    json(res, 200, {
+      commands: [
+        ...commands.map((c) => ({ ...c, kind: 'cmd' })),
+        ...skills.map((s) => ({ ...s, kind: 'skill' })),
+      ],
+    });
   });
 
   router.get('/api/ping', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { ok: true, version: '0.1.0' }); });

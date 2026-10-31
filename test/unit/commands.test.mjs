@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BUILTIN_COMMANDS, parseCommandFrontmatter, scanCommandsDir, collectCommands } from '../../bridge/lib/commands.js';
+import { BUILTIN_COMMANDS, parseCommandFrontmatter, scanCommandsDir, collectCommands, scanSkillsDir, collectSkills } from '../../bridge/lib/commands.js';
 
 test('builtins: P0/P1/P2 whitelist intact, names unique and lowercase', () => {
   const names = BUILTIN_COMMANDS.map((c) => c.name);
@@ -60,5 +60,36 @@ test('collect: builtins first, project overrides user, missing user dir tolerate
   const bare = collectCommands(null);
   assert.equal(bare.length, BUILTIN_COMMANDS.length);
   assert.ok(bare.every((c) => c.src === '内置'));
+  fs.rmSync(cwd, { recursive: true, force: true });
+});
+
+test('skills scan: <name>/SKILL.md only, hidden skipped, desc from frontmatter, sorted', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skillscan-'));
+  fs.mkdirSync(path.join(root, 'archify'));
+  fs.writeFileSync(path.join(root, 'archify', 'SKILL.md'), '---\nname: archify\ndescription: Build architecture diagrams\n---\nbody');
+  fs.mkdirSync(path.join(root, 'dataviz'));
+  fs.writeFileSync(path.join(root, 'dataviz', 'SKILL.md'), '---\ndescription: Charts\n---\nbody');
+  fs.mkdirSync(path.join(root, 'loose'));          // no SKILL.md -> not a skill
+  fs.writeFileSync(path.join(root, 'loose', 'x.md'), 'y');
+  fs.writeFileSync(path.join(root, 'flat.md'), 'z'); // file at root -> not a skill
+  fs.mkdirSync(path.join(root, '.hid'));
+  fs.writeFileSync(path.join(root, '.hid', 'SKILL.md'), '---\ndescription: nope\n---\nx');
+  const got = scanSkillsDir(root);
+  assert.deepEqual(got.map((s) => s.name), ['archify', 'dataviz']);
+  assert.equal(got[0].desc, 'Build architecture diagrams');
+  assert.equal(got[1].desc, 'Charts');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('skills collect: project overrides user, missing user dir tolerated', () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'skillcol-'));
+  fs.mkdirSync(path.join(cwd, '.claude', 'skills', 'projskill'), { recursive: true });
+  fs.writeFileSync(path.join(cwd, '.claude', 'skills', 'projskill', 'SKILL.md'), '---\ndescription: project skill\n---\nx');
+  const got = collectSkills(cwd);
+  const proj = got.filter((s) => s.src === '项目');
+  assert.equal(proj.length, 1);
+  assert.equal(proj[0].name, 'projskill');
+  assert.equal(proj[0].desc, 'project skill');
+  assert.equal(collectSkills(null).filter((s) => s.src === '项目').length, 0);
   fs.rmSync(cwd, { recursive: true, force: true });
 });

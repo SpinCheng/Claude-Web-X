@@ -441,7 +441,9 @@ function renderCmdMenu(q) {
       nm.appendChild(document.createTextNode(full.slice(at + 1 + ql.length)));
     } else nm.textContent = full;
     const de = document.createElement('span'); de.className = 'cm-desc'; de.textContent = c.desc || '';
-    const sr = document.createElement('span'); sr.className = 'cm-src'; sr.textContent = c.src;
+    const sr = document.createElement('span'); sr.className = 'cm-src';
+    // v135: kind chip - the menu lists commands AND skills, labeled
+    sr.textContent = (c.kind === 'skill' ? '技能' : '命令') + ' · ' + c.src;
     b.append(nm, de, sr);
     b.addEventListener('click', () => {
       if ($('msg-input').value.startsWith('/')) $('msg-input').value = '';

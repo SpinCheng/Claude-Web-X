@@ -77,3 +77,28 @@ export function collectCommands(cwd) {
     ...[...byName.values()].sort((a, b) => a.name.localeCompare(b.name)),
   ];
 }
+
+// v135: skills for the slash menu - <root>/<name>/SKILL.md, flat one level.
+// name = directory name, desc = SKILL.md frontmatter description; a dir
+// without a readable SKILL.md is not a skill. Hidden dirs skipped.
+export function scanSkillsDir(dir) {
+  const out = [];
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name.startsWith('.')) continue;
+    let fm = {};
+    try { fm = parseCommandFrontmatter(fs.readFileSync(path.join(dir, e.name, 'SKILL.md'), 'utf8')); } catch { continue; }
+    out.push({ name: e.name, desc: fm.description || '' });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function collectSkills(cwd) {
+  const user = path.join(os.homedir(), '.claude', 'skills');
+  const proj = cwd ? path.join(cwd, '.claude', 'skills') : null;
+  const byName = new Map();
+  for (const s of scanSkillsDir(user)) byName.set(s.name, { ...s, src: '用户' });
+  for (const s of proj ? scanSkillsDir(proj) : []) byName.set(s.name, { ...s, src: '项目' }); // project overrides user
+  return [...byName.values()];
+}
