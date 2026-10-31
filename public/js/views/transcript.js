@@ -771,9 +771,13 @@ function renderTurn(t) {
             info.append(nm, pp);
           } else info.append(nm);
           const fd = document.createElement('span'); fd.className = 'fd';
+          // v152: the +/- pair rides the same .diffbadge chip as the process
+          // node heads (panel background + radius) - it is a button here
+          const db = document.createElement('span'); db.className = 'diffbadge';
           const fi = document.createElement('i'); fi.className = 'ins'; fi.textContent = '+' + f.add;
           const fe = document.createElement('i'); fe.className = 'dele'; fe.textContent = '−' + f.del;
-          fd.append(fi, fe);
+          db.append(fi, fe);
+          fd.append(db);
           fd.onclick = (e) => { e.stopPropagation(); previewFileDiff(f.path); };
           row.onclick = () => previewArtifact(f.path);
           row.append(info, fd);
