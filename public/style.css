@@ -276,7 +276,7 @@ button { font-family: inherit; }
 .node.plain .node-head { cursor: default; }
 .node-head .badge { flex: none; font-family: var(--mono); font-size: 10px; color: var(--faint); letter-spacing: .1em; }
 .node-head .t { font-size: 13px; font-weight: 600; }
-.node-head .dur { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.node-head .dur { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
 .node-head .lnk { font-family: var(--mono); font-size: 11.5px; color: var(--acc-strong); text-decoration: none; border-bottom: 1px solid var(--acc-tint); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .node-head .chev { margin-left: auto; color: var(--faint); display: flex; transition: transform .15s; }
 .node.open .node-head .chev { transform: rotate(90deg); }

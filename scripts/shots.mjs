@@ -76,8 +76,10 @@ await withEnv(async (h, page) => {
   await sleep(600);
   await shot(page, 'list.png');
 
-  // 2. session detail (timeline: trigger pill, nodes, final card + rollup)
-  await page.ev('document.querySelectorAll(".srow")[0].click()');
+  // 2. session detail - pinned to the 预览测试 session BY TEXT: the list is
+  // sorted by lastActive, so positional [0] silently follows whichever fixture
+  // was written last (df1 in this script) and the shot content drifts
+  await page.ev('(function(){var r=[].slice.call(document.querySelectorAll(".srow")).find(function(x){return x.textContent.indexOf("预览测试")>=0}); r && r.click(); return true;})()');
   await page.waitFor('!!document.querySelector(".final-card")');
   await sleep(400);
   await shot(page, 'detail.png');
