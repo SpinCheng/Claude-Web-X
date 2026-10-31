@@ -318,20 +318,23 @@ async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?
   hpSrcText = o.srcText !== undefined ? o.srcText : '';
   $('hp-src').textContent = hpSrcText || '（空）';
   $('hp-tabs').classList.toggle('hidden', !!o.sourceOnly);
-  const f = $('hp-frame');
-  f.removeAttribute('src');
-  f.srcdoc = ''; // drop the previous preview while still hidden (no stale flash)
-  // v140: reveal the page BEFORE navigating the frame. Assigning srcdoc while
-  // the container is display:none leaves the frame never-laid-out and mobile
-  // Chromium builds no compositor layer for it - the render tab stays blank
-  // until a display toggle (src-tab round-trip) forces one.
-  setHpView(!o.sourceOnly);
+  // v140/v141: the page MUST be revealed before the frame gets content, and
+  // the frame is a FRESH node on every open. A node that has lived inside the
+  // display:none container since boot carries stuck compositor state - mobile
+  // Chromium keeps painting it blank until a display flip (src-tab round-trip)
+  // forces a rebuild; merely assigning srcdoc after the reveal (v140) did not
+  // cure it in the field. A fresh node attached to the already-visible page
+  // has no such history. sandbox is allow-scripts for every caller; md render
+  // passes popups so escaped-only docs can open their (https-only) links in
+  // new tabs. html keeps the strict set - never same-origin.
   $('html-prev').classList.remove('hidden');
-  void f.offsetWidth; // force a synchronous layout so the frame owns a box first
-  // sandbox is allow-scripts for every caller; md render passes popups
-  // so escaped-only docs can open their (https-only) links in new tabs. html
-  // keeps the strict set - never same-origin.
+  const f = document.createElement('iframe');
+  f.id = 'hp-frame';
+  f.className = 'hp-frame';
+  f.title = '页面预览';
   f.setAttribute('sandbox', 'allow-scripts' + (o.popups ? ' allow-popups' : ''));
+  $('hp-frame').replaceWith(f);
+  setHpView(!o.sourceOnly);
   f.srcdoc = o.text !== undefined ? o.text : '';
   hpSeq++;
   // bound the stack to ONE htmlprev entry: if the current entry is already a
