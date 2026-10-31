@@ -350,12 +350,11 @@ export class Runner extends EventEmitter {
     const onLine = (line) => {
       if (!line) return;
       let o; try { o = JSON.parse(line); } catch { return; }
-      // session_id rides on every stream-json line. Capture it when still
-      // unknown (start/fork) AND follow mid-run switches: /clear resets the
-      // CLI into a NEW session file and every line from the reset on carries
-      // the new id (probe 2026-10-31: conversation_reset, then a fresh init).
-      // Re-emit so the phone can follow the jump.
-      if (o.session_id && o.session_id !== run.sessionId) {
+      // session_id rides on every stream-json line; adopt it as soon as seen
+      // (matters for `start` where we don't know the id up front). Mid-run
+      // switches (/clear resets into a new file) are deliberately NOT
+      // followed - v150 tried and shipped confusing jumps; removed in v151.
+      if (o.session_id && !run.sessionId) {
         run.sessionId = o.session_id;
         this._emit(run);
       }

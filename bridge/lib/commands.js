@@ -11,7 +11,6 @@ import path from 'node:path';
 export const BUILTIN_COMMANDS = [
   { name: 'context', desc: '上下文占用明细', argHint: '' },
   { name: 'compact', desc: '压缩上下文，释放窗口空间', argHint: '[压缩指示]' },
-  { name: 'clear', desc: '开新会话清空上下文（旧会话留盘可恢复）', argHint: '[名称]' },
   { name: 'usage', desc: '订阅用量统计（/cost /stats 同义）', argHint: '' },
   { name: 'mcp', desc: '管理 MCP 服务器', argHint: '[reconnect|enable|disable <server>|all]' },
   { name: 'autocompact', desc: '自动压缩开关', argHint: '' },

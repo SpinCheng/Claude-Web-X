@@ -41,8 +41,6 @@ export const state = {
   batchSel: new Set(),    // v43: session ids ticked in batch mode
   pendingBranch: false,   // a fork send is in flight; adopt its real session id
   pendingBranchRun: null, // that fork's runId (known once the 202 lands)
-  pendingClear: false,    // v150: a /clear message is in flight; follow the
-  pendingClearRun: null,  // reset session's adopted id (jump, fork-style)
   histBefore: 0,      // v44 history pagination: trailing events already loaded
   histTotal: 0,       // v44: total parsed events in the transcript
   histLoading: false, // v44: an older-page fetch is in flight

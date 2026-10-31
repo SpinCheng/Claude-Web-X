@@ -391,13 +391,6 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
         // turn, optimistic=false makes it a no-op.
         retractOptimisticUser(shownTurn);
         toast('已排队（第 ' + j.position + ' 条）· 本轮结束后自动发出');
-      } else if (/^\/clear(\s|$)/.test(text)) {
-        // v150: /clear resets the CLI into a NEW session file; the runner
-        // re-emits the run under the adopted id and app.js jumps to it.
-        // Queued /clears stay put (no arming once the dispatch detaches
-        // from this send).
-        state.pendingClear = true;
-        state.pendingClearRun = j.runId || null;
       }
       state.atBottom = true;
     })

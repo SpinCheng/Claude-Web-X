@@ -8,8 +8,9 @@ import { BUILTIN_COMMANDS, parseCommandFrontmatter, scanCommandsDir, collectComm
 
 test('builtins: P0/P1/P2 whitelist intact, names unique and lowercase', () => {
   const names = BUILTIN_COMMANDS.map((c) => c.name);
-  assert.ok(names.includes('compact') && names.includes('clear') && names.includes('context') && names.includes('usage'), 'P0 present');
+  assert.ok(names.includes('compact') && names.includes('context') && names.includes('usage'), 'P0 present');
   assert.ok(!names.includes('add-dir'), 'add-dir removed (headless实测不可用)');
+  assert.ok(!names.includes('clear'), 'clear removed (v151: 与新建会话重复，切换跟踪 bug 面)');
   assert.ok(names.includes('mcp') && names.includes('autocompact') && names.includes('output-style'), 'P1 present');
   assert.ok(names.includes('goal') && names.includes('list-agents'), 'v110 additions present');
   assert.ok(names.includes('init') && names.includes('security-review') && names.includes('recap') && names.includes('skill-doctor') && names.includes('reload-skills') && names.includes('reload-plugins'), 'P2 present');
