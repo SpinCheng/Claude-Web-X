@@ -13,7 +13,7 @@ await withEnv(async (h, page) => {
   writeSession(h, 'T--e2e', 'pv2', previewLines(h.tmp, 'page.html'));
   writeSession(h, 'T--e2e', 'pv3', [
     user(1, 'md 链接测试'),
-    assistant(2, [text('设计稿 [打开](http://127.0.0.1:3799/mockup-slash-menu.html)')]),
+    assistant(2, [text('设计稿 [打开](http://127.0.0.1:3799/e2e-link-target.html)')]),
     stop(3),
   ]);
   const pv4Path = path.join(h.tmp, 'page.html');
@@ -78,11 +78,11 @@ await withEnv(async (h, page) => {
   // v104: same-origin markdown link opens the in-app preview page, back closes it
   assert(await waitSession('pv3'), 'md-link session visible');
   await page.open('pv3');
-  assert(await page.waitFor('!!document.querySelector("#chat a[href^=\\"http://127.0.0.1:3799/mockup\\"]")'), 'md link rendered as anchor');
-  await page.ev('(function(){document.querySelector("#chat a[href^=\\"http://127.0.0.1:3799/mockup\\"]").click(); return true;})()');
+  assert(await page.waitFor('!!document.querySelector("#chat a[href^=\\"http://127.0.0.1:3799/e2e-link\\"]")'), 'md link rendered as anchor');
+  await page.ev('(function(){document.querySelector("#chat a[href^=\\"http://127.0.0.1:3799/e2e-link\\"]").click(); return true;})()');
   assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'in-app preview page opened');
   assert((await page.ev('document.getElementById("hp-frame").getAttribute("sandbox")')) === 'allow-scripts', 'preview page iframe sandboxed');
-  assert(await page.waitFor('(document.getElementById("hp-frame").getAttribute("srcdoc") || "").indexOf("CMDS") >= 0'), 'link url fetched into srcdoc');
+  assert(await page.waitFor('(document.getElementById("hp-frame").getAttribute("srcdoc") || "").indexOf("E2E-LINK-TARGET") >= 0'), 'link url fetched into srcdoc');
   await page.ev('document.getElementById("hp-back").click()');
   assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), 'back closes preview page');
   // v106: bare path inside the conclusion bubble linkifies and previews in-app
