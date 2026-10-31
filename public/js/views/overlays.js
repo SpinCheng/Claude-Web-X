@@ -6,7 +6,7 @@
 import { $ } from '../util.js';
 import { state } from '../state.js';
 import { auth, api } from '../api.js';
-import { ART_IMG } from '../md.js';
+import { ART_IMG, mdDoc } from '../md.js';
 import { toast } from './toast.js';
 
 /* ---------- bubble popups (v15 E): anchored above the dock ---------- */
@@ -40,12 +40,17 @@ function openFilePreview(a) {
   if (!a.file) return;
   fetch('/files/' + a.file.split('/').map(encodeURIComponent).join('/'), { headers: auth() })
     .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then((t) => openHtmlPreview({ name: a.name, srcText: t, sourceOnly: true }))
+    // v139: .md attachments render like md artifacts (dual tab); other text
+    // stays source-only
+    .then((t) => /\.md$/i.test(a.name || '')
+      ? openHtmlPreview({ name: a.name, text: mdDoc(t), srcText: t, popups: true })
+      : openHtmlPreview({ name: a.name, srcText: t, sourceOnly: true }))
     .catch(() => toast('读取失败'));
 }
 
 /* ---------- artifact preview (v23) ---------- */
 const ART_HTML = /\.html?$/i;
+const ART_MD = /\.md$/i;
 let artPreviewUrl = '';
 async function previewArtifact(winPath) {
   const url = '/api/sessions/' + encodeURIComponent(state.currentId) + '/preview?p=' + encodeURIComponent(winPath);
@@ -61,8 +66,11 @@ async function previewArtifact(winPath) {
     } else {
       const text = await r.text();
       // v105/v107: html renders fullscreen in-app (srcdoc, opaque origin);
+      // v139: md gets the same dual-tab treatment via miniMd (popups enabled
+      // - md docs are link-heavy READMEs and the doc is escaped-only markup);
       // everything else opens the page in source mode
       if (ART_HTML.test(winPath)) openHtmlPreview({ name, text, srcText: text.slice(0, 128 * 1024) });
+      else if (ART_MD.test(winPath)) openHtmlPreview({ name, text: mdDoc(text), srcText: text.slice(0, 128 * 1024), popups: true });
       else openHtmlPreview({ name, srcText: text.slice(0, 128 * 1024), sourceOnly: true });
     }
   } catch (e) {
@@ -288,7 +296,7 @@ function setHpView(run) {
   $('hp-frame').classList.toggle('hidden', !run);
   $('hp-src').classList.toggle('hidden', run);
 }
-async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?}
+async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?, popups?}
   // v107: content is ALWAYS injected via srcdoc. Never set iframe.src here -
   // blob/direct src navigations append entries to the joint session history,
   // so a back press silently steps iframe state and the close-on-back wiring
@@ -312,6 +320,10 @@ async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?
   $('hp-tabs').classList.toggle('hidden', !!o.sourceOnly);
   const f = $('hp-frame');
   f.removeAttribute('src');
+  // v139: sandbox is allow-scripts for every caller; md render passes popups
+  // so escaped-only docs can open their (https-only) links in new tabs. html
+  // keeps the strict set - never same-origin.
+  f.setAttribute('sandbox', 'allow-scripts' + (o.popups ? ' allow-popups' : ''));
   f.srcdoc = o.text !== undefined ? o.text : '';
   setHpView(!o.sourceOnly);
   $('html-prev').classList.remove('hidden');

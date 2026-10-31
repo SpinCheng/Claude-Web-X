@@ -93,5 +93,47 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'bare path opens preview page');
   assert(await page.waitFor('(document.getElementById("hp-frame").getAttribute("srcdoc") || "").indexOf("e2e-render-ok") >= 0'), 'conclusion path renders via srcdoc');
   await page.ev('document.getElementById("hp-back").click()');
+  assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), 'preview closed before next stage');
+
+  // v139: md artifact opens dual-tab - render tab default (miniMd in a
+  // standalone srcdoc doc), frontmatter stripped there but intact on the
+  // source tab, raw html/script escaped, md iframe rides allow-popups
+  const mdSrc = [
+    '---', 'title: fm-strip-key', 'order: 2', '---', '',
+    '## 部署指南', '',
+    '- 步骤一 `npm i`', '- 步骤二 [文档](https://example.com/docs)', '',
+    '<span style="color:red">raw html</span>', '',
+    '<script>alert(1)</script>',
+  ].join('\n');
+  fs.writeFileSync(path.join(h.tmp, 'doc.md'), mdSrc);
+  writeSession(h, 'T--e2e', 'pv5', previewLines(h.tmp, 'doc.md'));
+  assert(await waitSession('pv5'), 'md session visible');
+  await page.open('pv5');
+  assert(await page.waitFor('document.querySelectorAll(".flink").length >= 1'), 'md path linkified');
+  await page.ev('(function(){var a=[].slice.call(document.querySelectorAll(".flink")).find(function(x){return /doc\\.md$/i.test(x.textContent)}); a && a.click(); return true;})()');
+  assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'md opens the preview page');
+  assert(await page.waitFor('!document.getElementById("hp-frame").classList.contains("hidden")'), 'md opens on the render tab');
+  assert(await page.waitFor('!document.getElementById("hp-tabs").classList.contains("hidden")'), 'md shows both tabs');
+  assert((await page.ev('document.getElementById("hp-frame").getAttribute("sandbox")')) === 'allow-scripts allow-popups', 'md iframe allows popups (links)');
+  const mdDocAttr = await page.ev('document.getElementById("hp-frame").getAttribute("srcdoc") || ""');
+  assert(mdDocAttr.indexOf('部署指南') >= 0 && mdDocAttr.indexOf('mdh2') >= 0, 'rendered heading rides the doc');
+  assert(mdDocAttr.indexOf('&lt;span') >= 0 && mdDocAttr.indexOf('&lt;script') >= 0, 'raw html + script escaped');
+  assert(mdDocAttr.indexOf('<script') === -1, 'no executable script tag in the doc');
+  assert(mdDocAttr.indexOf('fm-strip-key') === -1, 'frontmatter stripped from render');
+  await page.ev('(function(){document.getElementById("hp-tab-src").click(); return true;})()');
+  assert(await page.waitFor('!document.getElementById("hp-src").classList.contains("hidden")'), 'source tab shows raw text');
+  const mdSrcTxt = await page.ev('document.getElementById("hp-src").textContent');
+  assert(mdSrcTxt.indexOf('fm-strip-key') >= 0 && mdSrcTxt.indexOf('<span style=') >= 0, 'source tab keeps frontmatter + raw html');
+  await page.ev('document.getElementById("hp-back").click()');
+  assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), 'md preview closed');
+
+  // after a md open (allow-popups), an html open must reset to the strict set
+  await page.open('pv2');
+  assert(await page.waitFor('document.querySelectorAll(".flink").length >= 1'), 'html path linkified again');
+  await page.ev('var t=document.querySelector(".turn .trigger"); t && t.click()');
+  await page.ev('(function(){var a=[].slice.call(document.querySelectorAll(".flink")).find(function(x){return /page\\.html$/i.test(x.textContent)}); a && a.click(); return true;})()');
+  assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'html reopened');
+  assert((await page.ev('document.getElementById("hp-frame").getAttribute("sandbox")')) === 'allow-scripts', 'sandbox resets to allow-scripts for html');
+  await page.ev('document.getElementById("hp-back").click()');
   assert(true, 'done');
 });

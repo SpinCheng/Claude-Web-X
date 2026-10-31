@@ -84,7 +84,7 @@ sequenceDiagram
 - 实时转录：思考/工具调用折叠、结论常显、流式跟随滚动；历史分页加载（跟手渐显的加载行）
 - 直接续聊 / 新建任务（选工作目录）；发送可带权限模式（自动 / 手机逐条审批，审批卡含 Edit±diff 与会话级 always-allow）、模型与推理等级
 - 底部上下文圆环（与桌面端同口径，CLI `/context` 实测）；费用面板（官方口径 / 倍率 / 自定义单价，分模型计账）
-- 附件（图片压缩直传 / 文本内联）、产物预览（锁项目目录内、防 XSS 白名单）、导出 Markdown、改动文件 ± 汇总、会话内分支（fork）
+- 附件（图片压缩直传 / 文本内联）、产物预览（锁项目目录内、防 XSS 白名单；html 与 md 均有沙箱渲染 + 源码双 tab）、导出 Markdown、改动文件 ± 汇总、会话内分支（fork）
 - 排队消息（增删/重排/插队）、乐观上屏（呼吸灯→落盘转实，停止转红）
 
 ## 目录结构
@@ -105,7 +105,7 @@ claude-web/
 ├── public/                     # PWA（免构建 vanilla JS）：index.html / app.js / js/ / style.css / pair.html / vendor(qrcode, MIT)
 ├── cli/cr.mjs                  # 电脑端接管工具（跨平台）list/attach/release/url
 ├── scripts/                    # start-bridge.vbs / rotate-token.ps1 / make-icons.mjs / shots.mjs(截图)
-├── test/                       # unit(4 套 37 例) + e2e(隔离桥 :3799 + headless Edge，9 场景)
+├── test/                       # unit(9 套 73 例) + e2e(隔离桥 :3799 + headless Edge，13 场景)
 └── docs/screenshots/           # README 截图（合成数据拍摄）
 ```
 

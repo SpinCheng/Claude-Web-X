@@ -1,5 +1,6 @@
 // js/md.js - pure text/DOM helpers for transcript rendering: markdown
-// (conclusion cards, v25) + file-path linkify (artifact preview, v23).
+// (conclusion cards, v25) + file-path linkify (artifact preview, v23) +
+// md file render preview (frontmatter strip + standalone srcdoc doc, v139).
 // No app state lives here; linkifyPaths takes the open-callback as a param.
 
 /* safe markdown: escape first, then block-level (fences / headings / hr /
@@ -64,6 +65,45 @@ export function miniMd(src) {
     }
   }
   return html;
+}
+
+/* v139 md file preview (render tab): strip a leading YAML frontmatter block
+   before rendering - GitHub-style. Guarded so a bare leading `---` hr is NOT
+   swallowed: requires a closing `---`/`...` fence and at least one `key:`
+   line between. Source tab keeps the untouched text. CRLF tolerant. */
+export function mdFrontmatter(src) {
+  const m = String(src).match(/^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)\r?\n?/);
+  if (!m) return String(src);
+  const yamlish = m[1].split(/\r?\n/).some((l) => /^[ \t]*[\w$-]+:/.test(l));
+  return yamlish ? String(src).slice(m[0].length) : String(src);
+}
+
+/* v139: wrap miniMd output in a standalone doc for the #hp-frame srcdoc
+   (opaque-origin iframe - parent CSS vars don't reach it, so the tokens are
+   inlined to mirror the conclusion-card styles). Content is miniMd's
+   escape-first output: raw HTML/<script> arrive as text, links are https?
+   only. Links open in new tabs (the md iframe rides allow-popups). */
+export function mdDoc(src) {
+  const body = miniMd(mdFrontmatter(src));
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<style>' +
+    ':root{color-scheme:dark}' +
+    'body{margin:0;padding:14px 16px 44px;background:#1D1C1A;color:#F2EDE3;' +
+    'font:15px/1.55 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}' +
+    'p{margin:7px 0}b{font-weight:700}' +
+    'pre{background:#171613;border-radius:9px;padding:9px;overflow-x:auto;font-size:12px}' +
+    'code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px;background:rgba(255,250,240,.07);border-radius:5px;padding:1.5px 5px;overflow-wrap:anywhere}' +
+    'pre code{background:none;padding:0;border-radius:0;overflow-wrap:normal;font-weight:400}' +
+    '.mdh1{font-size:19px;font-weight:700;margin:15px 0 7px}.mdh2{font-size:17px;font-weight:650;margin:13px 0 6px}' +
+    '.mdh3{font-size:15px;font-weight:650;margin:11px 0 5px}.mdh4{font-size:13.5px;font-weight:600;color:#A79F92;margin:11px 0 5px}' +
+    'ul,ol{margin:7px 0;padding-left:20px;font-weight:400}li{margin:3px 0}' +
+    'blockquote{margin:8px 0;padding:2px 0 2px 11px;border-left:2px solid rgba(255,255,255,.16);color:#A79F92;font-weight:400}' +
+    'hr{border:0;height:1px;background:rgba(255,255,255,.1);margin:11px 0}' +
+    'table{border-collapse:collapse;margin:8px 0;font-size:12.5px;display:block;overflow-x:auto;max-width:100%}' +
+    'th,td{padding:5px 12px 5px 0;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-variant-numeric:tabular-nums;font-weight:400}' +
+    'th{color:#A79F92;font-weight:600;white-space:nowrap}' +
+    'a{color:#D97757;text-decoration:none;border-bottom:1px dashed rgba(217,119,87,.45);overflow-wrap:anywhere}' +
+    '</style></head><body>' + body + '</body></html>';
 }
 
 /* artifact linkify: absolute file paths (Windows drives + POSIX /) in tool

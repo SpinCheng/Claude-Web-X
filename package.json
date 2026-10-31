@@ -21,7 +21,7 @@
   },
   "scripts": {
     "start": "node bridge/index.js",
-    "test": "node --test test/unit/parsers.test.mjs test/unit/turns.test.mjs test/unit/adapter.test.mjs test/unit/cost.test.mjs test/unit/commands.test.mjs test/unit/agents.test.mjs test/unit/titlegen.test.mjs test/unit/runner.test.mjs && node test/e2e/run-all.mjs"
+    "test": "node --test test/unit/parsers.test.mjs test/unit/turns.test.mjs test/unit/adapter.test.mjs test/unit/cost.test.mjs test/unit/commands.test.mjs test/unit/agents.test.mjs test/unit/titlegen.test.mjs test/unit/runner.test.mjs test/unit/md.test.mjs && node test/e2e/run-all.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

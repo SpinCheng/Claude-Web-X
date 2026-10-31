@@ -82,7 +82,7 @@ Sessions are files: desktop, terminal and phone all write the same transcripts; 
 - Live transcript: folded thinking/tool calls, pinned conclusions, streaming follow; gesture-revealed history pagination
 - Continue a session or start a task (pick a working dir); per-message permission mode (auto / phone approval cards with Edit ±diff and session-level always-allow), model and reasoning effort
 - Context ring (Desktop-parity accounting via CLI `/context` probe); cost panel (official / multiplier / custom per-model rates)
-- Attachments (compressed images, inlined text), artifact preview (locked to the project dir, XSS-hardened), Markdown export, per-turn changed-files rollup, in-session fork
+- Attachments (compressed images, inlined text), artifact preview (locked to the project dir, XSS-hardened; html and md both get a sandboxed render + source dual tab), Markdown export, per-turn changed-files rollup, in-session fork
 - Message queue (edit/reorder/jump), optimistic bubbles (breathing dot → confirmed, red on stop)
 
 ## Directory layout
@@ -103,7 +103,7 @@ claude-web/
 ├── public/                     # PWA (zero-build vanilla JS) + pair.html + vendor(qrcode, MIT)
 ├── cli/cr.mjs                  # PC-side takeover (cross-platform)
 ├── scripts/                    # start-bridge.vbs / rotate-token.ps1 / make-icons.mjs / shots.mjs
-├── test/                       # unit (37) + e2e (isolated bridge + headless Edge, 9 scenarios)
+├── test/                       # unit (73) + e2e (isolated bridge + headless Edge, 13 scenarios)
 └── docs/screenshots/
 ```
 
