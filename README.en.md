@@ -123,10 +123,6 @@ Claude Code's Bash tool on Windows depends on *discovering Git Bash* (standard l
 
 The bridge consumes CLI behavior and data formats directly (transcript JSONL shape, flag names, hook payloads), so it is **tightly coupled to the CLI version** — pin `claudePath` in `bridge/data/config.json` if an upgrade breaks things.
 
-## Roadmap
-
-Phases 0–2 done (recon → read-only → full duplex + productized PWA); the P0/P1 feature loop is closed (approval diff, history pagination, always-allow, changed-files rollup, export, cost panel, search/batch, in-app confirm dialogs, branding). Next: slash-command palette, quota/rate display, offline PWA shell, checkpoint rollback; later, Cowork data & control planes.
-
 ## Notes
 
 - `.ps1` files must stay pure ASCII (PS 5.1 parses as GBK); JS/MD have no such limit
