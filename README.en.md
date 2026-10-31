@@ -2,17 +2,17 @@
 
 **View and drive your local Claude Code sessions from the phone — LAN bridge + zero-build PWA, single `ws` dependency.**
 
-<p>
-<img src="docs/screenshots/list.png" width="32%" alt="Session list"> <img src="docs/screenshots/detail.png" width="32%" alt="Live transcript"> <img src="docs/screenshots/detail-open.png" width="32%" alt="Expanded process capsule"><br>
-<img src="docs/screenshots/new-task.png" width="32%" alt="New task"> <img src="docs/screenshots/approval.png" width="32%" alt="Phone approval card (±diff)"> <img src="docs/screenshots/preview-md.png" width="32%" alt="Markdown render preview"><br>
-<img src="docs/screenshots/preview-diff.png" width="32%" alt="Side-by-side diff preview"> <img src="docs/screenshots/cost.png" width="32%" alt="Cost panel"> <img src="docs/screenshots/cmd-menu.png" width="32%" alt="Slash command & skill menu">
-</p>
-
 > **Disclaimer**: This is an **unofficial** personal-use project. It is not affiliated with or endorsed by Anthropic PBC or any Claude brand owner. Released under a [non-commercial license](LICENSE) — personal/study use allowed, redistribution must credit the source, **commercial use prohibited**. Use at your own risk.
 >
 > **Security**: this tool exposes a "can run arbitrary commands" Claude Code to a web page on your LAN. Only use it on trusted networks (home LAN / Tailscale); never port-forward it to the internet. See [SECURITY.md](SECURITY.md) (Chinese).
 
 **Form factor**: mobile-first (phone browser / add-to-home-screen PWA). The desktop browser works fully, but layout and interactions are designed for the phone; desktop niceties may come later.
+
+<p>
+<img src="docs/screenshots/list.png" width="32%" alt="Session list"> <img src="docs/screenshots/detail.png" width="32%" alt="Live transcript"> <img src="docs/screenshots/detail-open.png" width="32%" alt="Expanded process capsule"><br>
+<img src="docs/screenshots/new-task.png" width="32%" alt="New task"> <img src="docs/screenshots/approval.png" width="32%" alt="Phone approval card (±diff)"> <img src="docs/screenshots/preview-md.png" width="32%" alt="Markdown render preview"><br>
+<img src="docs/screenshots/preview-diff.png" width="32%" alt="Side-by-side diff preview"> <img src="docs/screenshots/cost.png" width="32%" alt="Cost panel"> <img src="docs/screenshots/cmd-menu.png" width="32%" alt="Slash command & skill menu">
+</p>
 
 ## Why claude-web
 

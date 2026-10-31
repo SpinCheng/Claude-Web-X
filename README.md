@@ -2,18 +2,19 @@
 
 **用手机（PWA）远程查看并操控本机 Claude Code 会话 —— 局域网 bridge + 免构建 PWA，单 `ws` 依赖。**
 
-<p>
-<img src="docs/screenshots/list.png" width="32%" alt="会话列表"> <img src="docs/screenshots/detail.png" width="32%" alt="会话转录"> <img src="docs/screenshots/detail-open.png" width="32%" alt="过程胶囊展开"><br>
-<img src="docs/screenshots/new-task.png" width="32%" alt="新建任务"> <img src="docs/screenshots/approval.png" width="32%" alt="手机逐条审批（±diff）"> <img src="docs/screenshots/preview-md.png" width="32%" alt="Markdown 渲染预览"><br>
-<img src="docs/screenshots/preview-diff.png" width="32%" alt="diff 并排对比预览"> <img src="docs/screenshots/cost.png" width="32%" alt="费用面板"> <img src="docs/screenshots/cmd-menu.png" width="32%" alt="斜杠命令与技能菜单">
-</p>
-
 > **免责声明**：本项目是为方便个人使用而开发的**非官方**作品，与 Anthropic PBC 及任何 Claude 品牌方无关联、未获其背书；Claude 及相关商标归其各自所有者。
 > 项目按[非商业许可](LICENSE)发布——个人学习研究可用、转载须注明出处、**禁止商用**。风险自担。
 >
 > **安全提醒**：这个工具把「能执行任意命令的 Claude Code」暴露给局域网网页。只在可信网络（家庭局域网 / Tailscale）使用，不要端口映射到公网。详见 [SECURITY.md](SECURITY.md)。
 
 **产品定位**：主要面向**移动端**（手机浏览器 / 添加到主屏幕的 PWA）。PC 端浏览器可正常使用全部功能，但布局与交互以手机为第一优先设计，桌面体验后续视情况补充。
+
+<p>
+<img src="docs/screenshots/list.png" width="32%" alt="会话列表"> <img src="docs/screenshots/detail.png" width="32%" alt="会话转录"> <img src="docs/screenshots/detail-open.png" width="32%" alt="过程胶囊展开"><br>
+<img src="docs/screenshots/new-task.png" width="32%" alt="新建任务"> <img src="docs/screenshots/approval.png" width="32%" alt="手机逐条审批（±diff）"> <img src="docs/screenshots/preview-md.png" width="32%" alt="Markdown 渲染预览"><br>
+<img src="docs/screenshots/preview-diff.png" width="32%" alt="diff 并排对比预览"> <img src="docs/screenshots/cost.png" width="32%" alt="费用面板"> <img src="docs/screenshots/cmd-menu.png" width="32%" alt="斜杠命令与技能菜单">
+</p>
+
 
 ## 为什么是 claude-web
 
