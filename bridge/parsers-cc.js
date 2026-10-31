@@ -310,6 +310,54 @@ function briefJson(input) {
   } catch { return ''; }
 }
 
+// v146: synthesize a unified-diff view of EVERY edit a transcript made to one
+// file, for the rollup's +/- tap. Works on RAW JSONL line objects (not the
+// display events - those truncate inputs at 300 chars). Edit/MultiEdit render
+// old->new hunks chronologically; Write/NotebookEdit render the full content
+// as additions (the previous content is unknowable from the input). Hunk
+// headers only need to LOOK like @@ markers - the PWA renderer never reads
+// the numbers. Returns '' when no tool_use targeted the file.
+const FILEDIFF_MAX = 256 * 1024;
+export function synthesizeFileDiff(lines, matchPath) {
+  const want = String(matchPath || '').toLowerCase();
+  if (!want) return '';
+  const name = String(matchPath).split(/[\\/]/).pop();
+  const lc = (v) => (typeof v === 'string' ? v.split('\n') : []);
+  const minus = (v) => (v ? lc(v).map((l) => '-' + l).join('\n') : '');
+  const plus = (v) => (v ? lc(v).map((l) => '+' + l).join('\n') : '');
+  let out = '', toolN = 0;
+  for (const obj of lines) {
+    if (!obj || obj.type !== 'assistant' || !obj.message) continue;
+    const parts = obj.message.content;
+    if (!Array.isArray(parts)) continue;
+    for (const p of parts) {
+      if (!p || p.type !== 'tool_use' || !p.input) continue;
+      const inp = p.input;
+      const fp = inp.file_path || inp.path || inp.notebook_path;
+      if (typeof fp !== 'string' || fp.toLowerCase() !== want) continue;
+      toolN++;
+      let hunk = '';
+      if (Array.isArray(inp.edits)) {
+        inp.edits.forEach((e, i) => {
+          hunk += '@@ MultiEdit ' + (i + 1) + '/' + inp.edits.length + ' @@\n' +
+            minus(e && e.old_string) + '\n' + plus(e && e.new_string) + '\n';
+        });
+      } else if (typeof inp.content === 'string') {
+        hunk += '@@ Write · 全文 ' + lc(inp.content).length + ' 行 @@\n' + plus(inp.content) + '\n';
+      } else if (typeof inp.new_source === 'string') {
+        hunk += '@@ NotebookEdit · 全文 ' + lc(inp.new_source).length + ' 行 @@\n' + plus(inp.new_source) + '\n';
+      } else {
+        hunk += '@@ Edit @@\n' + minus(inp.old_string) + '\n' + plus(inp.new_string) + '\n';
+      }
+      out += hunk;
+      if (out.length > FILEDIFF_MAX) { out = out.slice(0, FILEDIFF_MAX) + '\n…（过大截断，完整编辑记录见转录）'; break; }
+    }
+    if (out.length > FILEDIFF_MAX) break;
+  }
+  if (!toolN) return '';
+  return '--- a/' + name + '\n+++ b/' + name + '\n' + out;
+}
+
 // v145: per-tool_use changed-file delta for the PWA conclusion-card rollup,
 // mirroring the old frontend logic (Write counts every line as an addition -
 // the previous content is unknowable from the input alone). Called only for

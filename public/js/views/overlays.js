@@ -64,6 +64,19 @@ function openTextPreview(name, text) {
   }
   openHtmlPreview({ name, srcText, sourceOnly: true });
 }
+// v146: the rollup's +/- stats open a diff of that file's edits in the turn -
+// the bridge re-reads the transcript (display events truncate inputs) and
+// synthesizes unified-diff text, which rides the ordinary diffDoc dual tab.
+async function previewFileDiff(p) {
+  try {
+    const r = await api('/api/sessions/' + encodeURIComponent(state.currentId) + '/filediff?p=' + encodeURIComponent(p));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    openHtmlPreview({ name: (j.name || 'diff') + ' · 本轮编辑', text: diffDoc(j.text), srcText: j.text.slice(0, 128 * 1024) });
+  } catch (e) {
+    toast('diff 生成失败');
+  }
+}
 let artPreviewUrl = '';
 async function previewArtifact(winPath) {
   const url = '/api/sessions/' + encodeURIComponent(state.currentId) + '/preview?p=' + encodeURIComponent(winPath);
@@ -375,5 +388,5 @@ $('hp-back').onclick = () => closeHtmlPreview();
 $('hp-tab-run').onclick = () => setHpView(true);
 $('hp-tab-src').onclick = () => setHpView(false);
 
-export { BUBBLES, openBubble, closeBubble, showConfirm, openLightbox, openFilePreview, previewArtifact, openHtmlPreview, closeHtmlPreview,
+export { BUBBLES, openBubble, closeBubble, showConfirm, openLightbox, openFilePreview, previewArtifact, previewFileDiff, openHtmlPreview, closeHtmlPreview,
   queueApproval, showApproval, fetchPendingApprovals };

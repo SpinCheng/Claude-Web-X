@@ -54,6 +54,18 @@ export function register(router, ctx) {
     json(res, 200, out);
   });
 
+  // v146: per-file diff synthesized from the transcript's own tool_use inputs,
+  // for the conclusion-card rollup's +/- tap. No disk read (cwd lock not
+  // needed) - it can only ever echo what the transcript already recorded.
+  router.get('/api/sessions/:id/filediff', (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    if (!store.get(r.params.id)) { json(res, 404, { error: 'not found' }); return; }
+    const p = r.url.searchParams.get('p') || '';
+    const text = adapter.fileDiff(r.params.id, p);
+    if (!text) { json(res, 404, { error: 'no edits recorded for this file' }); return; }
+    json(res, 200, { name: p.split(/[\\/]/).pop(), text });
+  });
+
   // v112: one subagent's full display events (the 方案A bubble). Same applyLine
   // parsing as the parent transcript; api-request* blob lines never surface.
   router.get('/api/sessions/:id/agents/:agentId/events', (req, res, r) => {

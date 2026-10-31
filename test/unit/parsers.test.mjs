@@ -2,7 +2,7 @@
 // judgment pitfalls documented in CLAUDE.md (转录格式 section).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLine, fenceTitle } from '../../bridge/parsers-cc.js';
+import { applyLine, fenceTitle, synthesizeFileDiff } from '../../bridge/parsers-cc.js';
 
 const run = (lines, rec = {}) => { // rec defaults to a seeded (empty) record like _ensureSession creates
   const events = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
@@ -123,6 +123,23 @@ test('edit tool_use parts carry the changed-file delta f (v145)', () => {
   assert.deepEqual(parts[1].f, [{ path: 'D:\\e2e\\a.js', add: 1, del: 2 }]);
   assert.deepEqual(parts[2].f, [{ path: 'D:\\e2e\\b.js', add: 3, del: 3 }]);
   assert.deepEqual(parts[3].f, [{ path: 'D:\\e2e\\n.ipynb', add: 3, del: 0 }], 'notebook new_source counted');
+});
+
+test('synthesizeFileDiff builds chronological hunks from raw tool_use inputs (v146)', () => {
+  const lines = [
+    assistant([{ type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: 'D:\\e2e\\a.ts', old_string: 'x\ny', new_string: 'x1' } }]),
+    { type: 'user', message: { role: 'user', content: 'noise line' } },
+    assistant([
+      { type: 'tool_use', id: 'w1', name: 'Write', input: { file_path: 'D:\\E2E\\A.TS', content: 'full\nnew' } },
+      { type: 'tool_use', id: 'o1', name: 'Edit', input: { file_path: 'D:\\e2e\\other.ts', old_string: 'q', new_string: 'r' } },
+    ]),
+  ];
+  const txt = synthesizeFileDiff(lines, 'd:\\e2e\\a.ts');
+  assert.ok(txt.startsWith('--- a/a.ts\n+++ b/a.ts'), 'file header');
+  assert.ok(txt.indexOf('@@ Edit @@\n-x\n-y\n+x1') >= 0, 'edit hunk old->new');
+  assert.ok(txt.indexOf('@@ Write · 全文 2 行 @@\n+full\n+new') >= 0, 'write = whole content as adds (case-insensitive match)');
+  assert.ok(!txt.includes('other.ts'), 'other files excluded');
+  assert.equal(synthesizeFileDiff(lines, 'd:\\e2e\\none.ts'), '', 'no match -> empty');
 });
 
 test('tool_result text is capped at 4000 chars', () => {

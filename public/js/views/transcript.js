@@ -7,7 +7,7 @@
 import { $, fmtTs } from '../util.js';
 import { state } from '../state.js';
 import { miniMd, linkifyPaths, linkifyDom } from '../md.js';
-import { openLightbox, previewArtifact, openHtmlPreview } from './overlays.js';
+import { openLightbox, previewArtifact, previewFileDiff, openHtmlPreview } from './overlays.js';
 // v112 function-level cycle (same pattern as composer<->detail): the agent
 // live-line/chip open the bubble; agentview imports the node renderers back.
 // Zero cross-calls at module-evaluation time.
@@ -757,15 +757,26 @@ function renderTurn(t) {
         sum.append(lb, st, ch);
         det.appendChild(sum);
         for (const f of files.slice(0, MAXF)) {
+          // v146: basename on top, dimmed full path under it; the +/- stats on
+          // the right open the synthesized diff view (filediff), the rest of
+          // the row keeps the artifact preview
           const row = document.createElement('div');
           row.className = 'frow';
-          const nm = document.createElement('span'); nm.className = 'fname mono'; nm.textContent = f.path;
+          const info = document.createElement('div');
+          info.className = 'fmeta';
+          const nm = document.createElement('span'); nm.className = 'fname mono'; nm.textContent = f.path.split(/[\\/]/).pop();
+          const dir = f.path.replace(/[\\/][^\\/]*$/, '');
+          if (dir && dir !== f.path) {
+            const pp = document.createElement('span'); pp.className = 'fpath'; pp.textContent = dir;
+            info.append(nm, pp);
+          } else info.append(nm);
           const fd = document.createElement('span'); fd.className = 'fd';
           const fi = document.createElement('i'); fi.className = 'ins'; fi.textContent = '+' + f.add;
           const fe = document.createElement('i'); fe.className = 'dele'; fe.textContent = '−' + f.del;
           fd.append(fi, fe);
-          row.append(nm, fd);
+          fd.onclick = (e) => { e.stopPropagation(); previewFileDiff(f.path); };
           row.onclick = () => previewArtifact(f.path);
+          row.append(info, fd);
           det.appendChild(row);
         }
         if (files.length > MAXF) {

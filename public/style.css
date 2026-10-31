@@ -692,8 +692,10 @@ button { font-family: inherit; }
 .fsum .dele { color: var(--err); font-style: normal; }
 .fsum .frow { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 38px; border-top: 1px solid var(--line); cursor: pointer; }
 .fsum .frow:active { background: rgba(255, 250, 240, .03); }
-.fsum .frow .fd { font-size: 11px; flex: none; }
+.fsum .fmeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
+.fsum .frow .fd { font-size: 11px; flex: none; cursor: pointer; padding: 10px 0 10px 10px; }
 .fsum .fname { font-size: 11.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fsum .fpath { font-size: 10.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fsum .fmore { border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; padding: 7px 0 8px; }
 
 /* ---------- v109 slash-command menu + chip ---------- */

@@ -8,7 +8,7 @@
 
 - README「架构与消息流」双 mermaid 图 + 目录树。后端 `bridge/`：`server.js` 组装根 + `lib/`（router/wshub/auth/mime/models/**platform**=OS 差异单点，勿在其他模块分支 process.platform）+ `routes/` + `parsers-cc.js`（转录行判定纯函数，有单测）。前端 `public/` 免构建 vanilla JS：`app.js` 组装根（boot/gate/路由/WS 帧语义）→ `js/` + `js/views/`。函数级循环 import（求值期零交叉）：composer↔detail、list↔sessops、detail↔ctxring、transcript↔agentview。**滚动三律与 renderTail 不变量在 transcript.js 文件头**。
 - 本机细节：`LOCAL.md`；调试时间线：`docs/history.md`（均 gitignored）。docs 里只有 `screenshots/`（README 截图）入库；设计稿（`docs/design/`、`docs/mockup-*`）与方案文档不入库。
-- 测试：`npm test` = 84 单测（parsers/turns/adapter/cost/commands/agents/titlegen/runner/md）+ 13 e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）。fixture 勿走 bash 内联（反斜杠被吃）；harness 的 api() 头必须合并非替换；harness 停桥必须 `closeAllConnections()` + 等 close 回调——server.close() 不等 keep-alive 排空，Windows 允许双绑 :3799 → 新旧桥竞态应答。场景只经 run-all 跑（结尾显式 process.exit）——单场景直跑会因残留句柄不退出（历史如此，勿误判为新回归）；预览类断言先断 `#html-prev`/`#lightbox` 容器（默认 hidden），**勿断 `#hp-frame`**（静态 HTML 无 hidden，异步 fetch 未完成即假通过——已三次踩中）。
+- 测试：`npm test` = 85 单测（parsers/turns/adapter/cost/commands/agents/titlegen/runner/md）+ 13 e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）。fixture 勿走 bash 内联（反斜杠被吃）；harness 的 api() 头必须合并非替换；harness 停桥必须 `closeAllConnections()` + 等 close 回调——server.close() 不等 keep-alive 排空，Windows 允许双绑 :3799 → 新旧桥竞态应答。场景只经 run-all 跑（结尾显式 process.exit）——单场景直跑会因残留句柄不退出（历史如此，勿误判为新回归）；预览类断言先断 `#html-prev`/`#lightbox` 容器（默认 hidden），**勿断 `#hp-frame`**（静态 HTML 无 hidden，异步 fetch 未完成即假通过——已三次踩中）。
 
 ## 快速开始
 
@@ -56,7 +56,7 @@ npm start          # node bridge/index.js，端口 3742
 `~/.claude/projects/<工作区slug>/<sessionId>.jsonl`（追加式）；slug：`D:\foo\Bar` → `D--foo-Bar`。adapter 消费：
 
 - `user`：**人机判定按内容**——含 tool_result 块即机器回合（origin 不可靠，tool_result 行 origin 为 null）；压缩续传（`isCompactSummary:true`）与技能注入（纯 text 数组 + 首段 "Base directory for this skill:"）折叠为标记；**勿按"origin 缺失"折叠**（手机 promptSource=sdk 的消息同样无 origin）；`<command-*>` 信封归一成 `/名 参数`。
-- `assistant`：`message.content[]` = thinking/text/tool_use（**tool_use 的 `id` 是结果配对键**）；`message.model` 是显示模型名唯一来源；`message.usage` 是圆环唯一数据源（in/cacheRead/cacheCreate/out）。改动文件 ± 摘要在**解析层**算好随事件下发（`f:[{path,add,del}]`，Edit/Write/MultiEdit/NotebookEdit；v145）——chip 文本 `v` 被 briefJson 截到 300 字符，**勿在前端 JSON.parse(v) 做汇总**（截断串必炸，v145 前超限输入的文件全被静默丢出汇总）。
+- `assistant`：`message.content[]` = thinking/text/tool_use（**tool_use 的 `id` 是结果配对键**）；`message.model` 是显示模型名唯一来源；`message.usage` 是圆环唯一数据源（in/cacheRead/cacheCreate/out）。改动文件 ± 摘要在**解析层**算好随事件下发（`f:[{path,add,del}]`，Edit/Write/MultiEdit/NotebookEdit；v145）——chip 文本 `v` 被 briefJson 截到 300 字符，**勿在前端 JSON.parse(v) 做汇总**（截断串必炸，v145 前超限输入的文件全被静默丢出汇总）。汇总行 ± 点击=`GET /api/sessions/:id/filediff`（v146）——adapter 重读 JSONL **原文**现场合成该文件全部编辑的 unified diff（Write/NotebookEdit 只出新增侧；不读盘故无 cwd 锁；hunk 头数字仅供渲染），前端走 diffDoc 双 tab。
 - `cost-state`：聚合全部模型、**不覆盖** model 标签；相邻快照折叠保末值。`custom-title`、`system`（stop 类 subtype → idle + stop 标记事件）。
 
 ## PWA 硬约束（勿回退）

@@ -17,7 +17,7 @@ import os from 'node:os';
 import { EventEmitter } from 'node:events';
 import { Tailer } from './tailer.js';
 import { AgentTracker } from './agents.js';
-import { applyLine, fenceTitle } from './parsers-cc.js';
+import { applyLine, fenceTitle, synthesizeFileDiff } from './parsers-cc.js';
 
 const ACTIVE_WINDOW_MS = 120_000;
 // terminal-ish system subtypes => idle + a last run outcome the PWA can show
@@ -307,6 +307,20 @@ export class CcAdapter extends EventEmitter {
     }
     const end = Math.max(0, events.length - Math.max(0, before | 0));
     return { events: events.slice(Math.max(0, end - limit), end), total: events.length };
+  }
+
+  // v146: per-file diff text for the rollup's +/- tap. Re-reads the RAW
+  // transcript (the display events truncate tool inputs at 300 chars, which
+  // would gut every real edit); one pass, no state kept.
+  fileDiff(id, p) {
+    const rec = this.store.get(id);
+    if (!rec || !rec.transcriptPath) return '';
+    const lines = [];
+    for (const line of new Tailer(rec.transcriptPath).readAll()) {
+      let obj; try { obj = JSON.parse(line); } catch { continue; }
+      lines.push(obj);
+    }
+    return synthesizeFileDiff(lines, p);
   }
 }
 
