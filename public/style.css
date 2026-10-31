@@ -711,9 +711,13 @@ button { font-family: inherit; }
 .cmd-tag .x { color: var(--faint); font-weight: 400; padding: 0 3px; font-size: 13px; cursor: pointer; }
 .b-tag { display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--acc-strong); background: var(--acc-tint); border-radius: 999px; padding: 2px 9px; margin-right: 2px; vertical-align: 1px; }
 .cm-name b { color: var(--acc-strong); }
-/* v111: command chip sits INLINE with the input (same row, not above) */
-.input-line { display: flex; align-items: flex-start; gap: 8px; }
-.input-line .cmd-chips { display: flex; flex: none; padding: 9px 0 0; gap: 8px; }
-.input-line textarea { flex: 1; min-width: 0; }
+/* v137: command chip floats INLINE over the textarea's first line - the JS
+   sets text-indent to the chip's width so the first line dodges it while
+   wrapped lines start at the true left edge. Chip kept compact (~19px) so a
+   wrapped second line (top at 30px) clears its bottom (9+19=28px). */
+.input-line { position: relative; }
+.input-line .cmd-chips { position: absolute; top: 9px; left: 2px; z-index: 1; display: flex; gap: 8px; padding: 0; }
+.input-line .cmd-tag { padding: 2px 6px 2px 10px; font-size: 11.5px; line-height: 1.3; max-width: 72%; }
+.input-line .cmd-tag b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v111: executed-command stdout panel - right side, under the command bubble */
 .cmdout { max-width: 86%; width: fit-content; background: var(--panel2); border-radius: 4px 12px 12px 12px; padding: 8px 12px; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; margin-top: 4px; }

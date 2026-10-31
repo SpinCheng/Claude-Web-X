@@ -472,11 +472,16 @@ function setCmdChip(c) {
   tag.appendChild(x);
   row.appendChild(tag);
   row.classList.remove('hidden');
+  // v137: the chip floats over the textarea's first line - reserve its width
+  // via text-indent (first line only), so wrapped lines start at the true
+  // left edge instead of beside the chip
+  $('msg-input').style.textIndent = (tag.getBoundingClientRect().width + 8) + 'px';
 }
 function clearCmdChip() {
   cmdChip = null;
   const row = $('cmd-chips');
   if (row) { row.innerHTML = ''; row.classList.add('hidden'); }
+  $('msg-input').style.textIndent = '';
 }
 $('msg-input').addEventListener('input', () => {
   const v = $('msg-input').value;
