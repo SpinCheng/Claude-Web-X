@@ -120,6 +120,24 @@ test('fileChanges merges edits per file (case-insensitive) with ± lines', () =>
   assert.deepEqual([b.add, b.del], [2, 0], 'write counts every line as an addition');
 });
 
+test('fileChanges prefers bridge-side f deltas (v145) and mixes with legacy v-parse', () => {
+  const t = { steps: [
+    // bridge precomputed: a huge Write whose briefJson v is truncated (and
+    // thus unparseable) still counts via f
+    { t: 'tool', tool: { name: 'Write', v: '{"file_path":"D:\\x\\big.txt","content":"' + 'x'.repeat(400), f: [{ path: 'D:\\x\\big.txt', add: 900, del: 0 }] } },
+    // legacy part (older bridge): still parsed from v
+    { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'D:\\x\\big.txt', old_string: 'a', new_string: 'b\nc' }) } },
+    // f wins even when v happens to be parseable
+    { t: 'tool', tool: { name: 'Write', v: JSON.stringify({ file_path: 'D:\\x\\c.md', content: 'zz' }), f: [{ path: 'D:\\x\\c.md', add: 7, del: 4 }] } },
+  ] };
+  const files = fileChanges(t);
+  assert.equal(files.length, 2);
+  const big = files.find((f) => /big\.txt$/i.test(f.path));
+  assert.deepEqual([big.add, big.del], [902, 1], 'f (900+) + legacy edit (+2-1) merge on one file');
+  const c = files.find((f) => /c\.md$/i.test(f.path));
+  assert.deepEqual([c.add, c.del], [7, 4], 'f takes precedence over parseable v');
+});
+
 test('mergeBotTurns splices the two halves of a page-split turn', () => {
   const a = { role: 'bot', think: ['t1'], tools: [], texts: ['前半'],
     steps: [{ t: 'think', v: 't1' }, { t: 'text', v: '前半' }], ts: '1' };

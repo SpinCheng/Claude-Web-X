@@ -106,6 +106,25 @@ test('tool_use carries id (pairing key); toolres items extract text/err/images',
   assert.ok(tr.items[0].text.includes('fileA'));
 });
 
+test('edit tool_use parts carry the changed-file delta f (v145)', () => {
+  const big = 'x\n'.repeat(200); // input JSON far beyond the 300-char brief
+  const { events } = run([
+    assistant([
+      { type: 'tool_use', id: 'w1', name: 'Write', input: { file_path: 'D:\\e2e\\big.txt', content: big } },
+      { type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: 'D:\\e2e\\a.js', old_string: 'x\ny', new_string: 'x1' } },
+      { type: 'tool_use', id: 'm1', name: 'MultiEdit', input: { file_path: 'D:\\e2e\\b.js', edits: [{ old_string: 'a', new_string: 'b\nc' }, { old_string: 'd\ne', new_string: 'f' }] } },
+      { type: 'tool_use', id: 'n1', name: 'NotebookEdit', input: { notebook_path: 'D:\\e2e\\n.ipynb', new_source: 'q\nr\ns' } },
+    ]),
+  ]);
+  const parts = events[0].parts.filter((p) => p.t === 'tool');
+  assert.deepEqual(parts[0].f, [{ path: 'D:\\e2e\\big.txt', add: 201, del: 0 }], 'big Write counted despite truncated v');
+  assert.ok(parts[0].v.length <= 305 && parts[0].v.endsWith('...'), 'chip text stays brief');
+  assert.ok(!events[0].parts.some((p) => p.t === 'tool' && p.name === 'Bash' && p.f), 'Bash never carries f (sanity)');
+  assert.deepEqual(parts[1].f, [{ path: 'D:\\e2e\\a.js', add: 1, del: 2 }]);
+  assert.deepEqual(parts[2].f, [{ path: 'D:\\e2e\\b.js', add: 3, del: 3 }]);
+  assert.deepEqual(parts[3].f, [{ path: 'D:\\e2e\\n.ipynb', add: 3, del: 0 }], 'notebook new_source counted');
+});
+
 test('tool_result text is capped at 4000 chars', () => {
   const { events } = run([toolResultLine('t1', 'x'.repeat(9000))]);
   assert.ok(events[0].items[0].text.length < 4100);

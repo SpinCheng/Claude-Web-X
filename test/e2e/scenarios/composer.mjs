@@ -59,4 +59,25 @@ await withEnv(async (h, page) => {
   await page.waitFor('(function(){var s=document.getElementById("send");return !s.classList.contains("hidden") && !s.classList.contains("queue")})()');
   s = await st();
   assert(s.send && !s.queue && !s.stop, 'run end: back to idle');
+
+  // v145: pasted files ride the attachment pipeline - synthetic ClipboardEvent
+  // with a real DataTransfer (works in Chromium); a text paste without files
+  // keeps the browser default and never opens the chips row
+  await page.ev(`(function(){
+    var dt = new DataTransfer();
+    dt.items.add(new File(['paste-body-1'], 'pasted.txt', { type: 'text/plain' }));
+    document.getElementById('msg-input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    return true;
+  })()`);
+  assert(await page.waitFor('!document.getElementById("attach-chips").classList.contains("hidden")'), 'paste: chips row opens');
+  assert(await page.waitFor('(document.querySelector("#attach-chips .ac-name") || {textContent:""}).textContent.indexOf("pasted.txt") >= 0'), 'paste: chip named');
+  assert(await page.waitFor('(document.querySelector("#attach-chips .ac-name") || {textContent:""}).textContent.indexOf("…") < 0'), 'paste: upload settled');
+  await page.ev('(function(){var x=document.querySelector("#attach-chips .ac-x"); x && x.click(); return true;})()');
+  assert(await page.waitFor('document.getElementById("attach-chips").classList.contains("hidden")'), 'paste: chip removed');
+  await page.ev(`(function(){
+    var dt = new DataTransfer();
+    document.getElementById('msg-input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    return true;
+  })()`);
+  assert(true, 'done');
 });

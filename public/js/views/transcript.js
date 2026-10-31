@@ -98,8 +98,13 @@ function applyEventToTurns(ev) {
     // v111: the executed command's stdout - its own right-aligned panel right
     // under the command bubble (never merges into a bot turn)
     T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
-  } else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') {
-    T.push(sysMarkerTurn(ev));
+  } else if (ev.k === 'compact' || ev.k === 'skill') {
+    // v145: cost-state snapshots (k:'stats') no longer render a timeline
+    // row - the user ruling killed the "成本 $x · in/out tok" reminder; the
+    // number lives on in the header entry / cost panel via the sessions
+    // frame, so this display removal loses nothing.
+    const mk = sysMarkerTurn(ev);
+    if (mk) T.push(mk);
   } else if (ev.k === 'title') { /* meta only */ }
 }
 // shared turn-shape builders (v44): the history paginator replays older
@@ -110,6 +115,7 @@ function addAssistantPart(turn, p) {
   if (p.t === 'think') { turn.think.push(p.v); turn.steps.push({ t: 'think', v: p.v }); }
   else if (p.t === 'tool') {
     const tool = { name: p.name, id: p.id || '', v: p.v, out: null };
+    if (p.f) tool.f = p.f; // v145: bridge-side changed-file delta for the rollup
     turn.tools.push(tool);
     turn.steps.push({ t: 'tool', tool });
   }
@@ -161,11 +167,10 @@ function drainOrphanRes(turns) {
     }
   }
 }
-// folded marker lines (cost snapshot / compaction summary / skill injection)
+// folded marker lines (compaction summary / skill injection). Cost-state
+// snapshots stopped rendering here in v145 (see applyEventToTurns).
 function sysMarkerTurn(ev) {
   const wan = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字');
-  if (ev.k === 'stats') return { role: 'sys', text: '成本 $' + (ev.stats.usd != null ? Number(ev.stats.usd).toFixed(2) : '?') +
-    ' · in ' + (ev.stats.inTok ?? '?') + ' / out ' + (ev.stats.outTok ?? '?') + ' tok' };
   if (ev.k === 'compact') return { role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + wan(ev.n || 0) + '，已折叠）' };
   return { role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + wan(ev.n || 0) + '，已折叠）' };
 }
@@ -329,9 +334,13 @@ function toolDiff(t) {
 
 // v45 (P1-6R): per-turn changed-file rollup for the conclusion card. Pure
 // function of the turn's steps - recomputed on each renderTurn, not cached.
-// The tool_use input already carries file_path + old/new, so this needs no
-// bridge support. Path identity is case-insensitive (Windows); Write counts
-// every line as an addition (the old content is unknowable from the input).
+// v145: the ± numbers come PRE-COMPUTED from the bridge (tool.f) - the chip
+// text v is briefJson-capped at 300 chars, and JSON.parse on a truncated
+// string used to silently drop every edit whose input exceeded the cap
+// (only tiny files made it into the rollup). The legacy v-parse path stays
+// as a fallback for inputs produced by older bridges. Path identity is
+// case-insensitive (Windows); Write counts every line as an addition (the
+// old content is unknowable from the input).
 const EDIT_TOOLS = { Edit: 1, Write: 1, MultiEdit: 1 };
 const lineCount = (v) => (typeof v === 'string' ? v.split('\n').length : 0);
 function fileChanges(t) {
@@ -346,6 +355,10 @@ function fileChanges(t) {
   };
   for (const s of t.steps || []) {
     if (s.t !== 'tool' || !EDIT_TOOLS[s.tool.name]) continue;
+    if (Array.isArray(s.tool.f)) {
+      for (const r of s.tool.f) bump(r.path, r.add || 0, r.del || 0);
+      continue;
+    }
     let input = null;
     try { input = JSON.parse(s.tool.v); } catch { continue; }
     if (!input || typeof input !== 'object') continue;
@@ -946,7 +959,10 @@ function parseOlderTurns(events) {
       if (i != null && T[i] && T[i].role === 'bot' && ev.ts) T[i].endTs = ev.ts;
     }
     else if (ev.k === 'cmdout') T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
-    else if (ev.k === 'stats' || ev.k === 'compact' || ev.k === 'skill') T.push(sysMarkerTurn(ev));
+    else if (ev.k === 'compact' || ev.k === 'skill') {
+      const mk = sysMarkerTurn(ev); // stats rows are gone since v145 here too
+      if (mk) T.push(mk);
+    }
   }
   return T;
 }

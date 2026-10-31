@@ -234,7 +234,16 @@ export function applyLine(id, obj, patch, events, rec) {
             if (patch.est) patch.est.prose += p.text.length;
           }
           else if (p.type === 'tool_use') {
-            parts.push({ t: 'tool', name: p.name, id: p.id || '', v: briefJson(p.input) });
+            // v145: the changed-file rollup delta rides the part as f
+            // [{path,add,del}] - computed HERE while the input object is
+            // still whole. The chip text v is briefJson-capped at 300 chars
+            // and a truncated JSON string can never be re-parsed downstream,
+            // which used to silently drop every edit whose input exceeded
+            // the cap from the conclusion-card rollup.
+            const part = { t: 'tool', name: p.name, id: p.id || '', v: briefJson(p.input) };
+            const f = editDelta(p.name, p.input);
+            if (f) part.f = f;
+            parts.push(part);
             if (patch.est) { try { patch.est.tools += JSON.stringify(p.input || {}).length + 32; } catch { /* skip */ } }
           }
         }
@@ -299,6 +308,26 @@ function briefJson(input) {
     const s = JSON.stringify(input);
     return s && s.length > 300 ? s.slice(0, 300) + '...' : (s || '');
   } catch { return ''; }
+}
+
+// v145: per-tool_use changed-file delta for the PWA conclusion-card rollup,
+// mirroring the old frontend logic (Write counts every line as an addition -
+// the previous content is unknowable from the input alone). Called only for
+// file-edit tools; everything else returns null and carries no f.
+const EDIT_TOOLS = { Edit: 1, Write: 1, MultiEdit: 1, NotebookEdit: 1 };
+function editDelta(name, input) {
+  if (!EDIT_TOOLS[name] || !input || typeof input !== 'object') return null;
+  const p = input.file_path || input.path || input.notebook_path;
+  if (typeof p !== 'string' || !p) return null;
+  const lc = (v) => (typeof v === 'string' ? v.split('\n').length : 0);
+  if (Array.isArray(input.edits)) {
+    let add = 0, del = 0;
+    for (const e of input.edits) { add += lc(e && e.new_string); del += lc(e && e.old_string); }
+    return [{ path: p, add, del }];
+  }
+  if (typeof input.content === 'string') return [{ path: p, add: lc(input.content), del: 0 }];
+  return [{ path: p, add: lc(input.new_string) + lc(input.new_str) + lc(input.new_source),
+    del: lc(input.old_string) + lc(input.old_str) + lc(input.old_source) }];
 }
 
 // Drop <system-reminder>...</system-reminder> blocks (huge injected context).

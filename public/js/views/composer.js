@@ -496,6 +496,15 @@ $('msg-input').addEventListener('input', () => {
 $('msg-input').addEventListener('keydown', (e) => {
   if (e.key === 'Backspace' && $('msg-input').value === '' && cmdChip) { e.preventDefault(); clearCmdChip(); updateComposer(); }
 });
+// v145: pasted FILES ride the normal attachment pipeline (Ctrl+V on desktop,
+// e.g. a copied file in Explorer or a screenshot). Plain-text paste keeps the
+// browser default; images go through the same downscale+upload as picked ones.
+$('msg-input').addEventListener('paste', (e) => {
+  const files = e.clipboardData && e.clipboardData.files;
+  if (!files || !files.length) return;
+  e.preventDefault();
+  for (const f of files) addAttachment(f);
+});
 document.addEventListener('click', (e) => {
   if ($('cmd-menu').classList.contains('hidden')) return;
   if (e.target.closest('#cmd-menu') || e.target.id === 'msg-input') return;
