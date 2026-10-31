@@ -56,13 +56,13 @@ const ART_DOCS = [
   [/\.json$/i, (t) => jsonDoc(t), false],
   [/\.(diff|patch)$/i, (t) => diffDoc(t), false],
 ];
-function openTextPreview(name, text) {
+function openTextPreview(name, text, path) {
   const srcText = text.slice(0, 128 * 1024);
-  if (ART_HTML.test(name)) { openHtmlPreview({ name, text, srcText }); return; }
+  if (ART_HTML.test(name)) { openHtmlPreview({ name, text, srcText, path }); return; }
   for (const [re, build, popups] of ART_DOCS) {
-    if (re.test(name)) { openHtmlPreview({ name, text: build(text, name), srcText, popups }); return; }
+    if (re.test(name)) { openHtmlPreview({ name, text: build(text, name), srcText, popups, path }); return; }
   }
-  openHtmlPreview({ name, srcText, sourceOnly: true });
+  openHtmlPreview({ name, srcText, sourceOnly: true, path });
 }
 // v146: the rollup's +/- stats open a diff of that file's edits in the turn -
 // the bridge re-reads the transcript (display events truncate inputs) and
@@ -72,7 +72,7 @@ async function previewFileDiff(p) {
     const r = await api('/api/sessions/' + encodeURIComponent(state.currentId) + '/filediff?p=' + encodeURIComponent(p));
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
-    openHtmlPreview({ name: (j.name || 'diff') + ' · 本轮编辑', text: diffDoc(j.text), srcText: j.text.slice(0, 128 * 1024) });
+    openHtmlPreview({ name: (j.name || 'diff') + ' · 本轮编辑', text: diffDoc(j.text), srcText: j.text.slice(0, 128 * 1024), path: p });
   } catch (e) {
     toast('diff 生成失败');
   }
@@ -95,7 +95,7 @@ async function previewArtifact(winPath) {
       openLightbox(artPreviewUrl);
     } else {
       const text = await r.text();
-      openTextPreview(name, text);
+      openTextPreview(name, text, winPath);
     }
   } catch (e) {
     // status-specific reasons - "HTTP 403" tells the user nothing about WHY
@@ -320,7 +320,7 @@ function setHpView(run) {
   $('hp-frame').classList.toggle('hidden', !run);
   $('hp-src').classList.toggle('hidden', run);
 }
-async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?, popups?}
+async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?, popups?, path?}
   // v107: content is ALWAYS injected via srcdoc. Never set iframe.src here -
   // blob/direct src navigations append entries to the joint session history,
   // so a back press silently steps iframe state and the close-on-back wiring
@@ -338,7 +338,12 @@ async function openHtmlPreview(o) { // {name, url?, text?, srcText?, sourceOnly?
       return;
     }
   }
-  $('hp-title').textContent = o.name || o.url || '';
+  // v148: title = name over the full path (vertical), when the caller knows
+  // a real path; attachment/URL previews simply keep the single name line
+  $('hp-name').textContent = o.name || o.url || '';
+  const pe = $('hp-path');
+  if (o.path) { pe.textContent = o.path; pe.classList.remove('hidden'); }
+  else { pe.textContent = ''; pe.classList.add('hidden'); }
   hpSrcText = o.srcText !== undefined ? o.srcText : '';
   $('hp-src').textContent = hpSrcText || '（空）';
   $('hp-tabs').classList.toggle('hidden', !!o.sourceOnly);

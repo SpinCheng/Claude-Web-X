@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=147">
+  <link rel="stylesheet" href="/style.css?v=148">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v147</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v148</span></span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -169,7 +169,10 @@
         <button id="hp-back" class="icon-btn" aria-label="返回">
           <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
         </button>
-        <div id="hp-title" class="hp-title"></div>
+        <div class="hp-title">
+          <div id="hp-name" class="hp-name"></div>
+          <div id="hp-path" class="hp-path mono hidden"></div>
+        </div>
         <div id="hp-tabs" class="fp-tabs hidden">
           <button id="hp-tab-run" class="fp-tab on" type="button">渲染</button>
           <button id="hp-tab-src" class="fp-tab" type="button">源码</button>
@@ -331,6 +334,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=147"></script>
+  <script type="module" src="/app.js?v=148"></script>
 </body>
 </html>

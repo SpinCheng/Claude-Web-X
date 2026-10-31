@@ -161,6 +161,8 @@ await withEnv(async (h, page) => {
     // flight and srcdoc is still empty
     assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), sid + ' opens the preview page');
     assert(await page.waitFor('!document.getElementById("hp-frame").classList.contains("hidden")'), sid + ' opens on the render tab');
+    // v148: the header stacks the full path under the file name
+    assert((await page.ev('(document.getElementById("hp-path").textContent || "")')).indexOf(fname) >= 0, sid + ' header shows the full path');
     const attr = await page.ev('document.getElementById("hp-frame").getAttribute("srcdoc") || ""');
     assert(check(attr), label);
     await page.ev('document.getElementById("hp-back").click()');
