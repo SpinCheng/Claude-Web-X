@@ -3,9 +3,9 @@
 **用手机（PWA）远程查看并操控本机 Claude Code 会话 —— 局域网 bridge + 免构建 PWA，单 `ws` 依赖。**
 
 <p>
-<img src="docs/screenshots/list.png" width="32%" alt="会话列表"> <img src="docs/screenshots/detail.png" width="32%" alt="会话转录"> <img src="docs/screenshots/new-task.png" width="32%" alt="新建任务"><br>
-<img src="docs/screenshots/approval.png" width="32%" alt="手机逐条审批（±diff）"> <img src="docs/screenshots/preview-md.png" width="32%" alt="Markdown 渲染预览"> <img src="docs/screenshots/preview-diff.png" width="32%" alt="diff 并排对比预览"><br>
-<img src="docs/screenshots/cost.png" width="32%" alt="费用面板"> <img src="docs/screenshots/cmd-menu.png" width="32%" alt="斜杠命令与技能菜单">
+<img src="docs/screenshots/list.png" width="32%" alt="会话列表"> <img src="docs/screenshots/detail.png" width="32%" alt="会话转录"> <img src="docs/screenshots/detail-open.png" width="32%" alt="过程胶囊展开"><br>
+<img src="docs/screenshots/new-task.png" width="32%" alt="新建任务"> <img src="docs/screenshots/approval.png" width="32%" alt="手机逐条审批（±diff）"> <img src="docs/screenshots/preview-md.png" width="32%" alt="Markdown 渲染预览"><br>
+<img src="docs/screenshots/preview-diff.png" width="32%" alt="diff 并排对比预览"> <img src="docs/screenshots/cost.png" width="32%" alt="费用面板"> <img src="docs/screenshots/cmd-menu.png" width="32%" alt="斜杠命令与技能菜单">
 </p>
 
 > **免责声明**：本项目是为方便个人使用而开发的**非官方**作品，与 Anthropic PBC 及任何 Claude 品牌方无关联、未获其背书；Claude 及相关商标归其各自所有者。

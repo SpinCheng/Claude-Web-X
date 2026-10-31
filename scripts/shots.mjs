@@ -1,7 +1,8 @@
 // scripts/shots.mjs - README screenshots from the ISOLATED e2e environment
 // (bridge :3799 + synthetic T:\e2e fixtures) so no real session data leaks.
 // Usage: node scripts/shots.mjs -> docs/screenshots/*.png
-//   list / detail / new-task      - the classic trio
+//   list / detail / detail-open  - list, collapsed detail, expanded process capsule
+//   new-task                     - new-task modal
 //   approval / cost / cmd-menu    - phone approval card, cost panel, slash menu
 //   preview-md / preview-diff     - v139/v142-v143 preview pages (render tabs)
 import fs from 'node:fs';
@@ -91,6 +92,18 @@ await withEnv(async (h, page) => {
   const pending = await (await api('/api/approvals/pending')).json();
   if (pending.approvals[0]) await api('/api/approvals/' + encodeURIComponent(pending.approvals[0].id), { method: 'POST', body: '{"decision":"deny"}' });
   await page.waitFor('document.getElementById("approval").classList.contains("hidden")');
+
+  // 3b. detail with the process capsule EXPANDED: trigger tap reveals the
+  // full timeline (think/tool/text nodes), then open the tool node body and
+  // anchor the capsule at the viewport top so the shot shows it from its start
+  await page.ev('var t=document.querySelector(".turn .trigger"); t && t.click()');
+  await page.waitFor('!!document.querySelector(".node .node-head")');
+  await page.ev('(function(){var h=document.querySelector(".node:not(.plain) .node-head"); h && h.click(); return true;})()');
+  await sleep(400);
+  await page.ev('(function(){var w=document.querySelector(".turn.open")||document.querySelector(".turn"); var c=document.getElementById("chat"); c.scrollTop=Math.max(0,w.offsetTop-56); c.dispatchEvent(new Event("scroll")); return true;})()');
+  await sleep(300);
+  await shot(page, 'detail-open.png');
+  await page.ev('var t=document.querySelector(".turn .trigger"); t && t.click()');
 
   // 4. cost panel (session with a cost-state snapshot; header $ -> sheet)
   await page.navigate('http://127.0.0.1:3799/?token=e2etok#open=cs1');
