@@ -98,13 +98,15 @@ await withEnv(async (h, page) => {
   await page.waitFor('document.getElementById("approval").classList.contains("hidden")');
 
   // 3b. detail with the process capsule EXPANDED: trigger tap reveals the
-  // full timeline (think/tool/text nodes), then open the tool node body and
-  // anchor the capsule at the viewport top so the shot shows it from its start
+  // full timeline (think/tool/text nodes), then open the tool node body.
+  // Anchor so the user bubble is FULLY in frame above the capsule - the old
+  // anchor (capsule top - 56) sliced the bubble in half at the viewport top,
+  // which read as a stray clipped bubble
   await page.ev('var t=document.querySelector(".turn .trigger"); t && t.click()');
   await page.waitFor('!!document.querySelector(".node .node-head")');
   await page.ev('(function(){var h=document.querySelector(".node:not(.plain) .node-head"); h && h.click(); return true;})()');
   await sleep(400);
-  await page.ev('(function(){var w=document.querySelector(".turn.open")||document.querySelector(".turn"); var c=document.getElementById("chat"); c.scrollTop=Math.max(0,w.offsetTop-56); c.dispatchEvent(new Event("scroll")); return true;})()');
+  await page.ev('(function(){var w=document.querySelector(".turn.open")||document.querySelector(".turn"); var c=document.getElementById("chat"); var user=w.previousElementSibling||w; c.scrollTop=Math.max(0,(user.offsetTop)-4); c.dispatchEvent(new Event("scroll")); return true;})()');
   await sleep(300);
   await shot(page, 'detail-open.png');
   await page.ev('var t=document.querySelector(".turn .trigger"); t && t.click()');
