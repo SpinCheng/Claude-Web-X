@@ -26,6 +26,8 @@ await withEnv(async (h, page) => {
   assert(frow.toLowerCase() === 'a.txt', 'fsum row shows the basename (got "' + frow + '")');
   const fpath = await page.ev('(function(){var r=document.querySelector(".fsum .frow .fpath"); return r?r.textContent:""})()');
   assert(fpath.toLowerCase() === 'd:\\e2e', 'fsum row dims the directory (got "' + fpath + '")');
+  const sameLine = await page.ev('(function(){var a=document.querySelector(".fsum .frow .fname").getBoundingClientRect(),b=document.querySelector(".fsum .frow .fpath").getBoundingClientRect();return Math.abs(a.top-b.top)<2})()');
+  assert(sameLine, 'v147: name and path share one line');
   // v146: the +/- stats open the synthesized per-file diff view
   await page.ev('(function(){var s=document.querySelector(".fsum .frow .fd"); s && s.click(); return true;})()');
   assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'filediff preview opens');
