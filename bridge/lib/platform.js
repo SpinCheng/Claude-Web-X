@@ -52,6 +52,14 @@ export function findClaudeBinary(override) {
   return 'claude';
 }
 
+// root/sudo cannot run the CLI with --dangerously-skip-permissions (Linux
+// hard refusal, observed on RHEL 2026-10-28: the child dies instantly and
+// only its stderr says why - the phone just saw a silent instant failure).
+// Windows has no such form. The runner asks before spawning yolo runs.
+export function isRootUser() {
+  return !IS_WIN && typeof process.getuid === 'function' && process.getuid() === 0;
+}
+
 // Claude Code's Bash tool needs a discoverable Git Bash. This machine keeps
 // git under a user-local manager (hermes), NOT Program Files, so a bridge
 // started from a lean context (boot autostart / wscript chain, no user PATH)

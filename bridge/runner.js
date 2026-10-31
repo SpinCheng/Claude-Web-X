@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
-import { findClaudeBinary, bashToolEnv } from './lib/platform.js';
+import { findClaudeBinary, bashToolEnv, isRootUser } from './lib/platform.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_CONCURRENT_RUNS = 4;
@@ -30,6 +30,15 @@ const MAX_CONCURRENT_RUNS = 4;
 export function closeExitCode(run, code) {
   if (code == null) return run.cancelled ? 'cancelled' : 0;
   return run.watchdogFired ? 0 : code;
+}
+
+// root/sudo (Linux) + yolo is a hard CLI refusal (see platform.isRootUser):
+// the child dies before writing anything, so refuse BEFORE spawning and hand
+// the phone a readable reason instead of a silent instant failure.
+export function yoloBlockedReason(root, perm, yolo) {
+  return (root && perm !== 'ask' && yolo)
+    ? 'root 用户不能以跳过权限模式（yolo）运行——请用普通用户运行桥，或该消息改用逐条审批'
+    : null;
 }
 
 export class Runner extends EventEmitter {
@@ -50,8 +59,11 @@ export class Runner extends EventEmitter {
     this._qseq = 0;
     this._claudeExe = null;
     this._settingsEnv = null;
+    this._settingsEnvMtime = -1;
+    this._settingsPath = opts.settingsPath || path.join(os.homedir(), '.claude', 'settings.json');
     // v94: hung-CLI janitor (see _watchdog)
     this._watchdogTimer = setInterval(() => this._watchdog(), 30_000);
+    this._watchdogTimer.unref?.(); // test safety: never hold the process open
   }
 
   // live or recently-finished run record (for approval routing)
@@ -63,15 +75,22 @@ export class Runner extends EventEmitter {
   }
 
   // `env` block of ~/.claude/settings.json (relay base URL + auth token...).
-  // Read lazily and cached; never logged, never returned to clients.
+  // Cached per file mtime: caching the first read unconditionally used to
+  // lock in `{}` when the file did not exist yet (start bridge first, write
+  // settings later => every run "not logged in", never self-heals) and kept
+  // env edits from ever loading. Never logged, never returned to clients.
   settingsEnv() {
-    if (this._settingsEnv) return this._settingsEnv;
+    let mtime = 0;
+    try { mtime = fs.statSync(this._settingsPath).mtimeMs; } catch { /* absent */ }
+    if (this._settingsEnv && this._settingsEnvMtime === mtime) return this._settingsEnv;
     this._settingsEnv = {};
-    try {
-      const p = path.join(os.homedir(), '.claude', 'settings.json');
-      const env = JSON.parse(fs.readFileSync(p, 'utf8')).env;
-      if (env && typeof env === 'object') this._settingsEnv = env;
-    } catch { /* no settings / no env block */ }
+    this._settingsEnvMtime = mtime;
+    if (mtime) {
+      try {
+        const env = JSON.parse(fs.readFileSync(this._settingsPath, 'utf8')).env;
+        if (env && typeof env === 'object') this._settingsEnv = env;
+      } catch { /* unreadable / no env block */ }
+    }
     return this._settingsEnv;
   }
 
@@ -250,6 +269,8 @@ export class Runner extends EventEmitter {
     let live = 0;
     for (const r of this.runs.values()) if (r.state === 'running') live++;
     if (live >= MAX_CONCURRENT_RUNS) return { error: 'overloaded' };
+    const blocked = yoloBlockedReason(isRootUser(), perm, this.yolo);
+    if (blocked) return { error: blocked };
 
     // attachments (v19): images ride the message as native image blocks via
     // --input-format stream-json stdin (probe-verified on 2.1.308; stdin must
@@ -315,6 +336,11 @@ export class Runner extends EventEmitter {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     if (stdinMsg) child.stdin.write(stdinMsg); // keep stdin open: closing right away stalls the CLI
+    else child.stdin.end(); // v150: the prompt rides argv here; a held-open
+                           // stdin pipe made the CLI idle-wait 3s for piped
+                           // data ("no stdin data received in 3s", probe
+                           // 2026-10-31) before emitting init. EOF skips the
+                           // wait; the stream-json path above is exempt.
     const run = {
       runId, sessionId, child, state: 'running', startedAt: Date.now(),
       exitCode: null, stderrTail: '', cancelled: false, forkFrom,
@@ -324,9 +350,12 @@ export class Runner extends EventEmitter {
     const onLine = (line) => {
       if (!line) return;
       let o; try { o = JSON.parse(line); } catch { return; }
-      // session_id rides on every stream-json line; adopt it as soon as seen
-      // (matters for `start` where we don't know the id up front).
-      if (o.session_id && !run.sessionId) {
+      // session_id rides on every stream-json line. Capture it when still
+      // unknown (start/fork) AND follow mid-run switches: /clear resets the
+      // CLI into a NEW session file and every line from the reset on carries
+      // the new id (probe 2026-10-31: conversation_reset, then a fresh init).
+      // Re-emit so the phone can follow the jump.
+      if (o.session_id && o.session_id !== run.sessionId) {
         run.sessionId = o.session_id;
         this._emit(run);
       }
