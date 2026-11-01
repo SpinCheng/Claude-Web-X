@@ -100,21 +100,27 @@ const fmtDur = (ms) => {
 
 // bg agents are IN-PROCESS tasks of the parent CLI (no per-agent OS process,
 // v154 real-data probe) - the only honest per-row stop is cancelling the owning
-// run. Available only while this session has a live phone run.
+// run. Available only while this session has a live phone run. runId comes
+// from the run frame OR the sessions frame (refresh/mid-run-open covers the
+// case where no run frame was ever seen - parity with composer stopRun).
 const ICO_STOP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
 const ICO_COLLAPSE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
 function cancellableRunId() {
   const run = state.runs[state.currentId];
-  return run && run.state === 'running' && run.runId ? run.runId : '';
+  if (run && run.state === 'running' && run.runId) return run.runId;
+  const rec = state.currentId && state.sessions.find((x) => x.id === state.currentId);
+  return rec && rec.running && rec.runId ? rec.runId : '';
 }
 function stopOwningRun(e) {
   e.stopPropagation();
   const runId = cancellableRunId();
   if (!runId) return;
   api('/api/runs/' + encodeURIComponent(runId) + '/cancel', { method: 'POST' })
-    .then(() => toast('已停止运行（含其后台代理）'))
-    .catch(() => {});
+    .then((r) => { if (r.ok) toast('已停止运行（含其后台代理）'); else toast('停止失败——运行可能已结束'); })
+    .catch(() => toast('停止失败——网络错误'));
 }
+// run frames flip: re-render so the stop buttons appear/vanish with the run
+export function refreshActivity() { render(); }
 
 function render() {
   const el = $('act');
