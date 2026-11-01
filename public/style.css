@@ -778,3 +778,13 @@ button { font-family: inherit; }
 .tb-run { color: var(--acc-strong); }
 .tb-done { color: var(--dim); }
 .tb-cancel { color: var(--faint); }
+
+/* ---------- v165: goal 生命周期走 cmdout 面板通道（用户裁定沿用 Goal set 口径） ---------- */
+.cmdout.goal b { font-weight: 600; }
+.cmdout.goal .st-set { color: var(--acc-strong); }
+.cmdout.goal .st-hold { color: var(--warn); }
+.cmdout.goal .st-stop { color: var(--faint); }
+.cmdout.goal .st-ok { color: var(--ok); }
+.ac-goalrow { display: flex; gap: 9px; padding: 4px 0; font-size: 13px; align-items: baseline; min-width: 0; }
+.ac-goalrow .g { flex: none; width: 14px; text-align: center; color: var(--acc); font-size: 12px; }
+.ac-goalrow .txt { min-width: 0; flex: 1 1 auto; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

@@ -169,9 +169,17 @@ export function applyLine(id, obj, patch, events, rec) {
         if (/^\[agent-wait\] /.test(text)) return null;
         // v162: /goal's Stop-hook block feedback rides as a user turn whose
         // text is the goal-keeper's dynamic verdict wrapped in a fixed
-        // envelope ("Stop hook feedback: [<goal>]..."). Machine text aimed at
-        // the model - fold the envelope; the model's follow-up reply renders.
-        if (/^Stop hook feedback:\s*\[/.test(text)) return null;
+        // envelope ("Stop hook feedback: [<goal>]: <verdict>..."). Machine text
+        // aimed at the model - v165 用户裁定：**仅恢复后首轮显示**（armed 由
+        // resume 事件武装、一次即解除），常规每轮收尾的检查反馈保持折叠。
+        const gh = text.match(/^Stop hook feedback:\s*\[([\s\S]*?)\]\s*:\s*([\s\S]*)$/);
+        if (gh) {
+          if (rec && rec._goalHoldArmed) {
+            rec._goalHoldArmed = false;
+            return { k: 'goalhold', ts: obj.timestamp || '', cond: gh[1].trim(), verdict: gh[2].trim() };
+          }
+          return null;
+        }
         // v114: prompt-type commands (custom .md / init / security-review)
         // write their EXPANDED template body as the next plain user line -
         // machine-expanded text for the model, never a second human bubble.
@@ -304,16 +312,54 @@ export function applyLine(id, obj, patch, events, rec) {
       case 'system': {
         if (obj.subtype === 'local_command') {
           const so = String(obj.content || '').match(/^\s*<local-command-stdout>([\s\S]*?)<\/local-command-stdout>\s*$/);
-          if (so && so[1].trim()) return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
+          if (so && so[1].trim()) {
+            const txt = so[1].trim();
+            // v165: /goal 的 cmdout 信封（"Goal set: <条件>"）→ goal 事件（前端走
+            // cmdout 面板通道中文渲染）；与 goal_status attachment 行共用事件形状
+            const gs = txt.match(/^Goal set:\s*([\s\S]+)$/);
+            if (gs) return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond: gs[1].trim() };
+            return { k: 'cmdout', ts: obj.timestamp || '', text: txt };
+          }
         }
         if (STOP_SUBTYPES.has(obj.subtype)) {
           patch.status = 'idle';
           if (OUTCOME_SUBTYPES[obj.subtype]) patch.lastOutcome = OUTCOME_SUBTYPES[obj.subtype];
+          // v165: goal 活着却停机 → 中断事件；其后 goal 活动 → 恢复事件。
+          // 跨行状态走 rec（_cmdEnv 先例）。
+          if (rec && rec._goalLive) {
+            rec._goalInterrupted = true;
+            events.push({ k: 'stop' }); // cost-state 先例：伴生事件直接入列
+            return { k: 'goal', ts: obj.timestamp || '', st: 'interrupted', cond: rec._goalCond || '' };
+          }
           // marker event: lets the PWA auto-collapse the live turn the moment
           // ANY driver (Desktop/CLI/phone) finishes, not just phone runs
           return { k: 'stop' };
         }
         return null;
+      }
+      case 'attachment': {
+        // v165: goal 生命周期行（/goal 的持久状态源）→ {k:'goal'} 事件。
+        // 形状（实测 9a8cf13d）：{attachment:{type:'goal_status',met,failed,
+        // condition,sentinel?}}；v162 墓碑=met:true + note 'cancelled by user'。
+        const at = obj.attachment;
+        if (!at || at.type !== 'goal_status') return null;
+        const cond = String(at.condition || '');
+        if (at.met || at.failed) {
+          if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; }
+          return { k: 'goal', ts: obj.timestamp || '', st: at.met ? (at.note ? 'stopped' : 'met') : 'failed', cond };
+        }
+        // met:false：goal 仍活着。中断后再次出现 = 恢复（并武装首轮拦停显示）；
+        // sentinel 行（set 时立即写的那条）= 设定；常规检查行静默
+        if (rec) {
+          if (rec._goalInterrupted) {
+            rec._goalInterrupted = false;
+            rec._goalHoldArmed = true;
+            rec._goalLive = true; rec._goalCond = cond;
+            return { k: 'goal', ts: obj.timestamp || '', st: 'resumed', cond };
+          }
+          rec._goalLive = true; rec._goalCond = cond;
+        }
+        return at.sentinel ? { k: 'goal', ts: obj.timestamp || '', st: 'set', cond } : null;
       }
       default:
         return null;

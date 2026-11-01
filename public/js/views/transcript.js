@@ -105,6 +105,13 @@ function applyEventToTurns(ev) {
     // frame, so this display removal loses nothing.
     const mk = sysMarkerTurn(ev);
     if (mk) T.push(mk);
+  } else if (ev.k === 'goal') {
+    // v165: /goal 生命周期 → cmdout 面板通道（现有样式，中文文案，全文不折叠）
+    state.goal = goalStateAfter(ev);
+    T.push({ role: 'goalmk', st: ev.st, cond: ev.cond || '', ts: ev.ts });
+  } else if (ev.k === 'goalhold') {
+    // v165: 拦停反馈（仅恢复后首轮出现）→ 同通道琥珀行
+    T.push({ role: 'goalmk', st: 'hold', cond: ev.cond || '', verdict: ev.verdict || '', ts: ev.ts });
   } else if (ev.k === 'title') { /* meta only */ }
 }
 // shared turn-shape builders (v44): the history paginator replays older
@@ -174,6 +181,22 @@ function sysMarkerTurn(ev) {
   const wan = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字');
   if (ev.k === 'compact') return { role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + wan(ev.n || 0) + '，已折叠）' };
   return { role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + wan(ev.n || 0) + '，已折叠）' };
+}
+// v165: goal 生命周期 → cmdout 面板文案（全文，用户裁定不折叠）
+function goalMkText(t) {
+  const c = t.cond || '';
+  if (t.st === 'set') return ['目标已设定', '：' + c, 'st-set'];
+  if (t.st === 'resumed') return ['目标已恢复', '：' + c, 'st-set'];
+  if (t.st === 'hold') return ['目标未达成', ' · 本轮继续执行目标（' + (t.verdict || '') + '）', 'st-hold'];
+  if (t.st === 'interrupted') return ['会话中断', ' · 目标保留（可随时继续）', 'st-stop'];
+  if (t.st === 'stopped') return ['目标已停止', ' · 不再自动恢复（用户手动停止）', 'st-stop'];
+  if (t.st === 'failed') return ['目标失败', '：' + c, 'st-stop'];
+  return ['目标已达成', '：' + c, 'st-ok']; // met
+}
+// 活性归约：最后一条 goal 事件决定面板「目标」区（活着=未 met/failed/stopped）
+function goalStateAfter(ev) {
+  if (ev.st === 'set' || ev.st === 'resumed') return { live: true, cond: ev.cond || '' };
+  return null;
 }
 function markLiveTurn() {
   // the trailing bot turn is "live" when its session is streaming
@@ -687,6 +710,15 @@ function renderTurn(t) {
     d.textContent = t.text;
     return d;
   }
+  if (t.role === 'goalmk') {
+    // v165: goal 生命周期走 cmdout 面板通道；CLI/模型产物一律 textContent
+    const [word, rest, cls] = goalMkText(t);
+    const d = document.createElement('div');
+    d.className = 'cmdout goal';
+    const b = document.createElement('b'); b.className = cls; b.textContent = word;
+    d.append(b, document.createTextNode(rest));
+    return d;
+  }
   if (t.role === 'user') {
     // v40: wrapper keeps renderTail's 1:1 child/turn invariant while adding
     // the meta row (time extracted OUT of the bubble + copy) BELOW it
@@ -1035,6 +1067,8 @@ function parseOlderTurns(events) {
       const mk = sysMarkerTurn(ev); // stats rows are gone since v145 here too
       if (mk) T.push(mk);
     }
+    else if (ev.k === 'goal') { state.goal = goalStateAfter(ev); T.push({ role: 'goalmk', st: ev.st, cond: ev.cond || '', ts: ev.ts }); }
+    else if (ev.k === 'goalhold') T.push({ role: 'goalmk', st: 'hold', cond: ev.cond || '', verdict: ev.verdict || '', ts: ev.ts });
   }
   return T;
 }

@@ -57,8 +57,9 @@ test('command stdout surfaces as cmdout; goal hook injection folds (v111)', () =
   assert.equal(a.events[0].k, 'cmdout', 'user-line stdout carrier -> cmdout');
   assert.equal(a.events[0].text, 'Set model to ' + String.fromCharCode(96) + 'x' + String.fromCharCode(96));
   const b = run([{ type: 'system', subtype: 'local_command', timestamp: '2026-10-29T00:00:00.000Z', content: '<local-command-stdout>Goal set: do it</local-command-stdout>' }]);
-  assert.equal(b.events[0].k, 'cmdout', 'system/local_command carrier -> cmdout');
-  assert.equal(b.events[0].text, 'Goal set: do it');
+  assert.equal(b.events[0].k, 'goal', 'v165: Goal set envelope -> goal event (cmdout-channel rendering upstream)');
+  assert.equal(b.events[0].st, 'set');
+  assert.equal(b.events[0].cond, 'do it');
   const c = run([user({ message: { role: 'user', content: 'A session-scoped Stop hook is now active with condition: "ok". Acknowledge.' } })]);
   assert.equal(c.events.length, 0, 'hook injection line never a human bubble');
 });
@@ -324,4 +325,52 @@ test('v162: /goal Stop-hook feedback envelope folds out', () => {
   assert.equal(a.events.length, 0, 'goal-keeper verdict is machine text, folded');
   const b = run([user({ message: { role: 'user', content: 'Stop hook feedback 讨论一下这个词的翻译' } })]);
   assert.equal(b.events.length, 1, 'human message mentioning the phrase stays');
+});
+
+// ---------- v165: goal 生命周期（cmdout 通道版） ----------
+const goalAtt = (over = {}) => ({ type: 'attachment', timestamp: 't', attachment: { type: 'goal_status', met: false, condition: '汇总新闻为报告', ...over } });
+const goalCmd = () => ({ type: 'system', subtype: 'local_command', timestamp: 't', content: '<local-command-stdout>Goal set: 汇总新闻为报告</local-command-stdout>' });
+const holdLine = (cond, verdict) => user({ message: { role: 'user', content: 'Stop hook feedback:\n[' + cond + ']: ' + verdict } });
+
+test('v165: goal set via cmdout envelope + sentinel attachment', () => {
+  const rec = {};
+  const a = applyLine('s', goalCmd(), {}, [], rec);
+  assert.deepEqual(a, { k: 'goal', ts: 't', st: 'set', cond: '汇总新闻为报告' });
+  const b = applyLine('s', goalAtt({ sentinel: true }), {}, [], rec);
+  assert.equal(b.st, 'set');
+});
+
+test('v165: interrupt on stop-while-live; resume arms the first-round hold', () => {
+  const rec = {};
+  applyLine('s', goalCmd(), {}, [], rec);
+  // 常规检查行：静默
+  assert.equal(applyLine('s', goalAtt({}), {}, [], rec), null);
+  // 拦停反馈（未恢复过）：静默折叠（用户裁定：仅恢复后首轮显示）
+  assert.equal(applyLine('s', holdLine('汇总新闻为报告', '搜集未完成'), {}, [], rec), null);
+  // 停机 → 中断
+  const evs = [];
+  const r = applyLine('s', { type: 'system', subtype: 'stop_hook_summary', timestamp: 't2' }, {}, evs, rec);
+  assert.equal(evs[0] && evs[0].k, 'stop');
+  assert.equal(r.st, 'interrupted');
+  // 恢复 → 武装
+  const r2 = applyLine('s', goalAtt({}), {}, [], rec);
+  assert.equal(r2.st, 'resumed');
+  // 首轮拦停：显示一次
+  const h = applyLine('s', holdLine('汇总新闻为报告', '此前代理启动被中断'), {}, [], rec);
+  assert.equal(h.k, 'goalhold');
+  assert.equal(h.cond, '汇总新闻为报告');
+  // 后续拦停：回到静默
+  assert.equal(applyLine('s', holdLine('汇总新闻为报告', '仍在进行'), {}, [], rec), null);
+});
+
+test('v165: tombstone=stopped; met; failed; cond 全文透传（不折叠）', () => {
+  const rec = {};
+  applyLine('s', goalCmd(), {}, [], rec);
+  const s = applyLine('s', goalAtt({ met: true, note: 'cancelled by user (claude-web stop)' }), {}, [], rec);
+  assert.equal(s.st, 'stopped');
+  applyLine('s', goalCmd(), {}, [], rec);
+  const m = applyLine('s', goalAtt({ met: true }), {}, [], rec);
+  assert.equal(m.st, 'met');
+  const f = applyLine('s', goalAtt({ failed: true }), {}, [], rec);
+  assert.equal(f.st, 'failed');
 });
