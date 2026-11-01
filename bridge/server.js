@@ -39,7 +39,11 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   const hub = createHub({ cfg, store, runner, pins });
   // v115: LLM auto-title for phone-created sessions (cfg.titleGen=false off);
   // v121: its suggest() also backs the rename modal's manual ✦ button
-  const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false });
+  // v159: helper runs (titlegen/ctxprobe) live in their own CLAUDE_CONFIG_DIR
+  // so their throwaway transcripts never land in the watched projects tree
+  // (real-find: the titlegen one-shot flashed as a list row for ~23s)
+  const HELPER_HOME = paths.helperHome || path.join(__dirname, 'data', 'helper-home');
+  const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false, helperHome: HELPER_HOME });
   const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR, titlegen, pins };
 
   const router = createRouter();

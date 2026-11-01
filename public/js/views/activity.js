@@ -183,23 +183,24 @@ function renderPanel(el, b, hasBoard, ags) {
     p.append(list);
   }
   if (ags.length) {
-    p.append(sechd('代理', '运行中 ' + ags.length));
+    // v159: 总停钮在分区标题上——bg 代理是父 CLI 进程内任务，停的语义只能是整轮
+    // run（v155 曾放行级，视觉上像"停这一个"，真机反馈误导）；有活 run 才渲染。
+    const hd = sechd('代理', '运行中 ' + ags.length);
+    if (cancellableRunId()) {
+      const st = document.createElement('button'); st.className = 'ac-stop'; st.title = '停止本轮运行（全部代理）';
+      st.setAttribute('aria-label', '停止本轮运行');
+      st.innerHTML = ICO_STOP;
+      st.onclick = stopOwningRun;
+      hd.append(st);
+    }
+    p.append(hd);
     for (const { tid, a } of ags) {
       const r = document.createElement('button'); r.className = 'ac-agrow'; r.dataset.tid = tid;
       const lamp = document.createElement('span'); lamp.className = 'lamp'; lamp.dataset.st = 'running';
       const d = document.createElement('span'); d.className = 'd'; d.textContent = a.desc || '子代理';
       const dur = document.createElement('span'); dur.className = 'dur'; dur.textContent = fmtDur(Date.now() - a.startedAt);
-      r.append(lamp, d, dur);
-      const runId = cancellableRunId();
-      if (runId) {
-        const st = document.createElement('span'); st.className = 'ac-stop'; st.title = '停止（结束本轮运行）';
-        st.setAttribute('aria-label', '停止');
-        st.innerHTML = ICO_STOP;
-        st.onclick = stopOwningRun;
-        r.append(st);
-      }
       const chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '›';
-      r.append(chev);
+      r.append(lamp, d, dur, chev);
       r.onclick = () => openAgentView(tid);
       p.append(r);
     }

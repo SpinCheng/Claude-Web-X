@@ -772,9 +772,10 @@ button { font-family: inherit; }
 .ac-agrow .lamp { flex: none; }
 .ac-agrow .d { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-agrow .dur { flex: none; font: 11.5px var(--mono); color: var(--dim); }
-/* v155: 代理行停止钮（仅本会话有活 run 时渲染）——停的是所属 run（bg 代理是父 CLI 进程内任务，无法单杀） */
-.ac-stop { flex: none; width: 22px; height: 22px; border-radius: 7px; background: var(--panel2); color: var(--dim);
-  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+/* v159: 总停钮在代理分区标题上——bg 代理是父 CLI 进程内任务，停的语义只能是整轮 run */
+.ac-stop { flex: none; margin-left: auto; width: 22px; height: 22px; border: 0; border-radius: 7px;
+  background: var(--panel2); color: var(--dim); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; }
 .ac-stop:active { background: var(--raise); color: var(--err); }
 .ac-agrow .chev { flex: none; color: var(--faint); font-size: 15px; line-height: 1; }
 /* v154: 转录内待办节点（badge「待办」，静态渲染——进行中=珊瑚无呼吸灯） */

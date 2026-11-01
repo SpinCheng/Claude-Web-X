@@ -62,6 +62,7 @@ export class CtxProbe {
     this.adapter = opts.adapter;     // for archiveSession() cleanup
     this.cachePath = opts.cachePath || '';
     this.defaultCwd = opts.defaultCwd || '';
+    this.helperHome = opts.helperHome || ''; // v159: isolated CLAUDE_CONFIG_DIR
     this.cache = new Map();          // "cwd|modelId" -> report
     this.inflight = new Map();
     try {
@@ -101,7 +102,10 @@ export class CtxProbe {
       args.push('/context', '--output-format', 'stream-json', '--verbose');
       const child = spawn(exe, args, {
         cwd: cwd || this.defaultCwd || undefined,
-        env: { ...process.env, ...this.runner.settingsEnv() },
+        // v159: helper runs live in their own CLAUDE_CONFIG_DIR so the
+        // throwaway transcript never registers as a session row (real-find:
+        // the /context probe flashed in the list during the run it probed)
+        env: { ...process.env, ...this.runner.settingsEnv(), CLAUDE_CONFIG_DIR: this.helperHome },
         windowsHide: true,
       });
       let out = '', sessionId = '';

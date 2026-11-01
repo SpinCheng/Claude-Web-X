@@ -64,7 +64,7 @@ const store = new Store();
 const adapter = new CcAdapter(store, process.env.CR_ROOT || undefined, path.join(DATA_DIR, 'trash'), path.join(DATA_DIR, 'renames.json'));
 const runner = new Runner({ store, claudePath: cfg.claudePath, yolo: cfg.yolo !== false, port: cfg.port, uploadsDir: path.join(DATA_DIR, 'uploads') });
 const handoff = new Handoff({ store, locksDir: path.join(DATA_DIR, 'locks') });
-const ctxprobe = new CtxProbe({ runner, adapter, cachePath: path.join(DATA_DIR, 'ctx-probe.json'), defaultCwd: cfg.defaultCwd });
+const ctxprobe = new CtxProbe({ runner, adapter, cachePath: path.join(DATA_DIR, 'ctx-probe.json'), defaultCwd: cfg.defaultCwd, helperHome: path.join(DATA_DIR, 'helper-home') });
 const paths = {
   configPath: CONFIG_PATH,
   settingsPath: path.join(os.homedir(), '.claude', 'settings.json'),

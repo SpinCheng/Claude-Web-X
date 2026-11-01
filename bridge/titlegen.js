@@ -107,6 +107,7 @@ export class TitleGen {
     this.store = opts.store;
     this.enabled = opts.enabled !== false;
     this.done = new Set();         // one attempt per session per bridge life
+    this.helperHome = opts.helperHome || ''; // v159: isolated CLAUDE_CONFIG_DIR
   }
 
   maybeTitle(sessionId, model = '') {
@@ -153,7 +154,11 @@ export class TitleGen {
       try {
         child = spawn(this.runner.resolveClaude(), args, {
           cwd: rec.cwd || os.homedir(),
-          env: { ...process.env, ...this.runner.settingsEnv() },
+          // v159: helper runs live in their own CLAUDE_CONFIG_DIR - the
+          // transcript lands outside the watched projects tree, so the
+          // helper session never flashes as a list row (real-find: the
+          // titlegen one-shot appeared in the list for ~23s then vanished)
+          env: { ...process.env, ...this.runner.settingsEnv(), CLAUDE_CONFIG_DIR: this.helperHome },
           windowsHide: true,
         });
       } catch { resolve(''); return; }
