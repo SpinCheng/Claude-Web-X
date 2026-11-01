@@ -740,8 +740,10 @@ button { font-family: inherit; }
   box-shadow: 0 2px 10px rgba(12, 10, 8, .35), 0 14px 44px rgba(0, 0, 0, .5), inset 0 1px 0 var(--ink-hi); }
 .ac-hd { display: flex; align-items: center; gap: 8px; }
 .ac-hd .t { font-size: 14px; font-weight: 600; }
-.ac-close { margin-left: auto; width: 26px; height: 26px; border-radius: 9px; border: 0; background: var(--panel2);
-  color: var(--dim); font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+/* v155: 收起（非关闭）——胶囊/面板两态切换的回程钮 */
+.ac-collapse { margin-left: auto; width: 26px; height: 26px; border-radius: 9px; border: 0; background: var(--panel2);
+  color: var(--dim); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.ac-collapse:active { color: var(--fg); }
 .ac-sechd { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--dim);
   letter-spacing: .03em; margin: 12px 0 4px; }
 .ac-sechd .n { font: 600 11px var(--mono); color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 1px 8px; }
@@ -762,6 +764,10 @@ button { font-family: inherit; }
 .ac-agrow .lamp { flex: none; }
 .ac-agrow .d { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-agrow .dur { flex: none; font: 11.5px var(--mono); color: var(--dim); }
+/* v155: 代理行停止钮（仅本会话有活 run 时渲染）——停的是所属 run（bg 代理是父 CLI 进程内任务，无法单杀） */
+.ac-stop { flex: none; width: 22px; height: 22px; border-radius: 7px; background: var(--panel2); color: var(--dim);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.ac-stop:active { background: var(--raise); color: var(--err); }
 .ac-agrow .chev { flex: none; color: var(--faint); font-size: 15px; line-height: 1; }
 /* v154: 转录内待办节点（badge「待办」，静态渲染——进行中=珊瑚无呼吸灯） */
 .tdesc { font-size: 12.5px; line-height: 1.6; color: var(--dim); padding: 0 2px; white-space: pre-wrap; word-break: break-word; }

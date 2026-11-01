@@ -10,7 +10,9 @@
 // 随视图卸载、回来从桥侧快照重建（默认收起）。
 import { $ } from '../util.js';
 import { state } from '../state.js';
+import { api } from '../api.js';
 import { openAgentView } from './agentview.js';
+import { toast } from './toast.js';
 
 let expanded = false;
 let doneFlash = false; // 活态转全完成：胶囊短暂显示「已完成」
@@ -94,6 +96,24 @@ const fmtDur = (ms) => {
   return m > 0 ? m + 'm' + String(s % 60).padStart(2, '0') + 's' : s + 's';
 };
 
+// bg agents are IN-PROCESS tasks of the parent CLI (no per-agent OS process,
+// v154 real-data probe) - the only honest per-row stop is cancelling the owning
+// run. Available only while this session has a live phone run.
+const ICO_STOP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
+const ICO_COLLAPSE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
+function cancellableRunId() {
+  const run = state.runs[state.currentId];
+  return run && run.state === 'running' && run.runId ? run.runId : '';
+}
+function stopOwningRun(e) {
+  e.stopPropagation();
+  const runId = cancellableRunId();
+  if (!runId) return;
+  api('/api/runs/' + encodeURIComponent(runId) + '/cancel', { method: 'POST' })
+    .then(() => toast('已停止运行（含其后台代理）'))
+    .catch(() => {});
+}
+
 function render() {
   const el = $('act');
   if (!el) return;
@@ -142,7 +162,9 @@ function renderPanel(el, b, hasBoard, ags) {
   p.className = 'ac-panel';
   const hd = document.createElement('div'); hd.className = 'ac-hd';
   const t = document.createElement('span'); t.className = 't'; t.textContent = '会话活动';
-  const x = document.createElement('button'); x.className = 'ac-close'; x.textContent = '✕';
+  const x = document.createElement('button'); x.className = 'ac-collapse'; x.title = '收起';
+  x.setAttribute('aria-label', '收起');
+  x.innerHTML = ICO_COLLAPSE;
   x.onclick = () => { expanded = false; render(); };
   hd.append(t, x);
   p.append(hd);
@@ -159,8 +181,17 @@ function renderPanel(el, b, hasBoard, ags) {
       const lamp = document.createElement('span'); lamp.className = 'lamp'; lamp.dataset.st = 'running';
       const d = document.createElement('span'); d.className = 'd'; d.textContent = a.desc || '子代理';
       const dur = document.createElement('span'); dur.className = 'dur'; dur.textContent = fmtDur(Date.now() - a.startedAt);
+      r.append(lamp, d, dur);
+      const runId = cancellableRunId();
+      if (runId) {
+        const st = document.createElement('span'); st.className = 'ac-stop'; st.title = '停止（结束本轮运行）';
+        st.setAttribute('aria-label', '停止');
+        st.innerHTML = ICO_STOP;
+        st.onclick = stopOwningRun;
+        r.append(st);
+      }
       const chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '›';
-      r.append(lamp, d, dur, chev);
+      r.append(chev);
       r.onclick = () => openAgentView(tid);
       p.append(r);
     }
