@@ -737,7 +737,7 @@ button { font-family: inherit; }
 /* v158 方案C：左上珊瑚晕呼吸（活态语系：与状态灯/呼吸点同族）——示活 + panel2 底与聊天底拉开一档色差 */
 .ac-pill::after { content: ""; position: absolute; inset: 1px; border-radius: 999px; pointer-events: none;
   background: radial-gradient(120% 160% at 18% 0%, var(--acc-tint), transparent 62%);
-  animation: acBreathe 3.2s ease-in-out infinite; }
+  animation: acBreathe 2s ease-in-out infinite; }
 @keyframes acBreathe { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .ac-pill::after { animation: none; } }
 .ac-pill .of, .ac-pill .sep { color: var(--faint); font-weight: 400; }
