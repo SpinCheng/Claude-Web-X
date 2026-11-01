@@ -179,6 +179,10 @@ export class CcAdapter extends EventEmitter {
     // v112: parent transcript feeds the agent tracker (Agent tool_use spawns
     // + tool_result completions); boot replays are net-zero for finished pairs
     if (events.length) this.agents.onParentEvents(entry.id, events);
+    // v154: the parent turn STOPPED - in the -p one-shot world its background
+    // agents die with the CLI process (killed mid-step, no other signal);
+    // finish them so the capsule never counts corpses as running
+    if (events.some((e) => e && e.k === 'stop')) this.agents.onParentStop(entry.id);
     // v154: 待办板状态机——assistant 事件的 tb 载荷增量累积，toolres 绑回
     // TaskCreate 分配的 id；boot 回灌（emitAppends=false）静默构建，活 drain
     // 变更即广播 'tasks' 帧（订阅者路由见 wshub）

@@ -147,3 +147,68 @@ test('adapter: subagent transcript never registers as a session (ghost guard)', 
   assert.equal(ad.agents.bySession.get('sess1')?.size, 1);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+// ---------- v154: run_in_background launch-ack + meta-first ordering ----------
+test('bg launch ack ("Async agent launched successfully") must NOT finish the agent', () => {
+  const { tr, frames, agPath } = trackerWithAgentFile();
+  tr.onParentEvents('sess1', [spawnUse('call_bg', '盘点端点')]);
+  tr.touch(agPath);
+  // the CLI acks the LAUNCH of a run_in_background agent with an immediate
+  // tool_result - that is not a completion (v154 real-data find)
+  tr.onParentEvents('sess1', [{ k: 'toolres', ts: ts(4), items: [{ id: 'call_bg', text: 'Async agent launched successfully. (This tool result is truncated...)', err: false, images: [] }] }]);
+  let f = frames[frames.length - 1];
+  assert.equal(f.state, 'run', 'launch ack keeps the agent running');
+  assert.equal(f.finished, undefined, 'summary path: not finished either');
+  const e = tr.agents.get('aaa111');
+  assert.equal(e.finished, false);
+  // real completion: meta.json rewrite with finished:true
+  fs.writeFileSync(path.join(path.dirname(agPath), 'agent-aaa111.meta.json'),
+    JSON.stringify({ description: '盘点端点', toolUseId: 'call_bg', requestShape: 'background' }));
+  tr.touch(path.join(path.dirname(agPath), 'agent-aaa111.meta.json'));
+  assert.equal(e.finished, false, 'launch-time meta (no finished key) still running');
+  fs.writeFileSync(path.join(path.dirname(agPath), 'agent-aaa111.meta.json'),
+    JSON.stringify({ description: '盘点端点', toolUseId: 'call_bg', requestShape: 'background', finished: true }));
+  tr.touch(path.join(path.dirname(agPath), 'agent-aaa111.meta.json'));
+  assert.equal(e.finished, true, 'meta rewrite finishes the bg agent');
+  f = frames[frames.length - 1];
+  assert.equal(f.state, 'done');
+});
+
+test('meta-first ordering: sibling meta read at _ensure fills desc/bg/toolUseId', () => {
+  const { tr, frames, agPath, metaPath } = trackerWithAgentFile();
+  // real failure shape: the parent chip v is briefJson-truncated past
+  // description (long prompt) -> JSON.parse fails -> FIFO adopts with desc ''
+  const truncUse = { k: 'assistant', ts: ts(1), parts: [{ t: 'tool', name: 'Agent', id: 'call_x', v: '{"description":"盘点 bri' }] };
+  tr.onParentEvents('sess1', [truncUse]);
+  // meta.json event arrives BEFORE the .jsonl event: _readMeta hits "no entry"
+  fs.writeFileSync(metaPath, JSON.stringify({ description: '盘点 bridge/routes 端点', toolUseId: 'call_x', requestShape: 'background' }));
+  tr.touch(metaPath);
+  assert.equal(tr.agents.size, 0, 'meta alone registers nothing');
+  // now the transcript lands: _ensure must re-read the sibling meta
+  tr.touch(agPath);
+  const e = tr.agents.get('aaa111');
+  assert.equal(e.desc, '盘点 bridge/routes 端点', 'meta description recovered (chip was unparseable)');
+  assert.equal(e.bg, true, 'requestShape background recovered');
+  const f = frames[frames.length - 1];
+  assert.equal(f.desc, '盘点 bridge/routes 端点');
+});
+
+test('parent turn stop finishes still-running bg agents (killed at CLI exit)', () => {
+  const { tr, frames, agPath, metaPath } = trackerWithAgentFile();
+  const truncUse = { k: 'assistant', ts: ts(1), parts: [{ t: 'tool', name: 'Agent', id: 'call_bg', v: '{"description":"盘点 bri' }] };
+  tr.onParentEvents('sess1', [truncUse]);
+  fs.writeFileSync(metaPath, JSON.stringify({ description: '盘点端点', toolUseId: 'call_bg', requestShape: 'background' }));
+  tr.touch(agPath); // registers + reads sibling meta (bg=true)
+  tr.onParentEvents('sess1', [{ k: 'toolres', ts: ts(4), items: [{ id: 'call_bg', text: 'Async agent launched successfully. agentId: aaa111', err: false, images: [] }] }]);
+  let e = tr.agents.get('aaa111');
+  assert.equal(e.finished, false, 'launch ack skipped for bg agent');
+  // parent transcript stop marker (turn ended => CLI exited => agents killed)
+  tr.onParentStop('sess1');
+  assert.equal(e.finished, true, 'parent stop finishes the killed agent');
+  assert.ok(e.finishedAt > 0);
+  assert.equal(frames[frames.length - 1].state, 'done');
+  // idempotent: a second stop must not re-emit
+  const n = frames.length;
+  tr.onParentStop('sess1');
+  assert.equal(frames.length, n);
+});

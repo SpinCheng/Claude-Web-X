@@ -78,6 +78,12 @@ export class AgentTracker extends EventEmitter {
       e.desc = this.toolDesc.get(e.toolUseId) || '';
       this._emit(e, 'run');
     }
+    // v154: the meta.json sibling often arrives BEFORE this .jsonl (watcher
+    // order is not guaranteed) - _readMeta then hit "no entry" and the
+    // launch-time description/toolUseId/bg were lost FOREVER (desc fell back
+    // to '' because the parent chip v is briefJson-truncated past
+    // description). Re-read the sibling once the entry exists.
+    this._readMeta(absPath.slice(0, -'.jsonl'.length) + '.meta.json');
     return e;
   }
 
@@ -170,16 +176,40 @@ export class AgentTracker extends EventEmitter {
           if (q) { const i = q.indexOf(it.id); if (i >= 0) q.splice(i, 1); }
           this.toolDesc.delete(it.id);
           // the result landing IS the agent's completion signal (works even
-          // when meta.json is never rewritten, e.g. killed CLI)
+          // when meta.json is never rewritten, e.g. killed CLI) - EXCEPT for
+          // run_in_background agents: the CLI acks the LAUNCH with an
+          // immediate tool_result ("Async agent launched successfully").
+          // v154 real-data find: that ack used to finish the agent at birth.
+          // Background completion = the meta.json rewrite (finished:true).
           for (const aid of this.bySession.get(sessionId) || []) {
             const e = this.agents.get(aid);
             if (e && e.toolUseId === it.id && !e.finished) {
+              if (e.bg || /async agent launched/i.test(it.text || '')) continue;
               e.finished = true;
               e.finishedAt = Date.now();
               this._emit(e, 'done');
             }
           }
         }
+      }
+    }
+  }
+
+  // v154: a stop-class line in the parent transcript = that CLI process's
+  // turn ended. In the -p one-shot world every phone turn is its own
+  // process, and its still-running background agents are KILLED at process
+  // exit (their transcripts end mid-step, no result line, no meta rewrite -
+  // v154 real-data find). Finishing them here is the only completion signal
+  // they will ever get. Limitation: a真 TUI parent that parks bg agents
+  // across turns also writes per-turn stop lines - those agents would be
+  // finished early. No TUI parents exist in claude-remote's world.
+  onParentStop(sessionId) {
+    for (const aid of this.bySession.get(sessionId) || []) {
+      const e = this.agents.get(aid);
+      if (e && !e.finished) {
+        e.finished = true;
+        e.finishedAt = e.lastTs || Date.now();
+        this._emit(e, 'done');
       }
     }
   }
