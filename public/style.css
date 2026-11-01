@@ -763,3 +763,8 @@ button { font-family: inherit; }
 .ac-agrow .d { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-agrow .dur { flex: none; font: 11.5px var(--mono); color: var(--dim); }
 .ac-agrow .chev { flex: none; color: var(--faint); font-size: 15px; line-height: 1; }
+/* v154: 转录内待办节点（badge「待办」，静态渲染——进行中=珊瑚无呼吸灯） */
+.tdesc { font-size: 12.5px; line-height: 1.6; color: var(--dim); padding: 0 2px; white-space: pre-wrap; word-break: break-word; }
+.tb-run { color: var(--acc-strong); }
+.tb-done { color: var(--dim); }
+.tb-cancel { color: var(--faint); }
