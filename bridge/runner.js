@@ -327,11 +327,22 @@ export class Runner extends EventEmitter {
     } else if (this.yolo) {
       args.push('--dangerously-skip-permissions');
     }
+    // v158: agent-guard Stop hook - on turn end the CLI asks the bridge (via
+    // hook-agent-wait.mjs -> /internal/agent-wait) whether this session still
+    // has running background agents; if yes the stop is BLOCKED with a reason
+    // telling the model to wait on them via TaskOutput. One-shot -p runs
+    // otherwise exit at turn end and their in-process agents die mid-work
+    // (v154 real-data find). --settings rides as an inline JSON string.
+    const hookScript = path.join(__dirname, 'hook-agent-wait.mjs').split(path.sep).join('/');
+    const agentGuard = JSON.stringify({
+      hooks: { Stop: [{ hooks: [{ type: 'command', command: JSON.stringify(process.execPath) + ' ' + JSON.stringify(hookScript) + ' --port ' + String(this.port) }] }] },
+    });
+    args.push('--settings', agentGuard);
     const child = spawn(this.resolveClaude(), args, {
       cwd,
       // bashToolEnv: prepend the detected git dirs so the CLI's Bash tool
       // seats even when this bridge inherited a PATH without Git (v62)
-      env: { ...process.env, ...this.settingsEnv(), ...bashToolEnv(process.env) },
+      env: { ...process.env, ...this.settingsEnv(), ...bashToolEnv(process.env), CLAUDE_CODE_STOP_HOOK_BLOCK_CAP: '32' },
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });

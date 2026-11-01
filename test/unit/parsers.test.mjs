@@ -308,3 +308,12 @@ test('v158: synthetic "No response requested." sentinel folds out', () => {
   assert.equal(d.events.length, 1);
   assert.deepEqual(d.events[0].parts.map((p) => p.t), ['think']);
 });
+
+test('v158: agent-wait block-reason injection folds out', () => {
+  const a = run([user({ message: { role: 'user', content: '[agent-wait] 还有 2 个后台代理在运行。不要结束本轮：用 TaskOutput 轮询等待它们全部完成（不要提前结束、不要输出总结），全部完成后再继续任务。' } })]);
+  assert.equal(a.events.length, 0, 'hook block reason is machine text, folded');
+  const b = run([user({ message: { role: 'user', content: '[agent-wait] 前缀相同的普通消息也可能存在吗？' } })]);
+  assert.equal(b.events.length, 0, 'prefix fold is intentional (fixed sentinel wording)');
+  const c = run([user({ message: { role: 'user', content: '普通消息提到 agent-wait 但不是行首标记' } })]);
+  assert.equal(c.events.length, 1, 'human message untouched');
+});

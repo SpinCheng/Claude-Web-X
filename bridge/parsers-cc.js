@@ -164,6 +164,9 @@ export function applyLine(id, obj, patch, events, rec) {
         // user line - machine text aimed at the model, never a human bubble.
         // The model acknowledges the goal in its reply, so nothing is lost.
         if (/^A session-scoped Stop hook is now active with condition:/.test(text)) return null;
+        // v158: the agent-guard Stop hook's block reason rides as an injected
+        // user turn (same shape as the /goal directive) - machine text, fold.
+        if (/^\[agent-wait\] /.test(text)) return null;
         // v114: prompt-type commands (custom .md / init / security-review)
         // write their EXPANDED template body as the next plain user line -
         // machine-expanded text for the model, never a second human bubble.
