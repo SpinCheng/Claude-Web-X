@@ -71,7 +71,10 @@ await withEnv(async (h, page) => {
   assert(grown.h > 60 && Math.abs(grown.h - grown.need) <= 2,
     'refilled draft auto-grew (h=' + grown.h + ' scrollHeight=' + grown.need + ')');
 
-  // ---- agent bubble clamps to the phone viewport even with wide content ----
+  // ---- agent sheet clamps to the phone viewport even with wide content ----
+  // (v122: the anchored bubble became a FULL-WIDTH sheet - width rides
+  // min(100vw, 520px) with no side margins, so the invariant is "never
+  // overflows the viewport", not "keeps 12px margins")
   await page.ev(`(function(){
     const b = document.getElementById("ag-body");
     b.innerHTML = '';
@@ -85,7 +88,7 @@ await withEnv(async (h, page) => {
   const w = await page.ev(`(function(){
     return { bub: document.querySelector("#agent-sheet .agent-bub").getBoundingClientRect().width, vw: window.innerWidth };
   })()`);
-  assert(w.bub <= w.vw - 23, 'agent bubble clamped to viewport margins (bub=' + w.bub + ' vw=' + w.vw + ')');
+  assert(w.bub <= w.vw + 1, 'agent sheet clamped to viewport width (bub=' + w.bub + ' vw=' + w.vw + ')');
   await page.ev('document.getElementById("ag-close").click()');
 
   // ---- preview failure reasons + a real open, all against the session cwd ----
