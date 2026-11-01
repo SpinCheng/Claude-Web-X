@@ -13,6 +13,7 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser,
   updateAgentNode, updateAgentClocks, tickTurnDur } from './js/views/transcript.js';
 import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
+import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity } from './js/views/activity.js';
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
@@ -268,7 +269,7 @@ $('back').onclick = () => {
   } else closeDetail();
 };
 $('del').onclick = deleteSession;
-setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); tickTurnDur(); } }, 1000);
+setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); tickTurnDur(); tickActivity(); } }, 1000);
 
 /* ---------------- wiring: transport <-> semantics ---------------- */
 initWs({
@@ -350,7 +351,9 @@ initWs({
     };
     updateAgentNode(d);
     onAgentFrame(d);
+    onAgentUpdate(); // 活动胶囊跟随（运行数 / 最后一代理完成转「已完成」）
   },
+  tasks: (d) => onTasksFrame(d),
   approval: queueApproval,
   'approval-result': (d) => {
     // a decision landed (this client or another); drop it if still queued

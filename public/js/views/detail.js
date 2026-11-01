@@ -14,6 +14,7 @@ import { sendWs } from '../ws.js';
 import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns, pushOptimisticUser } from './transcript.js';
 import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
+import { seedActivity, resetActivity } from './activity.js';
 
 /* ---------------- history (system back = leave detail) ---------------- */
 function openDetail(id) {
@@ -33,6 +34,7 @@ function openDetail(id) {
   setDraft(id);
   $('chat').innerHTML = '';
   state.agentView = null; // v112: the agent bubble never crosses a session switch
+  resetActivity(); // v154: 活动悬浮件不跨会话（清计时器/代理集合，默认收起）
   renderMeta();
   refreshDriver();
   ensureModels(); // context-window lookup for the ring
@@ -44,6 +46,7 @@ function openDetail(id) {
       // v112: agent summaries seed the agent nodes BEFORE the first render -
       // finished agents get their 全文 entry without ever seeing a live frame
       if (d.agents) for (const a of d.agents) if (a.toolUseId) state.agents[a.toolUseId] = a;
+      seedActivity(d); // v154: 待办板快照 + 本会话代理集合 → 悬浮件重建（默认收起）
       buildTurns(d.events || []);
       renderAllTurns();
       // v64: new-session race - the transcript user line lands within
@@ -91,6 +94,7 @@ function closeDetail() { // via the ← button only
   state.histBefore = 0; state.histTotal = 0; state.histLoading = false;
   state.orphanToolRes.clear();
   state.agentView = null; // v112
+  resetActivity(); // v154
   $('agent-sheet').classList.add('hidden');
   const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
   $('detail').classList.add('hidden');

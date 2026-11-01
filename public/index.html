@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=153">
+  <link rel="stylesheet" href="/style.css?v=154">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v153</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v154</span></span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -117,6 +117,8 @@
     <button id="jump" class="fab hidden" title="跳到最新" aria-label="跳到最新">
       <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 4h2v12l5.5-5.5 1.42 1.42L12 19.84l-7.92-7.92L5.5 10.5 11 16z"/></svg>
     </button>
+    <!-- v154 会话活动悬浮件：胶囊/面板两态。#detail 子节点（非 #chat——renderTail 1:1 红线），activity.js 渲染 -->
+    <div id="act" class="hidden"></div>
     <div id="composer" class="composer">
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div id="cmd-menu" class="cmd-menu hidden"><div id="cmd-menu-list" class="cmd-menu-list"></div></div>
@@ -334,6 +336,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=153"></script>
+  <script type="module" src="/app.js?v=154"></script>
 </body>
 </html>

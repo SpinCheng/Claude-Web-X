@@ -50,6 +50,10 @@ export const state = {
                        // finished, state, steps, act, startedAt} (agent frames
                        // + the messages fetch's agents summary)
   agentView: null,     // v112: the open agent bubble {toolUseId, agentId}
+  board: null,         // v154: current session's task board snapshot
+                       // {n, total, items:[{id,s,st,af}]} (messages fetch +
+                       // 'tasks' frames; structured from the bridge - never
+                       // parsed from chip text)
 };
 
 export { CLOSED_KEY };
