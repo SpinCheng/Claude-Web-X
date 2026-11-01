@@ -5,6 +5,9 @@
 // 16:49 pin via a day-old "new" line and the title reverted again.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { CcAdapter } from '../../bridge/adapter-cc.js';
 
 // renamesPath='' keeps pins in memory (no fs writes); store.get returns a
@@ -49,4 +52,24 @@ test('fence: live stale echo still swallowed', () => {
   a._applyLine('s', titleLine('旧'), patch, [], true);
   assert.ok(a.renames.has('s'));
   assert.equal(patch.title, '新');
+});
+
+test('v162: appendGoalTombstone writes a met goal_status the restore logic yields to', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-goal-'));
+  const tp = path.join(tmp, 's.jsonl');
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'hi' } }) + '\n');
+  const store = { get: () => ({ transcriptPath: tp }), upsert() {}, drop() {} };
+  const a = new CcAdapter(store, 'Z:\\nonexistent', '', '');
+  assert.equal(a.appendGoalTombstone('s'), true);
+  const last = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean).pop();
+  const o = JSON.parse(last);
+  assert.equal(o.type, 'attachment');
+  assert.equal(o.attachment.type, 'goal_status');
+  assert.equal(o.attachment.met, true, 'met=true makes the CLI goal-restore (xun) give up');
+  // no-newline tail gets repaired (appendTitle discipline)
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'x' } })); // no trailing \n
+  a.appendGoalTombstone('s');
+  const lines = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean);
+  assert.equal(lines.length, 2, 'previous line not concatenated');
+  assert.equal(JSON.parse(lines[1]).attachment.type, 'goal_status');
 });

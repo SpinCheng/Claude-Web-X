@@ -317,3 +317,11 @@ test('v158: agent-wait block-reason injection folds out', () => {
   const c = run([user({ message: { role: 'user', content: '普通消息提到 agent-wait 但不是行首标记' } })]);
   assert.equal(c.events.length, 1, 'human message untouched');
 });
+
+test('v162: /goal Stop-hook feedback envelope folds out', () => {
+  const fb = 'Stop hook feedback:\n[安排2个subagent搜索新闻并汇总html报告]: 条件未满足：两个 subagent 的启动均被中断。目标中的搜索、汇总、HTML 报告、核实交付均未发生。';
+  const a = run([user({ message: { role: 'user', content: fb } })]);
+  assert.equal(a.events.length, 0, 'goal-keeper verdict is machine text, folded');
+  const b = run([user({ message: { role: 'user', content: 'Stop hook feedback 讨论一下这个词的翻译' } })]);
+  assert.equal(b.events.length, 1, 'human message mentioning the phrase stays');
+});

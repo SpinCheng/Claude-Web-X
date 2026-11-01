@@ -249,6 +249,17 @@ export class Runner extends EventEmitter {
     if (!run || run.state !== 'running') return false;
     run.cancelled = true;
     try { run.child.kill(); } catch { /* already gone */ }
+    // v162: a user-cancelled run must not resurrect its /goal - the goal
+    // Stop hook lives in session state and survives the kill; the next
+    // resume would re-arm it and hijack that turn (real-find 9a8cf13d: a
+    // cancelled news-collection goal woke up 23 minutes later and injected
+    // "Stop hook feedback" into an unrelated todo-list turn). The CLI's own
+    // restore logic gives up when the LAST goal_status attachment line says
+    // met/failed (xun()) - append exactly that shape (appendTitle precedent:
+    // newline repair first).
+    if (run.sessionId && this.onCancelWrite) {
+      try { this.onCancelWrite(run.sessionId); } catch { /* best effort */ }
+    }
     return true;
   }
 

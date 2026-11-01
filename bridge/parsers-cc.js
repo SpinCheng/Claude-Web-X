@@ -167,6 +167,11 @@ export function applyLine(id, obj, patch, events, rec) {
         // v158: the agent-guard Stop hook's block reason rides as an injected
         // user turn (same shape as the /goal directive) - machine text, fold.
         if (/^\[agent-wait\] /.test(text)) return null;
+        // v162: /goal's Stop-hook block feedback rides as a user turn whose
+        // text is the goal-keeper's dynamic verdict wrapped in a fixed
+        // envelope ("Stop hook feedback: [<goal>]..."). Machine text aimed at
+        // the model - fold the envelope; the model's follow-up reply renders.
+        if (/^Stop hook feedback:\s*\[/.test(text)) return null;
         // v114: prompt-type commands (custom .md / init / security-review)
         // write their EXPANDED template body as the next plain user line -
         // machine-expanded text for the model, never a second human bubble.

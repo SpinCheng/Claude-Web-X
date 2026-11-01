@@ -273,6 +273,32 @@ export class CcAdapter extends EventEmitter {
     } catch { return false; }
   }
 
+  // v162: tombstone a session's /goal after a user-cancelled run. The CLI's
+  // goal-restore scans the LAST attachment {type:'goal_status'} line and
+  // gives up when it says met/failed (xun()) - so one appended line kills the
+  // resurrect-on-resume for good. Same newline-repair discipline as appendTitle.
+  appendGoalTombstone(id) {
+    const rec = this.store.get(id);
+    if (!rec || !rec.transcriptPath) return false;
+    try {
+      let pre = '';
+      try {
+        const st = fs.statSync(rec.transcriptPath);
+        if (st.size > 0) {
+          const fd = fs.openSync(rec.transcriptPath, 'r');
+          try {
+            const buf = Buffer.alloc(1);
+            if (fs.readSync(fd, buf, 0, 1, st.size - 1) === 1 && buf[0] !== 0x0A) pre = '\n';
+          } finally { fs.closeSync(fd); }
+        }
+      } catch { /* unreadable tail -> append as-is */ }
+      fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({
+        type: 'attachment', attachment: { type: 'goal_status', met: true, failed: false, condition: '', note: 'cancelled by user (claude-web stop)' },
+      }) + '\n');
+      return true;
+    } catch { return false; }
+  }
+
   // v40: name a freshly forked session "Fork-<source title>" - the fork's
   // transcript may copy the source's custom-title line, so ours must be
   // appended AFTER adoption (it is the last custom-title in file order and
