@@ -13,7 +13,7 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser,
   updateAgentNode, updateAgentClocks, tickTurnDur } from './js/views/transcript.js';
 import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
-import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity, refreshActivity } from './js/views/activity.js';
+import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity } from './js/views/activity.js';
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
@@ -155,8 +155,6 @@ window.addEventListener('pageshow', (e) => {
 function handleAppend(d) {
   if (d.id !== state.currentId) return;
   const prevLen = state.turns.length;
-  // v163: goal 生命周期事件改 goal 活性（胶囊「目标」段/面板分区）
-  if ((d.events || []).some((e) => e && (e.k === 'goal' || e.k === 'goalhold'))) refreshActivity();
   // optimistic-fold can edit a turn EARLIER than the tail; track the first
   // index touched so renderTail re-renders from there (children stay aligned)
   let editStart = prevLen - 1;

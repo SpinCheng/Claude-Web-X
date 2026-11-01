@@ -105,14 +105,6 @@ function applyEventToTurns(ev) {
     // frame, so this display removal loses nothing.
     const mk = sysMarkerTurn(ev);
     if (mk) T.push(mk);
-  } else if (ev.k === 'goal') {
-    // v163: /goal 生命周期标记（中文左气泡风，sysline 语法）+ goal 活性入 state
-    // （摘要面板「目标」分区 + 胶囊「目标」段的数据源）
-    state.goal = goalStateAfter(ev);
-    T.push(goalMarkerTurn(ev));
-  } else if (ev.k === 'goalhold') {
-    // v163: goal 拦停反馈 → 解释卡（模型为何续写旧任务），不再是用户气泡
-    T.push({ role: 'goalhold', cond: ev.cond || '', verdict: ev.verdict || '', ts: ev.ts });
   } else if (ev.k === 'title') { /* meta only */ }
 }
 // shared turn-shape builders (v44): the history paginator replays older
@@ -182,22 +174,6 @@ function sysMarkerTurn(ev) {
   const wan = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字');
   if (ev.k === 'compact') return { role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + wan(ev.n || 0) + '，已折叠）' };
   return { role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + wan(ev.n || 0) + '，已折叠）' };
-}
-// v163: /goal 生命周期 → 中文标记行（sysline 语法，goal 用珊瑚/绿区分）
-const GOAL_HEAD = (n) => (n.length > 40 ? n.slice(0, 40) + '…' : n) || '（未命名目标）';
-function goalMarkerTurn(ev) {
-  const h = GOAL_HEAD(ev.cond || '');
-  if (ev.st === 'set') return { role: 'sys', goal: true, text: '◎ 目标已设定 · ' + h };
-  if (ev.st === 'resumed') return { role: 'sys', goal: true, text: '⟳ 目标已恢复 · ' + h };
-  if (ev.st === 'interrupted') return { role: 'sys', text: '⏸ 会话中断 · 目标保留（' + h + '）' };
-  if (ev.st === 'stopped') return { role: 'sys', text: '✕ 目标已停止 · 不再恢复' };
-  if (ev.st === 'failed') return { role: 'sys', text: '✕ 目标失败 · ' + h };
-  return { role: 'sys', goal: true, done: true, text: '✓ 目标达成 · ' + h };
-}
-// 活性归约：最后一条 goal 事件决定面板/胶囊显示（活着=未 met/failed/stopped）
-function goalStateAfter(ev) {
-  if (ev.st === 'set' || ev.st === 'resumed') return { live: true, cond: ev.cond || '' };
-  return null; // met/failed/stopped/interrupted 都不显示（interrupted 保留标记行但面板不挂）
 }
 function markLiveTurn() {
   // the trailing bot turn is "live" when its session is streaming
@@ -700,21 +676,8 @@ function updateAgentClocks() {
 function renderTurn(t) {
   if (t.role === 'sys') {
     const d = document.createElement('div');
-    d.className = 'sysline' + (t.goal ? (t.done ? ' goal-done' : ' goal') : '');
+    d.className = 'sysline';
     d.textContent = t.text;
-    return d;
-  }
-  if (t.role === 'goalhold') {
-    // v163: goal 拦停解释卡（bridge 结构化字段，textContent 构建）
-    const d = document.createElement('div');
-    d.className = 'goal-hold';
-    const ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = '⏸';
-    const box = document.createElement('div');
-    const b = document.createElement('b'); b.textContent = '目标检查未通过 · 本轮继续执行目标';
-    const why = document.createElement('div'); why.className = 'why';
-    why.textContent = '目标：' + GOAL_HEAD(t.cond || '') + ' —— ' + (t.verdict || '');
-    box.append(b, why);
-    d.append(ic, box);
     return d;
   }
   if (t.role === 'cmdout') {
@@ -1072,8 +1035,6 @@ function parseOlderTurns(events) {
       const mk = sysMarkerTurn(ev); // stats rows are gone since v145 here too
       if (mk) T.push(mk);
     }
-    else if (ev.k === 'goal') T.push(goalMarkerTurn(ev)); // older pages: markers only
-    else if (ev.k === 'goalhold') T.push({ role: 'goalhold', cond: ev.cond || '', verdict: ev.verdict || '', ts: ev.ts });
   }
   return T;
 }

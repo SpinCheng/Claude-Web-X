@@ -167,11 +167,11 @@ export function applyLine(id, obj, patch, events, rec) {
         // v158: the agent-guard Stop hook's block reason rides as an injected
         // user turn (same shape as the /goal directive) - machine text, fold.
         if (/^\[agent-wait\] /.test(text)) return null;
-        // v162→v163: /goal 的 Stop-hook block feedback 是 goal-keeper 的动态
-        // 判定（"Stop hook feedback: [<goal>]: <verdict>"）。不再静默折叠：
-        // 转成 goal-hold 事件，前端渲染为解释卡（模型为何续写旧任务）。
-        const gh = text.match(/^Stop hook feedback:\s*\[([\s\S]*?)\]\s*:\s*([\s\S]*)$/);
-        if (gh) return { k: 'goalhold', ts: obj.timestamp || '', cond: gh[1].trim(), verdict: gh[2].trim() };
+        // v162: /goal's Stop-hook block feedback rides as a user turn whose
+        // text is the goal-keeper's dynamic verdict wrapped in a fixed
+        // envelope ("Stop hook feedback: [<goal>]..."). Machine text aimed at
+        // the model - fold the envelope; the model's follow-up reply renders.
+        if (/^Stop hook feedback:\s*\[/.test(text)) return null;
         // v114: prompt-type commands (custom .md / init / security-review)
         // write their EXPANDED template body as the next plain user line -
         // machine-expanded text for the model, never a second human bubble.
@@ -304,53 +304,16 @@ export function applyLine(id, obj, patch, events, rec) {
       case 'system': {
         if (obj.subtype === 'local_command') {
           const so = String(obj.content || '').match(/^\s*<local-command-stdout>([\s\S]*?)<\/local-command-stdout>\s*$/);
-          if (so && so[1].trim()) {
-            const txt = so[1].trim();
-            // v163: /goal 的 cmdout 信封（"Goal set: <条件>"）转译成中文目标标记，
-            // 与 goal_status attachment 行共用 {k:'goal'} 事件形状
-            const gs = txt.match(/^Goal set:\s*([\s\S]+)$/);
-            if (gs) return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond: gs[1].trim() };
-            return { k: 'cmdout', ts: obj.timestamp || '', text: txt };
-          }
+          if (so && so[1].trim()) return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
         }
         if (STOP_SUBTYPES.has(obj.subtype)) {
           patch.status = 'idle';
           if (OUTCOME_SUBTYPES[obj.subtype]) patch.lastOutcome = OUTCOME_SUBTYPES[obj.subtype];
-          // v163: goal 活着（最后一条 goal 事件未终结）却停机 → 中断标记；
-          // 其后再次出现 goal 活动 → 恢复标记。跨行状态走 rec（_cmdEnv 先例）。
-          if (rec && rec._goalLive) {
-            rec._goalInterrupted = true;
-            events.push({ k: 'stop' }); // cost-state 先例：伴生事件直接入列
-            return { k: 'goal', ts: obj.timestamp || '', st: 'interrupted', cond: rec._goalCond || '' };
-          }
           // marker event: lets the PWA auto-collapse the live turn the moment
           // ANY driver (Desktop/CLI/phone) finishes, not just phone runs
           return { k: 'stop' };
         }
         return null;
-      }
-      case 'attachment': {
-        // v163: goal 生命周期行（/goal 的持久状态源）→ {k:'goal'} 事件。
-        // 形状（实测 9a8cf13d）：{attachment:{type:'goal_status',met,failed,
-        // condition,sentinel?}}；v162 墓碑=met:true + note 'cancelled by user'。
-        const at = obj.attachment;
-        if (!at || at.type !== 'goal_status') return null;
-        const cond = String(at.condition || '');
-        if (at.met || at.failed) {
-          if (rec) { rec._goalLive = false; rec._goalInterrupted = false; }
-          return { k: 'goal', ts: obj.timestamp || '', st: at.met ? (at.note ? 'stopped' : 'met') : 'failed', cond };
-        }
-        // met:false：goal 仍活着。中断后再次出现 = 恢复；sentinel 行（set 时
-        // 立即写的那条）= 设定；常规检查行静默
-        if (rec) {
-          if (rec._goalInterrupted) {
-            rec._goalInterrupted = false;
-            rec._goalLive = true; rec._goalCond = cond;
-            return { k: 'goal', ts: obj.timestamp || '', st: 'resumed', cond };
-          }
-          rec._goalLive = true; rec._goalCond = cond;
-        }
-        return at.sentinel ? { k: 'goal', ts: obj.timestamp || '', st: 'set', cond } : null;
       }
       default:
         return null;

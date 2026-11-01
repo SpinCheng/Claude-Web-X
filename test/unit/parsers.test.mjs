@@ -57,9 +57,8 @@ test('command stdout surfaces as cmdout; goal hook injection folds (v111)', () =
   assert.equal(a.events[0].k, 'cmdout', 'user-line stdout carrier -> cmdout');
   assert.equal(a.events[0].text, 'Set model to ' + String.fromCharCode(96) + 'x' + String.fromCharCode(96));
   const b = run([{ type: 'system', subtype: 'local_command', timestamp: '2026-10-29T00:00:00.000Z', content: '<local-command-stdout>Goal set: do it</local-command-stdout>' }]);
-  assert.equal(b.events[0].k, 'goal', 'v163: Goal set envelope -> goal set event (Chinese marker upstream)');
-  assert.equal(b.events[0].st, 'set');
-  assert.equal(b.events[0].cond, 'do it');
+  assert.equal(b.events[0].k, 'cmdout', 'system/local_command carrier -> cmdout');
+  assert.equal(b.events[0].text, 'Goal set: do it');
   const c = run([user({ message: { role: 'user', content: 'A session-scoped Stop hook is now active with condition: "ok". Acknowledge.' } })]);
   assert.equal(c.events.length, 0, 'hook injection line never a human bubble');
 });
@@ -319,56 +318,10 @@ test('v158: agent-wait block-reason injection folds out', () => {
   assert.equal(c.events.length, 1, 'human message untouched');
 });
 
-test('v162→v163: /goal Stop-hook feedback becomes a structured goalhold event', () => {
+test('v162: /goal Stop-hook feedback envelope folds out', () => {
   const fb = 'Stop hook feedback:\n[安排2个subagent搜索新闻并汇总html报告]: 条件未满足：两个 subagent 的启动均被中断。目标中的搜索、汇总、HTML 报告、核实交付均未发生。';
   const a = run([user({ message: { role: 'user', content: fb } })]);
-  assert.equal(a.events.length, 1, 'never a human bubble; exactly one goalhold event');
-  assert.equal(a.events[0].k, 'goalhold');
+  assert.equal(a.events.length, 0, 'goal-keeper verdict is machine text, folded');
   const b = run([user({ message: { role: 'user', content: 'Stop hook feedback 讨论一下这个词的翻译' } })]);
   assert.equal(b.events.length, 1, 'human message mentioning the phrase stays');
-  assert.equal(b.events[0].k, 'user');
-});
-
-// ---------- v163: goal 生命周期事件 ----------
-const goalAtt = (over = {}) => ({ type: 'attachment', timestamp: 't', attachment: { type: 'goal_status', met: false, condition: '汇总新闻为报告', ...over } });
-
-test('v163: goal set via cmdout envelope + sentinel attachment dedupe', () => {
-  const rec = {};
-  const a = applyLine('s', { type: 'system', subtype: 'local_command', timestamp: 't', content: '<local-command-stdout>Goal set: 汇总新闻为报告</local-command-stdout>' }, {}, [], rec);
-  assert.deepEqual(a, { k: 'goal', ts: 't', st: 'set', cond: '汇总新闻为报告' });
-  const b = applyLine('s', goalAtt({ sentinel: true }), {}, [], rec);
-  assert.equal(b.st, 'set', 'sentinel attachment also reports set (duplicate display acceptable: same wording)');
-});
-
-test('v163: interrupt on stop while live; resume on next goal activity', () => {
-  const rec = {};
-  applyLine('s', goalAtt({ sentinel: true }), {}, [], rec); // set -> live
-  const evs = [];
-  const r = applyLine('s', { type: 'system', subtype: 'stop_hook_summary', timestamp: 't2' }, {}, evs, rec);
-  assert.equal(evs[0] && evs[0].k, 'stop', 'stop rides the events array (cost-state precedent)');
-  assert.equal(r.k, 'goal');
-  assert.equal(r.st, 'interrupted');
-  const r2 = applyLine('s', goalAtt({}), {}, [], rec); // non-sentinel after interrupt
-  assert.equal(r2.st, 'resumed', 'goal activity after interruption = resume marker');
-  const r3 = applyLine('s', goalAtt({}), {}, [], rec); // another check line -> silent
-  assert.equal(r3, null);
-});
-
-test('v163: tombstone (met+note) = stopped; plain met = 达成; failed', () => {
-  const rec = {};
-  applyLine('s', goalAtt({ sentinel: true }), {}, [], rec);
-  const s = applyLine('s', goalAtt({ met: true, note: 'cancelled by user (claude-web stop)' }), {}, [], rec);
-  assert.equal(s.st, 'stopped');
-  const m = applyLine('s', goalAtt({ met: true }), {}, [], rec);
-  assert.equal(m.st, 'met');
-  const f = applyLine('s', goalAtt({ failed: true }), {}, [], rec);
-  assert.equal(f.st, 'failed');
-});
-
-test('v163: goal-hold feedback becomes a structured event', () => {
-  const fb = 'Stop hook feedback:\n[汇总新闻为报告]: 条件未满足：搜集未执行。';
-  const r = applyLine('s', user({ message: { role: 'user', content: fb } }), {}, [], {});
-  assert.equal(r.k, 'goalhold');
-  assert.equal(r.cond, '汇总新闻为报告');
-  assert.ok(r.verdict.includes('条件未满足'));
 });

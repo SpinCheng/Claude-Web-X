@@ -22,7 +22,6 @@ export function resetActivity() {
   expanded = false; doneFlash = false; wasAllDone = false;
   clearTimeout(doneTimer); doneTimer = null;
   curAgents.clear();
-  state.goal = null; // v163: goal 不跨会话（重放时由 goal 事件重建）
   render();
 }
 
@@ -31,18 +30,15 @@ export function seedActivity(d) {
   curAgents.clear();
   if (d.agents) for (const a of d.agents) if (a.toolUseId) curAgents.add(a.toolUseId);
   state.board = d.board || null;
-  state.goal = null; // v163: goal 由 events 重放写入（buildTurns 顺序在 seed 之后）
   expanded = false; doneFlash = false;
   clearTimeout(doneTimer); doneTimer = null;
   wasAllDone = isAllDone(); // 陈旧全完成板不再触发收尾闪
   render();
 }
 
-// v163: goal 事件到达（初始重放后的首绘 / 活 append）后由 app.js/detail.js 调用
-export function refreshActivity() { render(); }
-
 // ws 'tasks' 帧（桥侧待办板变更，仅当前会话）
-export function onTasksFrame(d) {  if (d.id !== state.currentId) return;
+export function onTasksFrame(d) {
+  if (d.id !== state.currentId) return;
   state.board = d.board || null;
   noteDoneTransition();
   render();
@@ -109,18 +105,17 @@ function render() {
   const b = state.board;
   const ags = runningAgents();
   const hasBoard = !!(b && b.total > 0);
-  const goal = state.goal; // v163: 「目标」段（活着才显）
-  const allDone = hasBoard && b.n >= b.total && !ags.length && !goal;
-  if (!hasBoard && !ags.length && !goal) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const allDone = hasBoard && b.n >= b.total && !ags.length;
+  if (!hasBoard && !ags.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
   if (allDone && !doneFlash) { el.classList.add('hidden'); el.innerHTML = ''; return; }
   el.classList.remove('hidden');
-  if (expanded) renderPanel(el, b, hasBoard, ags, goal);
-  else renderPill(el, b, hasBoard, ags, goal);
+  if (expanded) renderPanel(el, b, hasBoard, ags);
+  else renderPill(el, b, hasBoard, ags);
 }
 
 const ICO_COLLAPSE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
 
-function renderPill(el, b, hasBoard, ags, goal) {
+function renderPill(el, b, hasBoard, ags) {
   el.innerHTML = '';
   const btn = document.createElement('button');
   btn.className = 'ac-pill' + (doneFlash ? ' done' : '');
@@ -129,24 +124,23 @@ function renderPill(el, b, hasBoard, ags, goal) {
     btn.textContent = '已完成';
   } else {
     let first = true;
-    const seg = (build) => {
-      if (!first) { const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '·'; btn.append(sep); }
-      build(); first = false;
-    };
-    if (goal) seg(() => { const s = document.createElement('span'); s.textContent = '目标'; btn.append(s); });
-    if (hasBoard) seg(() => {
+    if (hasBoard) {
       const s = document.createElement('span');
       s.append('待办 ');
       const n = document.createElement('span'); n.className = 'of'; n.textContent = b.n + '/' + b.total;
       s.append(n);
+      btn.append(s); first = false;
+    }
+    if (ags.length) {
+      if (!first) { const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '·'; btn.append(sep); }
+      const s = document.createElement('span'); s.textContent = '代理 ' + ags.length;
       btn.append(s);
-    });
-    if (ags.length) seg(() => { const s = document.createElement('span'); s.textContent = '代理 ' + ags.length; btn.append(s); });
+    }
   }
   el.append(btn);
 }
 
-function renderPanel(el, b, hasBoard, ags, goal) {
+function renderPanel(el, b, hasBoard, ags) {
   const old = el.querySelector('.ac-panel');
   const sTop = old ? old.scrollTop : 0;
   el.innerHTML = '';
@@ -160,15 +154,6 @@ function renderPanel(el, b, hasBoard, ags, goal) {
   x.onclick = () => { expanded = false; render(); };
   hd.append(t, x);
   p.append(hd);
-  // v163: 目标分区居首（用户裁定顺序：目标、待办、代理）
-  if (goal) {
-    p.append(sechd('目标', '进行中'));
-    const row = document.createElement('div'); row.className = 'ac-goalrow';
-    const g = document.createElement('span'); g.className = 'g'; g.textContent = '◎';
-    const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = goal.cond || '（未命名目标）';
-    row.append(g, txt);
-    p.append(row);
-  }
   if (hasBoard) {
     p.append(sechd('待办', b.n + '/' + b.total));
     const list = document.createElement('div');
