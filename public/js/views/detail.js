@@ -14,7 +14,7 @@ import { sendWs } from '../ws.js';
 import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns, pushOptimisticUser } from './transcript.js';
 import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
-import { seedActivity, resetActivity } from './activity.js';
+import { seedActivity, resetActivity, refreshActivity } from './activity.js';
 
 /* ---------------- history (system back = leave detail) ---------------- */
 function openDetail(id) {
