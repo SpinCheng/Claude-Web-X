@@ -332,15 +332,15 @@ const goalAtt = (over = {}) => ({ type: 'attachment', timestamp: 't', attachment
 const goalCmd = () => ({ type: 'system', subtype: 'local_command', timestamp: 't', content: '<local-command-stdout>Goal set: 汇总新闻为报告</local-command-stdout>' });
 const holdLine = (cond, verdict) => user({ message: { role: 'user', content: 'Stop hook feedback:\n[' + cond + ']: ' + verdict } });
 
-test('v165: goal set via cmdout envelope + sentinel attachment', () => {
+test('v165: goal set via cmdout envelope; sentinel behind it dedupes to null', () => {
   const rec = {};
   const a = applyLine('s', goalCmd(), {}, [], rec);
   assert.deepEqual(a, { k: 'goal', ts: 't', st: 'set', cond: '汇总新闻为报告' });
   const b = applyLine('s', goalAtt({ sentinel: true }), {}, [], rec);
-  assert.equal(b.st, 'set');
+  assert.equal(b, null, 'v165b: sentinel after the cmdout envelope only sets state (no duplicate bubble)');
 });
 
-test('v165: interrupt on stop-while-live; resume arms the first-round hold', () => {
+test('v165: interrupt on stop-while-live; resume on next human message arms the first-round hold', () => {
   const rec = {};
   applyLine('s', goalCmd(), {}, [], rec);
   // 常规检查行：静默
@@ -352,9 +352,12 @@ test('v165: interrupt on stop-while-live; resume arms the first-round hold', () 
   const r = applyLine('s', { type: 'system', subtype: 'stop_hook_summary', timestamp: 't2' }, {}, evs, rec);
   assert.equal(evs[0] && evs[0].k, 'stop');
   assert.equal(r.st, 'interrupted');
-  // 恢复 → 武装
-  const r2 = applyLine('s', goalAtt({}), {}, [], rec);
-  assert.equal(r2.st, 'resumed');
+  // 恢复（新契约）：goal 活着时来了新的人话消息 → resumed + 武装
+  const evs2 = [];
+  const u = applyLine('s', user({ message: { role: 'user', content: '你好' } }), {}, evs2, rec);
+  assert.equal(u.k, 'user', 'the human bubble still returns normally');
+  const r2 = evs2.find((e) => e.k === 'goal');
+  assert.ok(r2 && r2.st === 'resumed', 'resume rides the events array before the user bubble');
   // 首轮拦停：显示一次
   const h = applyLine('s', holdLine('汇总新闻为报告', '此前代理启动被中断'), {}, [], rec);
   assert.equal(h.k, 'goalhold');
@@ -373,4 +376,25 @@ test('v165: tombstone=stopped; met; failed; cond 全文透传（不折叠）', (
   assert.equal(m.st, 'met');
   const f = applyLine('s', goalAtt({ failed: true }), {}, [], rec);
   assert.equal(f.st, 'failed');
+});
+
+test('v165b: sentinel dedupes behind the cmdout envelope; silent-kill resume via user message', () => {
+  const rec = {};
+  const run2 = (lines) => { const evs = []; const patch = { est: { tools: 0, think: 0, prose: 0 } }; for (const o of lines) { const e = applyLine('s', o, patch, evs, rec); if (e) evs.push(e); } return evs; };
+  // cmdout 信封在前、sentinel 在后：只发一条 set
+  const a = run2([goalCmd(), goalAtt({ sentinel: true })]);
+  assert.equal(a.filter((e) => e.k === 'goal' && e.st === 'set').length, 1, 'cmdout envelope owns the set event');
+  // sentinel 单独出现（无 cmdout，异常驱动兜底）：发 set
+  const rec2 = {};
+  const b = (() => { const evs = []; const patch = { est: { tools: 0, think: 0, prose: 0 } }; const e = applyLine('s', goalAtt({ sentinel: true }), patch, evs, rec2); if (e) evs.push(e); return evs; })();
+  assert.equal(b.filter((e) => e.k === 'goal' && e.st === 'set').length, 1, 'sentinel alone still reports set');
+  // /goal 信封行本身：不触发恢复
+  const c = run2([user({ message: { role: 'user', content: '/goal 汇总新闻为报告' } })]);
+  assert.equal(c.filter((e) => e.k === 'goal' && e.st === 'resumed').length, 0);
+  // 静默被杀（无 stop 行）后新的人话消息：恢复 + 武装首轮拦停
+  const d = run2([user({ message: { role: 'user', content: '你好' } })]);
+  assert.equal(d.filter((e) => e.k === 'goal' && e.st === 'resumed').length, 1, 'silent-kill resume fires on the next human message');
+  const h = run2([user({ message: { role: 'user', content: 'Stop hook feedback:\n[汇总新闻为报告]: 此前中断' } })]);
+  // 注意：拦停反馈行不是人话（已折目标 hold 分支）——但此处它先被 hold 匹配：
+  assert.equal(h.filter((e) => e.k === 'goalhold').length, 1, 'armed hold shows once');
 });

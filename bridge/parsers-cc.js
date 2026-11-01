@@ -191,6 +191,13 @@ export function applyLine(id, obj, patch, events, rec) {
           return null; // expanded body folds away; the bubble shows /name args
         }
         if (patch.est) patch.est.prose += text.length;
+        // v165: goal 活着时来了新的（非 /goal）人话消息 = 恢复（单发世界每条
+        // 消息都是新进程；静默被杀的会话没有 stop 行，靠这条判定恢复——真机
+        // 44d2d62e 踩中）。内容判定顺序免疫；恢复即武装首轮拦停显示。
+        if (rec && rec._goalLive && !/^\/goal\b/.test(text)) {
+          rec._goalHoldArmed = true;
+          events.push({ k: 'goal', ts: obj.timestamp || '', st: 'resumed', cond: rec._goalCond || '' });
+        }
         // fallback title from first human message only; explicit custom-title wins.
         // Guard against same-batch overwrites (store not yet updated mid-batch).
         const rec0 = rec || {};
@@ -317,7 +324,10 @@ export function applyLine(id, obj, patch, events, rec) {
             // v165: /goal 的 cmdout 信封（"Goal set: <条件>"）→ goal 事件（前端走
             // cmdout 面板通道中文渲染）；与 goal_status attachment 行共用事件形状
             const gs = txt.match(/^Goal set:\s*([\s\S]+)$/);
-            if (gs) return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond: gs[1].trim() };
+            if (gs) {
+              if (rec) { rec._goalLive = true; rec._goalCond = gs[1].trim(); rec._goalSetSeen = true; }
+              return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond: gs[1].trim() };
+            }
             return { k: 'cmdout', ts: obj.timestamp || '', text: txt };
           }
         }
@@ -338,9 +348,9 @@ export function applyLine(id, obj, patch, events, rec) {
         return null;
       }
       case 'attachment': {
-        // v165: goal 生命周期行（/goal 的持久状态源）→ {k:'goal'} 事件。
-        // 形状（实测 9a8cf13d）：{attachment:{type:'goal_status',met,failed,
-        // condition,sentinel?}}；v162 墓碑=met:true + note 'cancelled by user'。
+        // v165: goal 生命周期行（/goal 的持久状态源）。sentinel 行只置状态——
+        // 「设定」气泡的唯一来源是 cmdout 信封（v165 真机踩中双气泡）；
+        // 仅当 cmdout 信封缺席（异常驱动）时 sentinel 兜底发事件。
         const at = obj.attachment;
         if (!at || at.type !== 'goal_status') return null;
         const cond = String(at.condition || '');
@@ -348,18 +358,11 @@ export function applyLine(id, obj, patch, events, rec) {
           if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; }
           return { k: 'goal', ts: obj.timestamp || '', st: at.met ? (at.note ? 'stopped' : 'met') : 'failed', cond };
         }
-        // met:false：goal 仍活着。中断后再次出现 = 恢复（并武装首轮拦停显示）；
-        // sentinel 行（set 时立即写的那条）= 设定；常规检查行静默
-        if (rec) {
-          if (rec._goalInterrupted) {
-            rec._goalInterrupted = false;
-            rec._goalHoldArmed = true;
-            rec._goalLive = true; rec._goalCond = cond;
-            return { k: 'goal', ts: obj.timestamp || '', st: 'resumed', cond };
-          }
-          rec._goalLive = true; rec._goalCond = cond;
+        if (rec) { rec._goalLive = true; rec._goalCond = cond; }
+        if (at.sentinel && rec && !rec._goalSetSeen) {
+          return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond };
         }
-        return at.sentinel ? { k: 'goal', ts: obj.timestamp || '', st: 'set', cond } : null;
+        return null;
       }
       default:
         return null;
