@@ -243,6 +243,10 @@ export function applyLine(id, obj, patch, events, rec) {
             const part = { t: 'tool', name: p.name, id: p.id || '', v: briefJson(p.input) };
             const f = editDelta(p.name, p.input);
             if (f) part.f = f;
+            // v154: 待办板结构化载荷照同一先例随事件下发（tb）——前端禁 parse
+            // chip 文本；会话级板状态由 adapter 用 applyBoard 累积
+            const tb = taskPart(p.name, p.input);
+            if (tb) part.tb = tb;
             parts.push(part);
             if (patch.est) { try { patch.est.tools += JSON.stringify(p.input || {}).length + 32; } catch { /* skip */ } }
           }
@@ -396,4 +400,116 @@ function stripReminder(text) {
     .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
     .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
     .trim();
+}
+
+// ---------- v154: 待办板（Task* / TodoWrite） ----------
+// 实测（2026-11-01，2.1.308 二进制 schema；-p 工具集不含这些工具，待办数据只
+// 可能来自 TUI/桌面驱动会话的转录）：
+//   TaskCreate = {subject, description?, activeForm?} 一次一条
+//   TaskUpdate = {taskId, status?(pending|in_progress|completed|deleted),
+//                 subject?, activeForm?} —— 真实枚举无 cancelled，deleted=移出板
+//   TodoWrite  = {todos:[{content, status(pending|in_progress|completed),
+//                 activeForm?}]} 全量覆写
+//   TaskList / TaskGet 只读查询，不解析（保持普通工具 chip）
+// tb 载荷照 v145 f:[] 先例随事件下发（chip v 截 300 字符，结构化必须解析层给）。
+
+export const TASK_TOOLS = { TaskCreate: 1, TaskUpdate: 1, TodoWrite: 1 };
+
+// 从原始 tool_use input 提取结构化载荷；非待办工具（或形状不认识）返回 null。
+export function taskPart(name, input) {
+  if (!input || typeof input !== 'object') return null;
+  if (name === 'TodoWrite') {
+    if (!Array.isArray(input.todos)) return null;
+    return { g: 'w', items: input.todos.map((t) => ({
+      s: String((t && t.content) || ''),
+      st: (t && t.status) || 'pending',
+      af: (t && t.activeForm) || '',
+    })) };
+  }
+  if (name === 'TaskCreate') {
+    if (typeof input.subject !== 'string' || !input.subject) return null;
+    return {
+      g: 'c', s: input.subject,
+      d: typeof input.description === 'string' ? input.description.slice(0, 500) : '',
+      af: typeof input.activeForm === 'string' ? input.activeForm : '',
+    };
+  }
+  if (name === 'TaskUpdate') {
+    if (input.taskId == null) return null;
+    return {
+      g: 'u', id: String(input.taskId),
+      st: typeof input.status === 'string' ? input.status : '',
+      s: typeof input.subject === 'string' ? input.subject : '',
+      af: typeof input.activeForm === 'string' ? input.activeForm : '',
+    };
+  }
+  return null;
+}
+
+// 会话级板状态机。board 形状（对外快照）：{n, total, items:[{id,s,st,af}]}——
+// n=completed 数，total=items.length（deleted 已移除；未知状态灰显计入分母）。
+// _pend 为内部字段（TaskCreate→tool_result 的 id 绑定槽），快照时剥掉。
+// 返回值=板是否变化（调用方据此决定是否广播）。
+export function applyBoard(board, tb, toolUseId) {
+  if (!board || !tb) return false;
+  if (tb.g === 'w') {
+    board.items = tb.items.map((it) => ({ id: '', s: it.s, st: it.st, af: it.af }));
+    board._pend = [];
+    return recalcBoard(board);
+  }
+  if (tb.g === 'c') {
+    const item = { id: '', s: tb.s, st: 'pending', af: tb.af };
+    board.items.push(item);
+    board._pend.push({ toolUseId: toolUseId || '', ref: item });
+    return recalcBoard(board);
+  }
+  if (tb.g === 'u') {
+    const it = board.items.find((x) => x.id && x.id === tb.id);
+    if (!it) {
+      // 未绑定的 id：占位行（TodoWrite 板无 id、或 create 结果未落盘时的兜底）
+      board.items.push({ id: tb.id, s: tb.s || '任务 #' + tb.id, st: tb.st && tb.st !== 'deleted' ? tb.st : 'pending', af: tb.af });
+      return recalcBoard(board);
+    }
+    if (tb.st === 'deleted') {
+      board.items.splice(board.items.indexOf(it), 1);
+      return recalcBoard(board);
+    }
+    if (tb.st) it.st = tb.st;
+    if (tb.s) it.s = tb.s;
+    if (tb.af) it.af = tb.af;
+    return recalcBoard(board);
+  }
+  return false;
+}
+
+// TaskCreate 的 tool_result 落地：从结果文本容错提取分配的 id 绑回条目。
+// 形状未实测（-p 无此工具），按 JSON {"id":...} / "#3" / 裸数字宽容匹配。
+export function bindCreated(board, toolUseId, text) {
+  if (!board || !Array.isArray(board._pend) || !board._pend.length) return false;
+  const i = board._pend.findIndex((p) => p.toolUseId && p.toolUseId === toolUseId);
+  if (i < 0) return false;
+  const pend = board._pend.splice(i, 1)[0];
+  const m = /"id"\s*:\s*"?(\w+)"?|#\s*(\w+)|\b(\d+)\b/.exec(String(text || '').slice(0, 400));
+  const id = m && (m[1] || m[2] || m[3]);
+  if (id && pend.ref) pend.ref.id = id;
+  return true;
+}
+
+function recalcBoard(board) {
+  const n = board.items.reduce((acc, it) => acc + (it.st === 'completed' ? 1 : 0), 0);
+  const sig = JSON.stringify(board.items);
+  const changed = board.n !== n || board.total !== board.items.length || board._sig !== sig;
+  board.n = n;
+  board.total = board.items.length;
+  board._sig = sig;
+  return changed;
+}
+
+// 对外快照：剥内部字段 + 拷贝，避免下发对象与内部状态共享引用。
+export function boardSnapshot(board) {
+  if (!board || !board.total) return null;
+  return {
+    n: board.n, total: board.total,
+    items: board.items.map((it) => ({ id: it.id, s: it.s, st: it.st, af: it.af })),
+  };
 }

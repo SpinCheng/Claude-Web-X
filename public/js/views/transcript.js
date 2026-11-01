@@ -116,6 +116,7 @@ function addAssistantPart(turn, p) {
   else if (p.t === 'tool') {
     const tool = { name: p.name, id: p.id || '', v: p.v, out: null };
     if (p.f) tool.f = p.f; // v145: bridge-side changed-file delta for the rollup
+    if (p.tb) tool.tb = p.tb; // v154: 待办板结构化载荷（照 f 的同路随行）
     turn.tools.push(tool);
     turn.steps.push({ t: 'tool', tool });
   }
@@ -281,13 +282,24 @@ function nodeEl(kind, head, bodyBuilder, open) {
   h.className = 'node-head';
   h.innerHTML = '<span class="badge"></span>' +
     (head.bg ? '<span class="ag-bgtag">后台</span>' : '') +
-    (head.title ? '<span class="t"></span>' : '') +
+    (head.title || head.titleParts ? '<span class="t"></span>' : '') +
     (head.meta ? '<span class="dur"></span>' : '') +
     (head.link ? '<span class="lnk"></span>' : '') +
     (head.diff ? '<span class="diffbadge"><span class="add"></span><span class="del"></span></span>' : '') +
     (plain ? '' : '<span class="chev">' + CHEV_S + '</span>');
   h.querySelector('.badge').textContent = head.badge;
   if (head.title) h.querySelector('.t').textContent = head.title;
+  else if (head.titleParts) {
+    // v154: 分段上色的标题（TaskUpdate「#id → 状态」）；片段全是固定文案+桥侧
+    // 结构化字段，textContent 逐段写入不拼 HTML
+    const tEl = h.querySelector('.t');
+    for (const tp of head.titleParts) {
+      const sp = document.createElement('span');
+      if (tp.cls) sp.className = tp.cls;
+      sp.textContent = tp.v;
+      tEl.append(sp);
+    }
+  }
   if (head.meta) h.querySelector('.dur').textContent = '· ' + head.meta;
   if (head.link) h.querySelector('.lnk').textContent = head.link;
   if (head.diff) {
@@ -392,6 +404,33 @@ function renderStepsInto(tl, steps, live) {
       }, live));
     } else if (s.t === 'tool') {
       const tool = s.tool;
+      // v154: 待办板工具（桥侧 tb 结构化载荷）渲染为可读节点——静态裁定：
+      // 转录节点不动态更新，进行中=静态珊瑚，无呼吸灯（活态动画专属运行中代理）。
+      // TaskList/TaskGet 无 tb，落回普通工具 chip。原文 ⚙ JSON 不再展示。
+      if (tool.tb) {
+        const tb = tool.tb;
+        const head = { badge: '待办' };
+        let body = null;
+        if (tb.g === 'c') {
+          head.title = '＋ ' + tb.s;
+          if (tb.d) body = (b) => {
+            const d = document.createElement('div'); d.className = 'tdesc'; d.textContent = tb.d;
+            b.appendChild(d);
+          };
+        } else if (tb.g === 'w') {
+          const n = tb.items.reduce((a, it) => a + (it.st === 'completed' ? 1 : 0), 0);
+          head.title = n + '/' + tb.items.length;
+          body = (b) => { tb.items.forEach((it, i) => b.appendChild(taskListRow(it, i))); };
+        } else if (tb.g === 'u') {
+          const st = tb.st || '';
+          const label = st === 'in_progress' ? '进行中' : st === 'completed' ? '已完成'
+            : st === 'pending' ? '待办' : st === 'deleted' ? '已取消' : (st || '未知');
+          head.titleParts = [{ v: '#' + tb.id + ' → ' },
+            { v: label, cls: st === 'in_progress' ? 'tb-run' : st === 'completed' ? 'tb-done' : 'tb-cancel' }];
+        }
+        tl.appendChild(nodeEl('tool', head, body));
+        continue;
+      }
       const isAgent = AGENT_TOOLS[tool.name] === 1;
       const ag = isAgent ? (state.agents[tool.id] || null) : null;
       const agRunning = !!(ag && !ag.finished && !tool.out);
@@ -481,6 +520,24 @@ function renderStepsInto(tl, steps, live) {
       }
     }
   }
+}
+
+// v154: 待办板行——与活动面板同一套 .ac-trow 语法（✓划线/●珊瑚静态/○待办/✕灰显）。
+// 不从 activity.js 导入：那条 import 会新增 transcript→activity→agentview→transcript 环。
+function taskListRow(it, i) {
+  const st = it.st;
+  const r = document.createElement('div');
+  r.className = 'ac-trow ' + (st === 'completed' ? 'done' : st === 'in_progress' ? 'act' : st === 'pending' ? 'todo' : 'cancel');
+  const g = document.createElement('span'); g.className = 'g';
+  g.textContent = st === 'completed' ? '✓' : st === 'in_progress' ? '●' : st === 'pending' ? '○' : '✕';
+  const idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = String(i + 1);
+  const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = it.s || '(无标题)';
+  r.append(g, idx, txt);
+  if (st === 'in_progress' && it.af) {
+    const af = document.createElement('div'); af.className = 'ac-af'; af.textContent = '↳ ' + it.af;
+    txt.append(af);
+  }
+  return r;
 }
 
 // description from the Agent tool_use input - v is briefJson({description,

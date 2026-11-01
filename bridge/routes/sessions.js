@@ -51,6 +51,8 @@ export function register(router, ctx) {
     if (!out) { json(res, 404, { error: 'not found' }); return; }
     // v112: agent summaries ride along (seeds finished agent nodes' 全文)
     out.agents = adapter.agents.summariesFor(r.params.id);
+    // v154: 待办板快照随行（空板=null；变更走 'tasks' 帧）
+    out.board = adapter.boardFor(r.params.id);
     json(res, 200, out);
   });
 

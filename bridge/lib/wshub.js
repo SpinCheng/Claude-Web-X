@@ -15,8 +15,8 @@ export function createHub({ cfg, store, runner, pins }) {
     for (const ws of clients) {
       if (ws.readyState !== 1) continue;
       // append events only go to the subscriber of that session; v112 agent
-      // summary frames follow the same per-session routing
-      if ((obj.type === 'append' || obj.type === 'agent') && ws.subId !== obj.id) continue;
+      // summary frames follow the same per-session routing; v154 tasks too
+      if ((obj.type === 'append' || obj.type === 'agent' || obj.type === 'tasks') && ws.subId !== obj.id) continue;
       ws.send(raw);
     }
   }

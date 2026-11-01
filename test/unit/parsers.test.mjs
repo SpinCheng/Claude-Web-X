@@ -2,7 +2,7 @@
 // judgment pitfalls documented in CLAUDE.md (转录格式 section).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLine, fenceTitle, synthesizeFileDiff } from '../../bridge/parsers-cc.js';
+import { applyLine, fenceTitle, synthesizeFileDiff, taskPart, applyBoard, bindCreated, boardSnapshot } from '../../bridge/parsers-cc.js';
 
 const run = (lines, rec = {}) => { // rec defaults to a seeded (empty) record like _ensureSession creates
   const events = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
@@ -239,4 +239,55 @@ test('cwd is harvested from non-user lines (ctxprobe sidecar shape)', () => {
     { type: 'cost-state', modelUsage: {} },
   ]);
   assert.equal(patch.cwd, 'D:\\x\\y');
+});
+
+// ---------- v154: 待办板（Task* / TodoWrite） ----------
+const tbTool = (name, input, id = 'tu1') => assistant([{ type: 'tool_use', id, name, input }]);
+
+test('taskPart: family shapes pinned to the 2.1.308 binary schema', () => {
+  assert.deepEqual(taskPart('TodoWrite', { todos: [{ content: 'a', status: 'completed', activeForm: '正在 a' }, { content: 'b' }] }),
+    { g: 'w', items: [{ s: 'a', st: 'completed', af: '正在 a' }, { s: 'b', st: 'pending', af: '' }] });
+  assert.deepEqual(taskPart('TaskCreate', { subject: 'x', description: 'd', activeForm: 'f' }),
+    { g: 'c', s: 'x', d: 'd', af: 'f' });
+  assert.deepEqual(taskPart('TaskUpdate', { taskId: 3, status: 'in_progress' }),
+    { g: 'u', id: '3', st: 'in_progress', s: '', af: '' });
+  assert.equal(taskPart('TaskList', {}), null, 'TaskList 不解析');
+  assert.equal(taskPart('TaskGet', { taskId: 1 }), null, 'TaskGet 不解析');
+  assert.equal(taskPart('TodoWrite', { todos: 'x' }), null);
+  assert.equal(taskPart('TaskCreate', { description: 'no subject' }), null);
+});
+
+test('applyLine: tb rides the tool part (v145 f:[] precedent)', () => {
+  const { events } = run([tbTool('TodoWrite', { todos: [{ content: 'a', status: 'pending' }] })]);
+  const part = events[0].parts[0];
+  assert.deepEqual(part.tb, { g: 'w', items: [{ s: 'a', st: 'pending', af: '' }] });
+  assert.equal(part.f, undefined, '非编辑工具无 f');
+  assert.ok(part.v.length > 0);
+});
+
+test('board: TodoWrite overwrite -> TaskCreate -> bindCreated -> TaskUpdate lifecycle', () => {
+  const b = { items: [], n: 0, total: 0, _pend: [] };
+  assert.equal(applyBoard(b, taskPart('TodoWrite', { todos: [{ content: 'a', status: 'completed' }, { content: 'b', status: 'pending' }] })), true);
+  assert.equal(b.n + '/' + b.total, '1/2');
+  assert.equal(applyBoard(b, taskPart('TaskCreate', { subject: 'c' }), 'tu9'), true);
+  assert.equal(b.total, 3);
+  assert.equal(bindCreated(b, 'tu9', 'Created task #3: c'), true);
+  assert.equal(b.items[2].id, '3', 'create 的 id 从 tool_result 文本绑回');
+  assert.equal(applyBoard(b, taskPart('TaskUpdate', { taskId: 3, status: 'in_progress' })), true);
+  assert.equal(b.items[2].st, 'in_progress');
+  assert.equal(applyBoard(b, taskPart('TaskUpdate', { taskId: 3, status: 'completed' })), true);
+  assert.equal(b.n, 2);
+  // 真实枚举无 cancelled：deleted=移出板
+  assert.equal(applyBoard(b, taskPart('TaskUpdate', { taskId: 3, status: 'deleted' })), true);
+  assert.equal(b.total, 2);
+  // 未绑定 id -> 占位行；未知状态 -> 灰显（计入分母）
+  assert.equal(applyBoard(b, taskPart('TaskUpdate', { taskId: 9, status: 'in_progress' })), true);
+  assert.equal(b.items[b.items.length - 1].s, '任务 #9');
+  applyBoard(b, taskPart('TaskUpdate', { taskId: 9, status: 'weird' }));
+  assert.equal(b.items[b.items.length - 1].st, 'weird');
+  // 快照剥内部字段
+  const snap = boardSnapshot(b);
+  assert.equal(snap.total, b.total);
+  assert.equal('_pend' in snap, false);
+  assert.deepEqual(snap.items[0], { id: '', s: 'a', st: 'completed', af: '' });
 });

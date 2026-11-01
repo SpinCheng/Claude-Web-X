@@ -17,7 +17,7 @@ import os from 'node:os';
 import { EventEmitter } from 'node:events';
 import { Tailer } from './tailer.js';
 import { AgentTracker } from './agents.js';
-import { applyLine, fenceTitle, synthesizeFileDiff } from './parsers-cc.js';
+import { applyLine, fenceTitle, synthesizeFileDiff, applyBoard, bindCreated, boardSnapshot } from './parsers-cc.js';
 
 const ACTIVE_WINDOW_MS = 120_000;
 // terminal-ish system subtypes => idle + a last run outcome the PWA can show
@@ -42,6 +42,8 @@ export class CcAdapter extends EventEmitter {
     // recursive watcher, different consumer; NOT sessions
     this.agents = new AgentTracker();
     this.agents.on('agent', (f) => this.emit('agent', f));
+    // v154: 会话级待办板（Task* 增量 + TodoWrite 全量；boot 回灌静默构建）
+    this.boards = new Map();
     this._pending = new Set();
     this._drainTimer = null;
   }
@@ -177,6 +179,25 @@ export class CcAdapter extends EventEmitter {
     // v112: parent transcript feeds the agent tracker (Agent tool_use spawns
     // + tool_result completions); boot replays are net-zero for finished pairs
     if (events.length) this.agents.onParentEvents(entry.id, events);
+    // v154: 待办板状态机——assistant 事件的 tb 载荷增量累积，toolres 绑回
+    // TaskCreate 分配的 id；boot 回灌（emitAppends=false）静默构建，活 drain
+    // 变更即广播 'tasks' 帧（订阅者路由见 wshub）
+    if (events.length) {
+      const board = this._boardFor(entry.id);
+      let boardDirty = false;
+      for (const ev of events) {
+        if (ev.k === 'assistant' && Array.isArray(ev.parts)) {
+          for (const p of ev.parts) {
+            if (p.tb && applyBoard(board, p.tb, p.id)) boardDirty = true;
+          }
+        } else if (ev.k === 'toolres' && Array.isArray(ev.items)) {
+          for (const it of ev.items) {
+            if (bindCreated(board, it.id, it.text)) boardDirty = true;
+          }
+        }
+      }
+      if (boardDirty && emitAppends) this.emit('tasks', { id: entry.id, board: boardSnapshot(board) });
+    }
     if (emitAppends && events.length > 0) {
       this.emit('append', { id: entry.id, events });
     }
@@ -307,6 +328,17 @@ export class CcAdapter extends EventEmitter {
     }
     const end = Math.max(0, events.length - Math.max(0, before | 0));
     return { events: events.slice(Math.max(0, end - limit), end), total: events.length };
+  }
+
+  // v154: messages 响应附带的待办板快照（空板=null）
+  boardFor(id) {
+    return boardSnapshot(this.boards.get(id));
+  }
+
+  _boardFor(id) {
+    let b = this.boards.get(id);
+    if (!b) { b = { items: [], n: 0, total: 0, _pend: [] }; this.boards.set(id, b); }
+    return b;
   }
 
   // v146: per-file diff text for the rollup's +/- tap. Re-reads the RAW

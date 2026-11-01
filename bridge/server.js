@@ -74,6 +74,8 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   });
   // v112: live subagent summary frames (routed to session subscribers)
   adapter.on('agent', (f) => hub.broadcast(f));
+  // v154: 待办板变更帧（订阅者路由同 append/agent）
+  adapter.on('tasks', (t) => hub.broadcast({ type: 'tasks', ...t }));
 
   // ------- wire runner events (Phase 2) -------
   runner.on('update', (u) => {
