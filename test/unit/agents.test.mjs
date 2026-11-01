@@ -212,3 +212,26 @@ test('parent turn stop finishes still-running bg agents (killed at CLI exit)', (
   tr.onParentStop('sess1');
   assert.equal(frames.length, n);
 });
+
+test('boot order: parent replay stops BEFORE agent files register - no running corpses', () => {
+  const { tr, agPath, metaPath } = trackerWithAgentFile();
+  // boot replay order: parent events first (spawn + launch ack + stop)...
+  const truncUse = { k: 'assistant', ts: ts(1), parts: [{ t: 'tool', name: 'Agent', id: 'call_bg', v: '{"description":"盘点 bri' }] };
+  tr.onParentEvents('sess1', [truncUse]);
+  fs.writeFileSync(metaPath, JSON.stringify({ description: '盘点端点', toolUseId: 'call_bg', requestShape: 'background' }));
+  tr.onParentEvents('sess1', [{ k: 'toolres', ts: ts(4), items: [{ id: 'call_bg', text: 'Async agent launched successfully.', err: false, images: [] }] }]);
+  tr.onParentStop('sess1'); // adapter routes the parent's stop marker here
+  // ...then scanAll discovers the agent file
+  tr.touch(agPath);
+  const e = tr.agents.get('aaa111');
+  assert.equal(e.finished, true, 'entry born into a stopped parent starts finished');
+  assert.ok(e.finishedAt > 0, 'duration frozen, not ticking');
+  // a NEW spawn later clears the stopped mark: the next agent registers running
+  tr.onParentEvents('sess1', [{ k: 'assistant', ts: ts(20), parts: [{ t: 'tool', name: 'Agent', id: 'call_new', v: JSON.stringify({ description: '新代理', prompt: 'p' }) }] }]);
+  const sub2 = path.join(path.dirname(agPath), 'agent-bbb222.jsonl');
+  W(sub2, [agUser(ts(21)), agToolUse(ts(22), 'st9', 'Read', { file_path: 'D:/x/a.js' })]);
+  fs.writeFileSync(path.join(path.dirname(agPath), 'agent-bbb222.meta.json'), JSON.stringify({ description: '新代理', toolUseId: 'call_new' }));
+  tr.touch(sub2);
+  const e2 = tr.agents.get('bbb222');
+  assert.equal(e2.finished, false, 'fresh spawn after the stop runs again');
+});

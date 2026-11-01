@@ -48,6 +48,12 @@ export class AgentTracker extends EventEmitter {
     this.bySession = new Map(); // sessionId -> Set(agentId)
     this.pending = new Map();   // sessionId -> [toolUseId] unmatched spawns (FIFO)
     this.toolDesc = new Map();  // toolUseId -> description (from parent tool_use)
+    this.stoppedParents = new Set(); // v154: last-known-stopped parents - boot
+                                     // replay drains the parent (stop fires,
+                                     // agents don't exist yet) BEFORE scanAll
+                                     // registers their files; entries created
+                                     // for an already-stopped parent start
+                                     // finished (a new spawn clears the mark)
   }
 
   // ---- discovery: adapter watcher routes every <sid>/subagents/ event here
@@ -71,6 +77,13 @@ export class AgentTracker extends EventEmitter {
     let set = this.bySession.get(sessionId);
     if (!set) { set = new Set(); this.bySession.set(sessionId, set); }
     set.add(agentId);
+    // v154: parent's replay already stopped (boot order: parent drain ran
+    // before this file was discovered) - a fresh unfinished entry would read
+    // as a running corpse in every summary until the next restart
+    if (this.stoppedParents.has(sessionId)) {
+      e.finished = true;
+      e.finishedAt = Date.now();
+    }
     // FIFO attribution: this new file belongs to the oldest unmatched spawn
     const q = this.pending.get(sessionId);
     if (q && q.length) {
@@ -165,6 +178,9 @@ export class AgentTracker extends EventEmitter {
           let q = this.pending.get(sessionId);
           if (!q) { q = []; this.pending.set(sessionId, q); }
           q.push(p.id);
+          // a fresh spawn = the parent is alive again (multi-turn replay:
+          // spawn...stop...spawn...stop arrives chronologically)
+          this.stoppedParents.delete(sessionId);
           // late parent drain (agent file + parent line landed inside the
           // same 200ms drain debounce): the file registered BEFORE its spawn
           // id was queued - adopt it now, oldest file first
@@ -204,6 +220,7 @@ export class AgentTracker extends EventEmitter {
   // across turns also writes per-turn stop lines - those agents would be
   // finished early. No TUI parents exist in claude-remote's world.
   onParentStop(sessionId) {
+    this.stoppedParents.add(sessionId);
     for (const aid of this.bySession.get(sessionId) || []) {
       const e = this.agents.get(aid);
       if (e && !e.finished) {
