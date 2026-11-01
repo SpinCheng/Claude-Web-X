@@ -46,8 +46,10 @@ export function onTasksFrame(d) {
   render();
 }
 
-// ws 'agent' 帧（state.agents 已写入后调用）：运行数变化 / 最后一代理完成
-export function onAgentUpdate() {
+// ws 'agent' 帧（state.agents 已写入后调用）：新代理入集合（curAgents 只靠
+// messages 快照播种——会话开着时新 spawn 的代理只能从这里进来，v156 真机踩中）
+export function onAgentUpdate(d) {
+  if (d && d.toolUseId) curAgents.add(d.toolUseId);
   noteDoneTransition();
   render();
 }

@@ -41,6 +41,12 @@ await withEnv(async (h, page) => {
   const dur = await page.ev('(function(){var d=document.querySelector(".node[data-agent] .node-head .dur"); return d?d.textContent:""})()');
   assert(/^· \d+m\d+s$/.test(dur), 'head dur is a live elapsed (got "' + dur + '")');
   assert(await page.ev('!!document.querySelector(".node[data-agent] .dot-tool.on")'), 'agent dot breathing');
+  // v156: the activity capsule must count agents spawned after the session
+  // opened (curAgents is seeded from the messages fetch; agent frames have
+  // to add late arrivals - real-phone find)
+  assert(await page.waitFor('!!document.querySelector("#act .ac-pill")'), 'activity pill visible for the running agent');
+  const pillTxt = await page.ev('(function(){var p=document.querySelector("#act .ac-pill"); return p?p.textContent:""})()');
+  assert(pillTxt.indexOf('代理 1') >= 0, 'pill counts the running agent (got "' + pillTxt + '")');
 
   // live-line tap opens the full-text bubble
   await page.ev('document.querySelector(".agent-live").click()');
@@ -62,6 +68,7 @@ await withEnv(async (h, page) => {
   fs.writeFileSync(path.join(sub, 'agent-e2eaaaa.meta.json'),
     line({ agentType: 'general-purpose', description: '文档审查', toolUseId: 'call_ag1', spawnDepth: 1, requestShape: 'foreground', finished: true }));
   assert(await page.waitFor('(function(){var l=document.querySelector(".agent-live"); return !l||l.classList.contains("done")})()'), 'meta finished flips the live-line to done');
+  assert(await page.waitFor('!document.querySelector("#act .ac-pill")'), 'activity pill hides once the agent finishes');
   fs.appendFileSync(path.join(h.tmp, 'projects', 'T--e2e', 'agsess.jsonl'),
     [line(toolResult(7, 'call_ag1', '审查完成：修复 3 处')), line(stop(8))].join('\n') + '\n');
   assert(await page.waitFor('(function(){return !document.querySelector(".agent-live")})()'), 'live-line gone once the result pairs');

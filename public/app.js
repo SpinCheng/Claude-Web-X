@@ -351,7 +351,7 @@ initWs({
     };
     updateAgentNode(d);
     onAgentFrame(d);
-    onAgentUpdate(); // 活动胶囊跟随（运行数 / 最后一代理完成转「已完成」）
+    onAgentUpdate(d); // 活动胶囊跟随（新代理入集合 / 运行数 / 完成转「已完成」）
   },
   tasks: (d) => onTasksFrame(d),
   approval: queueApproval,
