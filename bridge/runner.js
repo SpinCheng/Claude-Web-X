@@ -342,7 +342,13 @@ export class Runner extends EventEmitter {
       cwd,
       // bashToolEnv: prepend the detected git dirs so the CLI's Bash tool
       // seats even when this bridge inherited a PATH without Git (v62)
-      env: { ...process.env, ...this.settingsEnv(), ...bashToolEnv(process.env), CLAUDE_CODE_STOP_HOOK_BLOCK_CAP: '32' },
+      env: { ...process.env, ...this.settingsEnv(), ...bashToolEnv(process.env),
+        // v161: the task-list tool family is gated off by default in this CLI
+        // build - these flags turn it on for phone sessions (probed: with them
+        // the model really calls TaskCreate/TaskUpdate and the board parser
+        // gets live data; without them ToolSearch finds nothing)
+        CLAUDE_CODE_ENABLE_TODO_TOOLS: '1', CLAUDE_CODE_ENABLE_TASKS: '1',
+        CLAUDE_CODE_STOP_HOOK_BLOCK_CAP: '32' },
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
