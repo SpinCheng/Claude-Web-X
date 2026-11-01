@@ -13,7 +13,7 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
   markCapped, renderTurn, renderTail, scrollBottom, updateJumpFab, pushOptimisticUser, retractOptimisticUser,
   updateAgentNode, updateAgentClocks, tickTurnDur } from './js/views/transcript.js';
 import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
-import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity, refreshActivity } from './js/views/activity.js';
+import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity } from './js/views/activity.js';
 import { renderList } from './js/views/list.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
@@ -197,7 +197,6 @@ function handleRunFrame(d) {
     return;
   }
   state.runs[d.sessionId] = { runId: d.runId, state: d.state, startedAt: d.startedAt };
-  if (d.sessionId === state.currentId) refreshActivity(); // v157: 停止钮随 run 生灭
   // v88: a run that ends with an unconfirmed optimistic twin (stopped before
   // the CLI wrote the user line) flips its dot red+static instead of
   // breathing forever; the twin stays foldable if the line lands later
@@ -297,7 +296,6 @@ initWs({
     renderWaitBanner();
     updateTokenRing();
     updateRunStatus();
-    refreshActivity(); // v157: sessions 帧的 running 翻转也驱动停止钮生灭
     updateComposer(); // opening mid-run: no run frame will come, the list is the signal
     // liveness flip via session status (e.g. bridge saw the idle broadcast):
     // close the live turn without waiting for the next append

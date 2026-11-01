@@ -10,9 +10,7 @@
 // 随视图卸载、回来从桥侧快照重建（默认收起）。
 import { $ } from '../util.js';
 import { state } from '../state.js';
-import { api } from '../api.js';
 import { openAgentView } from './agentview.js';
-import { toast } from './toast.js';
 
 let expanded = false;
 let doneFlash = false; // 活态转全完成：胶囊短暂显示「已完成」
@@ -97,30 +95,8 @@ const fmtDur = (ms) => {
   const m = Math.floor(s / 60);
   return m > 0 ? m + 'm' + String(s % 60).padStart(2, '0') + 's' : s + 's';
 };
-
-// bg agents are IN-PROCESS tasks of the parent CLI (no per-agent OS process,
-// v154 real-data probe) - the only honest per-row stop is cancelling the owning
-// run. Available only while this session has a live phone run. runId comes
-// from the run frame OR the sessions frame (refresh/mid-run-open covers the
-// case where no run frame was ever seen - parity with composer stopRun).
-const ICO_STOP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
-const ICO_COLLAPSE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
-function cancellableRunId() {
-  const run = state.runs[state.currentId];
-  if (run && run.state === 'running' && run.runId) return run.runId;
-  const rec = state.currentId && state.sessions.find((x) => x.id === state.currentId);
-  return rec && rec.running && rec.runId ? rec.runId : '';
-}
-function stopOwningRun(e) {
-  e.stopPropagation();
-  const runId = cancellableRunId();
-  if (!runId) return;
-  api('/api/runs/' + encodeURIComponent(runId) + '/cancel', { method: 'POST' })
-    .then((r) => { if (r.ok) toast('已停止运行（含其后台代理）'); else toast('停止失败——运行可能已结束'); })
-    .catch(() => toast('停止失败——网络错误'));
-}
-// run frames flip: re-render so the stop buttons appear/vanish with the run
-export function refreshActivity() { render(); }
+// 停止语义归属 composer 的三态停止键（停主 run=停一切：bg 代理是父 CLI 进程内
+// 任务，无法单停，v159 曾试过面板总停钮——语义重复且误导，真机裁定撤除）。
 
 function render() {
   const el = $('act');
@@ -136,6 +112,8 @@ function render() {
   if (expanded) renderPanel(el, b, hasBoard, ags);
   else renderPill(el, b, hasBoard, ags);
 }
+
+const ICO_COLLAPSE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
 
 function renderPill(el, b, hasBoard, ags) {
   el.innerHTML = '';
@@ -183,17 +161,7 @@ function renderPanel(el, b, hasBoard, ags) {
     p.append(list);
   }
   if (ags.length) {
-    // v159: 总停钮在分区标题上——bg 代理是父 CLI 进程内任务，停的语义只能是整轮
-    // run（v155 曾放行级，视觉上像"停这一个"，真机反馈误导）；有活 run 才渲染。
-    const hd = sechd('代理', '运行中 ' + ags.length);
-    if (cancellableRunId()) {
-      const st = document.createElement('button'); st.className = 'ac-stop'; st.title = '停止本轮运行（全部代理）';
-      st.setAttribute('aria-label', '停止本轮运行');
-      st.innerHTML = ICO_STOP;
-      st.onclick = stopOwningRun;
-      hd.append(st);
-    }
-    p.append(hd);
+    p.append(sechd('代理', '运行中 ' + ags.length));
     for (const { tid, a } of ags) {
       const r = document.createElement('button'); r.className = 'ac-agrow'; r.dataset.tid = tid;
       const lamp = document.createElement('span'); lamp.className = 'lamp'; lamp.dataset.st = 'running';
