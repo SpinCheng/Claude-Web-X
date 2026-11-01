@@ -291,3 +291,20 @@ test('board: TodoWrite overwrite -> TaskCreate -> bindCreated -> TaskUpdate life
   assert.equal('_pend' in snap, false);
   assert.deepEqual(snap.items[0], { id: '', s: 'a', st: 'completed', af: '' });
 });
+
+test('v158: synthetic "No response requested." sentinel folds out', () => {
+  // kill-path bookkeeping: assistant line whose only content is the sentinel
+  const a = run([assistant([{ type: 'text', text: 'No response requested.' }])]);
+  assert.equal(a.events.length, 0, 'sentinel-only assistant line folds entirely');
+  // resume-patch shape seen in real transcripts: sentinel carries usage too
+  const b = run([{ type: 'assistant', timestamp: 't', message: { role: 'assistant', model: '<synthetic>', content: [{ type: 'text', text: 'No response requested.' }], usage: { input_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 0 } } }]);
+  assert.equal(b.events.length, 0);
+  // a real reply that merely contains the phrase still renders
+  const c = run([assistant([{ type: 'text', text: 'The user said "No response requested." to me.' }])]);
+  assert.equal(c.events.length, 1);
+  assert.equal(c.events[0].parts[0].v, 'The user said "No response requested." to me.');
+  // sentinel + real thinking in one turn: thinking survives, text part dropped
+  const d = run([assistant([{ type: 'thinking', thinking: 'hmm' }, { type: 'text', text: 'No response requested.' }])]);
+  assert.equal(d.events.length, 1);
+  assert.deepEqual(d.events[0].parts.map((p) => p.t), ['think']);
+});

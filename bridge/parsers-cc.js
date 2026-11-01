@@ -230,6 +230,12 @@ export function applyLine(id, obj, patch, events, rec) {
             if (patch.est) patch.est.think += p.thinking.length;
           }
           else if (p.type === 'text' && p.text) {
+            // v158: the CLI's synthetic "No response requested." text part is
+            // bookkeeping for a turn that ended with no model output (killed
+            // run / resume-time patch for an interrupted turn) - not model
+            // content, drop it. Exact-string match, so a longer reply that
+            // merely contains the phrase still renders.
+            if (p.text.trim() === 'No response requested.') continue;
             parts.push({ t: 'text', v: p.text });
             if (patch.est) patch.est.prose += p.text.length;
           }
