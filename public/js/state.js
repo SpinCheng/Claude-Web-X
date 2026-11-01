@@ -54,6 +54,9 @@ export const state = {
                        // {n, total, items:[{id,s,st,af}]} (messages fetch +
                        // 'tasks' frames; structured from the bridge - never
                        // parsed from chip text)
+  goal: null,          // v163: live /goal for the open session {cond} - set
+                       // by replaying goal events, cleared on met/failed/
+                       // stopped (interrupted also null: panel shows nothing)
 };
 
 export { CLOSED_KEY };

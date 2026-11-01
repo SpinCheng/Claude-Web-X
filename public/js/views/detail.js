@@ -48,6 +48,7 @@ function openDetail(id) {
       if (d.agents) for (const a of d.agents) if (a.toolUseId) state.agents[a.toolUseId] = a;
       seedActivity(d); // v154: 待办板快照 + 本会话代理集合 → 悬浮件重建（默认收起）
       buildTurns(d.events || []);
+      refreshActivity(); // v163: events 重放可能已写入 goal 活性 → 首绘带「目标」段
       renderAllTurns();
       // v64: new-session race - the transcript user line lands within
       // milliseconds of the adoption run frame, so the first page can miss
