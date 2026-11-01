@@ -86,6 +86,11 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
     if (u.state === 'end' || u.state === 'error') {
       handoff.phoneRunEnded(u.sessionId);
       hub.denyAllForRun(u.runId, 'run ended');
+      // v158: a killed/errored CLI writes NO stop line - its in-process agents
+      // (bg AND foreground) would read as running forever. The transcript's
+      // own stop marker usually fired this already (idempotent); this covers
+      // the cancel-kill path (real-find: a817ea34's capsule corpse).
+      if (u.sessionId) adapter.agents.onParentStop(u.sessionId);
     }
     // v115: first run of a phone-created session ended -> ask the model for a
     // real title instead of the 24-char prompt truncation (titlegen guards:
