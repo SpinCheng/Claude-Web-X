@@ -235,3 +235,20 @@ test('boot order: parent replay stops BEFORE agent files register - no running c
   const e2 = tr.agents.get('bbb222');
   assert.equal(e2.finished, false, 'fresh spawn after the stop runs again');
 });
+
+test('v166: parent stop persists finished:true into each meta.json (survives restarts)', () => {
+  const { tr, agPath, metaPath } = trackerWithAgentFile();
+  tr.onParentEvents('sess1', [spawnUse('call_bg', '盘点端点')]);
+  fs.writeFileSync(metaPath, JSON.stringify({ description: '盘点端点', toolUseId: 'call_bg', requestShape: 'background' }));
+  tr.touch(agPath);
+  tr.onParentStop('sess1');
+  const m = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  assert.equal(m.finished, true, 'meta rewritten with finished:true');
+  assert.ok(m.finishedAt, 'finishedAt persisted (ISO)');
+  assert.equal(m.description, '盘点端点', 'existing meta fields preserved');
+  // boot replay: fresh tracker reading the rewritten meta builds a finished entry
+  const tr2 = new AgentTracker();
+  tr2.touch(agPath);
+  const e2 = tr2.agents.get('aaa111');
+  assert.equal(e2.finished, true, 'restart rebuild honors the persisted finish');
+});

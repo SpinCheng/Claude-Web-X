@@ -229,6 +229,25 @@ export class AgentTracker extends EventEmitter {
         this._emit(e, 'done');
       }
     }
+    // v166: persist the finish into each agent's own meta.json - the tracker
+    // rebuilds from the transcript on every bridge restart, and a cancel-kill
+    // leaves NO stop line, so in-memory finishes resurrect as running corpses
+    // (real-find 44d2d62e: two cancelled runs, four corpses after reboot).
+    // meta.json is the CLI's own per-agent state file; boot replays honor its
+    // finished:true, making the kill durable.
+    for (const aid of this.bySession.get(sessionId) || []) {
+      const e = this.agents.get(aid);
+      if (!e || !e.path) continue;
+      const metaPath = e.path.slice(0, -'.jsonl'.length) + '.meta.json';
+      let m = {};
+      try { m = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch { /* absent/corrupt -> bare finish mark */ }
+      if (m.finished === true) continue;
+      try {
+        m.finished = true;
+        m.finishedAt = new Date(e.finishedAt || Date.now()).toISOString();
+        fs.writeFileSync(metaPath, JSON.stringify(m));
+      } catch { /* best effort */ }
+    }
   }
 
   // give registered-but-unattributed agent files (file event beat the parent
