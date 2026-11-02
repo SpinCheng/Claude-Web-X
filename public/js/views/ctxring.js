@@ -321,6 +321,16 @@ function renderCostSheet() {
   };
   grid.append(cell(fmtTokens(c.inTok || 0), '输入'), cell(fmtTokens(c.outTok || 0), '输出'),
     cell(fmtTokens(c.cacheRead || 0), '缓存读'), cell(fmtTokens(c.cacheCreate || 0), '缓存写'));
+  // v169: 缓存命中率 = 缓存读 / 输入侧全部（in+cacheRead+cacheCreate）——
+  // 反映长会话里上下文复用的程度；无输入侧数据则隐藏整行
+  const hitRow = $('cost-hit');
+  const denom = (c.inTok || 0) + (c.cacheRead || 0) + (c.cacheCreate || 0);
+  if (denom > 0) {
+    hitRow.hidden = false;
+    const pct = Math.min(100, (c.cacheRead || 0) / denom * 100);
+    $('cost-hit-num').textContent = pct.toFixed(1) + '%';
+    $('cost-hit-bar').style.width = Math.max(2, pct).toFixed(1) + '%';
+  } else hitRow.hidden = true;
   // per-model rows only when the session actually switched models
   const box = $('cost-models');
   box.textContent = '';
