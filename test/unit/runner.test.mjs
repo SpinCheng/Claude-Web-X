@@ -44,3 +44,40 @@ test('settingsEnv: mtime-keyed cache - missing file, then created, then edited',
   assert.deepEqual(r.settingsEnv(), { A: '2', B: 'x' }, 'env edit => reloaded without a bridge restart');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ---------- v168: hardKill verify-and-escalate ----------
+import { Runner as _R } from '../../bridge/runner.js';
+test('v168: hardKill escalates to SIGKILL when the first kill fails', async () => {
+  const r = new Runner({});
+  const kills = [];
+  const run = {
+    state: 'running',
+    child: { exitCode: null, kill(sig) { if (sig === 'SIGKILL') { kills.push('SIGKILL'); this.exitCode = 1; } else kills.push('TERM'); } },
+  };
+  r._hardKill(run, 20); // grace injectable - no real waiting
+  await new Promise((res) => setTimeout(res, 60));
+  assert.deepEqual(kills, ['TERM', 'SIGKILL'], 'survivor: TERM then escalate');
+  assert.notEqual(run.child.exitCode, null);
+});
+test('v168: hardKill no escalation when the child died cleanly', async () => {
+  const r = new Runner({});
+  const kills = [];
+  const run = {
+    state: 'running',
+    child: { exitCode: null, kill(sig) { kills.push(sig || 'TERM'); this.exitCode = 1; } }, // first kill works
+  };
+  r._hardKill(run, 20);
+  await new Promise((res) => setTimeout(res, 60));
+  assert.deepEqual(kills, ['TERM'], 'dead child -> probe sees exitCode set, no SIGKILL');
+});
+test('v168: hardKill honors an ended run (state flip aborts escalation)', async () => {
+  const r = new Runner({});
+  const kills = [];
+  const run = {
+    state: 'ended', // close handler already booked it
+    child: { exitCode: null, kill(sig) { kills.push(sig || 'TERM'); } },
+  };
+  r._hardKill(run, 20);
+  await new Promise((res) => setTimeout(res, 60));
+  assert.deepEqual(kills, ['TERM'], 'no escalation against a finished run record');
+});

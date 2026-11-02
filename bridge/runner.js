@@ -236,7 +236,7 @@ export class Runner extends EventEmitter {
           if (!isNaN(ts) && ts > run.startedAt - 1000) {
             run.watchdogFired = true;
             console.log(`[runner] watchdog: run ${run.runId} (session ${run.sessionId || '?'}) force-ended (transcript complete, CLI lingering)`);
-            try { run.child.kill(); } catch { /* already gone */ }
+            this._hardKill(run);
           }
           break; // only the last stop-class line is relevant
         }
@@ -248,7 +248,7 @@ export class Runner extends EventEmitter {
     const run = this.runs.get(runId);
     if (!run || run.state !== 'running') return false;
     run.cancelled = true;
-    try { run.child.kill(); } catch { /* already gone */ }
+    this._hardKill(run);
     // v162: a user-cancelled run must not resurrect its /goal - the goal
     // Stop hook lives in session state and survives the kill; the next
     // resume would re-arm it and hijack that turn (real-find 9a8cf13d: a
@@ -261,6 +261,23 @@ export class Runner extends EventEmitter {
       try { this.onCancelWrite(run.sessionId); } catch { /* best effort */ }
     }
     return true;
+  }
+
+  // v168: kill with verify-and-escalate. Real-find 9a8cf13d: a cancelled
+  // CLI survived child.kill() (exception swallowed, cause unknowable) and
+  // ran its goal to completion 20 minutes later. Liveness rides the child's
+  // OWN exitCode (null until the exit event lands) - no pid probing, no
+  // PID-reuse race; SIGKILL is TerminateProcess on Windows and a real
+  // SIGKILL elsewhere (libuv maps both). Everything downstream (outcome
+  // booking, queue drain, run frames) still hangs off the unchanged close
+  // handler - this only guarantees it eventually fires.
+  _hardKill(run, graceMs = 1500) {
+    try { run.child.kill(); } catch { /* already gone or racing spawn */ }
+    const stillAlive = () => run.state === 'running' && run.child.exitCode == null;
+    setTimeout(() => {
+      if (!stillAlive()) return;
+      try { run.child.kill('SIGKILL'); } catch { /* raced the exit */ }
+    }, graceMs).unref?.();
   }
 
   activeRunFor(sessionId) {
