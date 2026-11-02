@@ -322,12 +322,11 @@ function renderCostSheet() {
   grid.append(cell(fmtTokens(c.inTok || 0), '输入'), cell(fmtTokens(c.outTok || 0), '输出'),
     cell(fmtTokens(c.cacheRead || 0), '缓存读'), cell(fmtTokens(c.cacheCreate || 0), '缓存写'));
   // v169: 缓存命中 = 缓存读 / 输入侧全部（in+cacheRead+cacheCreate），同款卡片
-  // 紧跟缓存写（占第二行整行）；无输入侧数据则不加
+  // 紧跟缓存写（同行第五张）；无输入侧数据则不加
   const denom = (c.inTok || 0) + (c.cacheRead || 0) + (c.cacheCreate || 0);
   if (denom > 0) {
     const pct = Math.min(100, (c.cacheRead || 0) / denom * 100);
     const hit = cell(pct.toFixed(1) + '%', '缓存命中');
-    hit.classList.add('wide');
     grid.append(hit);
   }
   // per-model rows only when the session actually switched models
