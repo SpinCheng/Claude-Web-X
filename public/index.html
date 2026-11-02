@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=169">
+  <link rel="stylesheet" href="/style.css?v=170">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v169</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v170</span></span>
       </div>
       <button id="list-manage" class="icon-btn" title="批量管理" aria-label="批量管理">
         <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M3 5h2.4v2.4H3V5zm4.6.3h13.4v1.8H7.6V5.3zM3 10.8h2.4v2.4H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8zM3 16.6h2.4V19H3v-2.4zm4.6.3h13.4v1.8H7.6v-1.8z"/></svg>
@@ -244,11 +244,6 @@
           <div class="sheet-title">累计消耗</div>
           <div class="cost-hero"><b id="cost-usd">—</b><span id="cost-cap" class="cost-cap"></span></div>
           <div class="tok-grid" id="cost-grid"></div>
-          <div class="cost-hit" id="cost-hit" hidden>
-            <span class="lbl">缓存命中</span>
-            <div class="hit-track"><div class="hit-fill" id="cost-hit-bar"></div></div>
-            <b class="hit-num" id="cost-hit-num">—</b>
-          </div>
           <div id="cost-models" hidden></div>
           <p class="comp-cap">转录体积构成（字符占比，纯前端估算）</p>
           <div class="comp-bar" id="comp-bar"></div>
@@ -341,6 +336,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=169"></script>
+  <script type="module" src="/app.js?v=170"></script>
 </body>
 </html>
