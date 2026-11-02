@@ -782,8 +782,10 @@ button { font-family: inherit; }
 /* ---------- v165: goal 生命周期走 cmdout 面板通道（用户裁定沿用 Goal set 口径） ---------- */
 .cmdout.goal b { font-weight: 600; }
 .cmdout.goal .st-set { color: var(--acc-strong); }
+.cmdout.goal .st-resume { color: var(--warn); } /* v167: 目标已恢复=列表呼吸灯琥珀 */
 .cmdout.goal .st-hold { color: var(--warn); }
 .cmdout.goal .st-stop { color: var(--faint); }
+.cmdout.goal .st-err { color: var(--err); } /* v167: 目标已停止=红 */
 .cmdout.goal .st-ok { color: var(--ok); }
 .ac-goalrow { display: flex; gap: 9px; padding: 4px 0; font-size: 13px; align-items: baseline; min-width: 0; }
 .ac-goalrow .g { flex: none; width: 14px; text-align: center; color: var(--acc); font-size: 12px; }

@@ -186,10 +186,10 @@ function sysMarkerTurn(ev) {
 function goalMkText(t) {
   const c = t.cond || '';
   if (t.st === 'set') return ['目标已设定', '：' + c, 'st-set'];
-  if (t.st === 'resumed') return ['目标已恢复', '：' + c, 'st-set'];
+  if (t.st === 'resumed') return ['目标已恢复', '：' + c, 'st-resume']; // 列表呼吸灯琥珀
   if (t.st === 'hold') return ['目标未达成', ' · 本轮继续执行目标（' + (t.verdict || '') + '）', 'st-hold'];
   if (t.st === 'interrupted') return ['会话中断', ' · 目标保留（可随时继续）', 'st-stop'];
-  if (t.st === 'stopped') return ['目标已停止', ' · 不再自动恢复（用户手动停止）', 'st-stop'];
+  if (t.st === 'stopped') return ['目标已停止', ' · 不再自动恢复（用户手动停止）', 'st-err'];
   if (t.st === 'failed') return ['目标失败', '：' + c, 'st-stop'];
   return ['目标已达成', '：' + c, 'st-ok']; // met
 }
