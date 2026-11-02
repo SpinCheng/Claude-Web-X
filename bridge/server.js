@@ -25,7 +25,6 @@ import * as routesHooks from './routes/hooks.js';
 import * as routesAttachments from './routes/attachments.js';
 import * as routesSessions from './routes/sessions.js';
 import * as routesMessage from './routes/message.js';
-import * as routesAgentWait from './routes/agentwait.js';
 import { TitleGen } from './titlegen.js';
 import { Pins } from './pins.js';
 
@@ -53,7 +52,6 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   routesAttachments.register(router, ctx);
   routesSessions.register(router, ctx);
   routesMessage.register(router, ctx);
-  routesAgentWait.register(router, ctx); // v158: agent-guard Stop hook callback
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
