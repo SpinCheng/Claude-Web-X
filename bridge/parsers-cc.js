@@ -172,9 +172,15 @@ export function applyLine(id, obj, patch, events, rec) {
         // envelope ("Stop hook feedback: [<goal>]: <verdict>..."). Machine text
         // aimed at the model - v165 用户裁定：**仅恢复后首轮显示**（armed 由
         // resume 事件武装、一次即解除），常规每轮收尾的检查反馈保持折叠。
-        const gh = text.match(/^Stop hook feedback:\s*\[([\s\S]*?)\]\s*:\s*([\s\S]*)$/);
-        if (gh) {
-          if (rec && rec._goalHoldArmed) {
+        // v173: ANY "Stop hook feedback:" envelope is machine text aimed at the
+        // model - fold at PREFIX level (real-find e4ffccee: the old agent-guard
+        // hook's "[agent-wait] 还有 N 个…" shape missed the bracket-colon regex
+        // and leaked as a user bubble). The goal-keeper's structured verdict
+        // still upgrades to a goalhold event when armed AND the [goal]: verdict
+        // shape matches.
+        if (/^Stop hook feedback:/.test(text)) {
+          const gh = text.match(/^Stop hook feedback:\s*\[([\s\S]*?)\]\s*:\s*([\s\S]*)$/);
+          if (gh && rec && rec._goalHoldArmed) {
             rec._goalHoldArmed = false;
             return { k: 'goalhold', ts: obj.timestamp || '', cond: gh[1].trim(), verdict: gh[2].trim() };
           }

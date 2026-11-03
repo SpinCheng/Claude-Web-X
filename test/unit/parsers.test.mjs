@@ -398,3 +398,16 @@ test('v165b: sentinel dedupes behind the cmdout envelope; silent-kill resume via
   // 注意：拦停反馈行不是人话（已折目标 hold 分支）——但此处它先被 hold 匹配：
   assert.equal(h.filter((e) => e.k === 'goalhold').length, 1, 'armed hold shows once');
 });
+
+test('v173: Stop hook feedback folds at PREFIX level (agent-wait shape included)', () => {
+  const rec = {};
+  applyLine('s', { type: 'system', subtype: 'local_command', timestamp: 't', content: '<local-command-stdout>Goal set: g</local-command-stdout>' }, {}, [], rec);
+  const evs = [];
+  applyLine('s', user({ message: { role: 'user', content: 'hi' } }), {}, evs, rec); // resume -> armed
+  const leak = 'Stop hook feedback:\n[agent-wait] 还有 2 个后台代理在运行。不要结束本轮：用 TaskOutput 轮询等待它们全部完成。';
+  const r = applyLine('s', user({ message: { role: 'user', content: leak } }), {}, [], rec);
+  assert.equal(r, null, 'agent-wait shape (no bracket-colon) folds - never a bubble');
+  const structured = 'Stop hook feedback:\n[g]: 条件未满足';
+  const r2 = applyLine('s', user({ message: { role: 'user', content: structured } }), {}, [], rec);
+  assert.equal(r2.k, 'goalhold', 'armed + structured shape still upgrades');
+});
