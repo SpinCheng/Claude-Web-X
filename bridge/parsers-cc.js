@@ -372,7 +372,7 @@ export function applyLine(id, obj, patch, events, rec) {
         if (!at || at.type !== 'goal_status') return null;
         const cond = String(at.condition || '');
         if (at.met || at.failed) {
-          if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; }
+          if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; rec._goalSetSeen = false; } // v177: 终线复位设定去重——新 goal 的 set 必须能再显示
           // v177: 用户取消（墓碑）后 CLI 的会话状态仍会幽灵武装 Stop hook——
           // 后续 met/failed 是幽灵判定噪音（真机 6b03224e：取消后 hook 复活
           // 跑检查并写 met=「已完成」）。停止行本身照常展示并武装压制；
