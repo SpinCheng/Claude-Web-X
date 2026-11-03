@@ -58,7 +58,9 @@ test('fence: live stale echo still swallowed', () => {
 test('v162: appendGoalTombstone writes a met goal_status the restore logic yields to', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-goal-'));
   const tp = path.join(tmp, 's.jsonl');
-  fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'hi' } }) + '\n');
+  const anchor = '11111111-0000-4000-8000-0000000000aa';
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', uuid: anchor, message: { role: 'user', content: 'hi' } }) + '\n'
+    + JSON.stringify({ type: 'api-request-shape', payload: 'x'.repeat(70 * 1024) }) + '\n');
   const store = { get: () => ({ transcriptPath: tp }), upsert() {}, drop() {} };
   const a = new CcAdapter(store, 'Z:\\nonexistent', '', '');
   assert.equal(a.appendGoalTombstone('s'), true);
@@ -67,8 +69,11 @@ test('v162: appendGoalTombstone writes a met goal_status the restore logic yield
   assert.equal(o.type, 'attachment');
   assert.equal(o.attachment.type, 'goal_status');
   assert.equal(o.attachment.met, true, 'met=true makes the CLI goal-restore (xun) give up');
+  assert.ok(o.uuid && o.uuid.length === 36, 'tombstone is linked into the CLI history');
+  assert.equal(o.sessionId, 's');
+  assert.equal(o.parentUuid, anchor, 'finds the UUID before a >64KB uuid-less transcript row');
   // no-newline tail gets repaired (appendTitle discipline)
-  fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'x' } })); // no trailing \n
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', uuid: anchor, message: { role: 'user', content: 'x' } })); // no trailing \n
   a.appendGoalTombstone('s');
   const lines = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean);
   assert.equal(lines.length, 3, 'previous line not concatenated (tombstone + directive appended)');
@@ -85,12 +90,14 @@ test('v174: appendGoalTombstone also writes the model-visible cancellation direc
   const lines = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean);
   assert.equal(lines.length, 3, 'original + tombstone + directive');
   assert.equal(JSON.parse(lines[1]).attachment.type, 'goal_status');
+  assert.equal(JSON.parse(lines[1]).parentUuid, JSON.parse(lines[0]).uuid, 'tombstone chains to the preceding transcript row');
   const d = JSON.parse(lines[2]);
   assert.equal(d.type, 'user');
   assert.equal(d.message.content, GOAL_CANCEL_DIRECTIVE, 'v176: user-voice directive, exact authored constant');
   assert.ok(d.uuid && d.uuid.length === 36, 'v176: uuid present - uuid-less lines are DROPPED by the CLI context builder');
-  assert.equal(d.parentUuid, JSON.parse(lines[0]).uuid, 'parentUuid chains to the previous last line');
+  assert.equal(d.parentUuid, JSON.parse(lines[1]).uuid, 'directive chains to the tombstone');
   assert.equal(d.sessionId, 's');
+  assert.equal(d.isMeta, true, 'cancellation is injected as control metadata, not a new user utterance');
 });
 
 test('v180: goalLiveFor reads the parser flag on the record (window-proof)', () => {

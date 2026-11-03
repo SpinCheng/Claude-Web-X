@@ -297,48 +297,57 @@ export class CcAdapter extends EventEmitter {
     if (!rec || !rec.transcriptPath) return false;
     try {
       let pre = '';
+      const fd = fs.openSync(rec.transcriptPath, 'r');
+      let lastUuid = null;
       try {
-        const st = fs.statSync(rec.transcriptPath);
-        if (st.size > 0) {
-          const fd = fs.openSync(rec.transcriptPath, 'r');
-          try {
-            const buf = Buffer.alloc(1);
-            if (fs.readSync(fd, buf, 0, 1, st.size - 1) === 1 && buf[0] !== 0x0A) pre = '\n';
-          } finally { fs.closeSync(fd); }
-        }
-      } catch { /* unreadable tail -> append as-is */ }
-      fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({
-        type: 'attachment', attachment: { type: 'goal_status', met: true, failed: false, condition: '', note: 'cancelled by user (claude-web stop)' },
-      }) + '\n');
-      // v174→v176: the tombstone only speaks to the CLI's restore logic - the
-      // MODEL never sees attachment lines, so the goal narrative lives on and
-      // the next resume "helpfully" continues it. Two earlier directive
-      // attempts (machine prefix, then user voice) were NO-OPS: the CLI's
-      // context builder DROPS lines without a uuid chain (probe-verified:
-      // uuid-less line invisible, uuid-chained line quoted verbatim). The
-      // directive now carries uuid/parentUuid/sessionId - parent = the
-      // current last line's uuid, read from the tail before appending.
-      const lastUuid = (() => {
-        try {
-          const st = fs.statSync(rec.transcriptPath);
-          const len = Math.min(64 * 1024, st.size);
-          const buf = Buffer.alloc(len);
-          const fd = fs.openSync(rec.transcriptPath, 'r');
-          try { fs.readSync(fd, buf, 0, len, Math.max(0, st.size - len)); } finally { fs.closeSync(fd); }
-          const ls = buf.toString('utf8').split('\n').filter(Boolean);
-          for (let i = ls.length - 1; i >= 0; i--) {
-            const u = JSON.parse(ls[i]).uuid;
-            if (u) return u;
+        const size = fs.fstatSync(fd).size;
+        if (size > 0) {
+          const byte = Buffer.alloc(1);
+          fs.readSync(fd, byte, 0, 1, size - 1);
+          if (byte[0] !== 0x0A) pre = '\n';
+
+          // Transcript lines such as api-request-shape can exceed 64KB. Read
+          // backwards in bounded chunks, but keep scanning until a UUID row is
+          // found; a fixed tail window can leave our control rows orphaned.
+          let pos = size;
+          let carry = '';
+          const chunkSize = 64 * 1024;
+          while (pos > 0 && !lastUuid) {
+            const len = Math.min(chunkSize, pos);
+            pos -= len;
+            const buf = Buffer.alloc(len);
+            fs.readSync(fd, buf, 0, len, pos);
+            const parts = (buf.toString('utf8') + carry).split('\n');
+            carry = pos > 0 ? parts.shift() : '';
+            for (let i = parts.length - 1; i >= 0; i--) {
+              if (!parts[i]) continue;
+              try {
+                const uuid = JSON.parse(parts[i]).uuid;
+                if (uuid) { lastUuid = uuid; break; }
+              } catch { /* incomplete or malformed rows have no usable UUID */ }
+            }
           }
-        } catch { /* fall through */ }
-        return null;
-      })();
-      fs.appendFileSync(rec.transcriptPath, JSON.stringify({
+        }
+      } finally { fs.closeSync(fd); }
+      // An unlinked goal_status is ignored by the CLI history builder. Refuse
+      // to write one if the transcript has no chain anchor.
+      if (!lastUuid) return false;
+      const tombstoneUuid = crypto.randomUUID();
+      const stopped = {
+        type: 'attachment', timestamp: new Date().toISOString(), uuid: tombstoneUuid,
+        parentUuid: lastUuid, sessionId: id,
+        attachment: { type: 'goal_status', met: true, failed: false, condition: '', note: 'cancelled by user (claude-web stop)' },
+      };
+      // The CLI's history builder drops unlinked rows. The goal_status tombstone
+      // must participate in the UUID chain too; otherwise /goal is restored on
+      // the next --resume and its Stop hook hijacks unrelated follow-up turns.
+      const directive = {
         type: 'user', timestamp: new Date().toISOString(),
-        uuid: crypto.randomUUID(), parentUuid: lastUuid, sessionId: id,
+        uuid: crypto.randomUUID(), parentUuid: tombstoneUuid, sessionId: id,
         message: { role: 'user', content: GOAL_CANCEL_DIRECTIVE },
-        userType: 'external',
-      }) + '\n');
+        userType: 'external', isMeta: true,
+      };
+      fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify(stopped) + '\n' + JSON.stringify(directive) + '\n');
       return true;
     } catch { return false; }
   }

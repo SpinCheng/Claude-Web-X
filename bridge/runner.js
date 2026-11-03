@@ -248,6 +248,8 @@ export class Runner extends EventEmitter {
     const run = this.runs.get(runId);
     if (!run || run.state !== 'running') return false;
     run.cancelled = true;
+    run.goalCancelPending = !!(run.sessionId && this.shouldWriteGoalTombstone
+      && this.shouldWriteGoalTombstone(run.sessionId));
     this._hardKill(run);
     // v162: a user-cancelled run must not resurrect its /goal - the goal
     // Stop hook lives in session state and survives the kill; the next
@@ -257,9 +259,6 @@ export class Runner extends EventEmitter {
     // restore logic gives up when the LAST goal_status attachment line says
     // met/failed (xun()) - append exactly that shape (appendTitle precedent:
     // newline repair first).
-    if (run.sessionId && this.onCancelWrite) {
-      try { this.onCancelWrite(run.sessionId); } catch { /* best effort */ }
-    }
     return true;
   }
 
@@ -420,6 +419,10 @@ export class Runner extends EventEmitter {
       this.runs.delete(runId);
     });
     child.on('close', (code) => {
+      if (run.cancelled && run.goalCancelPending && run.sessionId && this.onCancelWrite) {
+        try { this.onCancelWrite(run.sessionId); } catch { /* best effort */ }
+      }
+      run.goalCancelPending = false;
       run.state = 'end';
       run.exitCode = closeExitCode(run, code);
       this._emit(run);

@@ -12,10 +12,9 @@
 // prev value -> caller swallows it; 'disarm' = a genuinely new title (a real
 // desktop rename) -> desktop is authoritative, pin goes away; null = no fence
 // action (no pin / same-as-pinned title / malformed blank record).
-// v175: 取消目标的模型可见声明（用户口吻——真实-find 96ea9734：机器前缀在模型
-// 处权威性不足，目标叙事会赢「顺便继续推进目标」）。adapter 写入、解析层折叠，
-// 双方共用此常量（全串精确匹配，唯作者）。
-export const GOAL_CANCEL_DIRECTIVE = '先到这里：我手动停止了刚才的目标任务，它已经作废。之后只处理我新发的消息，不要再继续或恢复那个目标，除非我明确重新提出。';
+// v175: 取消目标的会话控制元数据。adapter 写入 isMeta 行、解析层折叠，避免
+// 把停止状态显示成用户发言，也避免后续回答主动复述取消说明。
+export const GOAL_CANCEL_DIRECTIVE = '【会话控制状态】用户已手动停止并作废之前的目标。除非用户明确通过新的 /goal 命令重新设定目标，否则不得恢复或续做该目标；后续消息按当前问题直接回答，不要主动提及或复述这条控制状态。';
 
 export function fenceTitle(pin, customTitle) {
   if (!pin || typeof customTitle !== 'string') return null;
