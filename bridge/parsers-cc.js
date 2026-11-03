@@ -338,7 +338,11 @@ export function applyLine(id, obj, patch, events, rec) {
             // cmdout 面板通道中文渲染）；与 goal_status attachment 行共用事件形状
             const gs = txt.match(/^Goal set:\s*([\s\S]+)$/);
             if (gs) {
-              if (rec) { rec._goalLive = true; rec._goalCond = gs[1].trim(); rec._goalSetSeen = true; }
+              if (rec) { rec._goalLive = true; rec._goalCond = gs[1].trim(); rec._goalCancelled = false; }
+              // v177: 与 sentinel 双向去重——谁先到谁发「设定」，后到者静默
+              // （v165b 只挡了 sentinel 在后的方向；6b03224e 是 sentinel 在前）
+              if (rec && rec._goalSetSeen) return null;
+              if (rec) rec._goalSetSeen = true;
               return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond: gs[1].trim() };
             }
             return { k: 'cmdout', ts: obj.timestamp || '', text: txt };
@@ -369,10 +373,27 @@ export function applyLine(id, obj, patch, events, rec) {
         const cond = String(at.condition || '');
         if (at.met || at.failed) {
           if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; }
-          return { k: 'goal', ts: obj.timestamp || '', st: at.met ? (at.note ? 'stopped' : 'met') : 'failed', cond };
+          // v177: 用户取消（墓碑）后 CLI 的会话状态仍会幽灵武装 Stop hook——
+          // 后续 met/failed 是幽灵判定噪音（真机 6b03224e：取消后 hook 复活
+          // 跑检查并写 met=「已完成」）。停止行本身照常展示并武装压制；
+          // 新 /goal 的 sentinel 行解除压制。
+          const stopped = !!(at.met && at.note);
+          if (stopped) {
+            if (rec) rec._goalCancelled = true;
+            return { k: 'goal', ts: obj.timestamp || '', st: 'stopped', cond };
+          }
+          if (rec && rec._goalCancelled) return null;
+          return { k: 'goal', ts: obj.timestamp || '', st: at.met ? 'met' : 'failed', cond };
+        }
+        // v177: 取消后的非 sentinel 检查行（幽灵 hook 写入）全部静默；
+        // sentinel = 用户重新 /goal = 重启 goal 显示
+        if (rec && rec._goalCancelled) {
+          if (!at.sentinel) return null;
+          rec._goalCancelled = false;
         }
         if (rec) { rec._goalLive = true; rec._goalCond = cond; }
         if (at.sentinel && rec && !rec._goalSetSeen) {
+          rec._goalSetSeen = true; // v177: sentinel-first 顺序同样登记，后续 cmdout 去重
           return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond };
         }
         return null;

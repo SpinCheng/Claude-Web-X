@@ -418,3 +418,23 @@ test('v175: user-voice cancel directive folds by exact full-string match', () =>
   const b = run([user({ message: { role: 'user', content: '先到这里：开头相似但不完全相同的消息正常显示' } })]);
   assert.equal(b.events.length, 1, 'only the exact authored string folds');
 });
+
+test('v177: post-cancel ghost goal events are suppressed; a new /goal re-arms', () => {
+  const rec = {};
+  const seq = [
+    goalCmd(),                                                  // set (cmdout)
+    goalAtt({}),                                                // silent check line
+    { type: 'system', subtype: 'stop_hook_summary', timestamp: 't2' }, // stop while live -> interrupted
+    goalAtt({ met: true, note: 'cancelled by user (claude-web stop)' }), // tombstone -> stopped + arm suppression
+    goalAtt({}),                                                // GHOST: hook's non-sentinel check -> silent
+    user({ message: { role: 'user', content: '现在几点' } }),      // would-be resume -> no marker
+    goalAtt({ met: true }),                                     // GHOST verdict met -> silent
+    goalCmd(),                                                  // NEW /goal (cmdout path) -> re-armed set
+  ];
+  const evs = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
+  for (const o of seq) { const e = applyLine('s', o, patch, evs, rec); if (e) evs.push(e); }
+  const g = evs.filter((e) => e.k === 'goal');
+  assert.deepEqual(g.map((e) => e.st), ['set', 'interrupted', 'stopped', 'set'],
+    'ghost checks/resume/met suppressed; new sentinel re-arms');
+  assert.equal(rec._goalCancelled, false, 'new goal cleared the flag');
+});
