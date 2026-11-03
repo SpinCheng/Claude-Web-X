@@ -92,3 +92,21 @@ test('v174: appendGoalTombstone also writes the model-visible cancellation direc
   assert.equal(d.parentUuid, JSON.parse(lines[0]).uuid, 'parentUuid chains to the previous last line');
   assert.equal(d.sessionId, 's');
 });
+
+test('v180: goalLiveFor reads the last goal_status; tombstone only for live goals', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-gl-'));
+  const tp = path.join(tmp, 's.jsonl');
+  const store = { get: () => ({ transcriptPath: tp }), upsert() {}, drop() {} };
+  const a = new CcAdapter(store, 'Z:\nonexistent', '', '');
+  // no goal lines at all -> not live -> cancel writes NOTHING
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', uuid: 'u1', message: { role: 'user', content: 'hi' } }) + '\n');
+  assert.equal(a.goalLiveFor('s'), false, 'goal-less session: not live');
+  // live goal (last goal_status met=false) -> live
+  fs.appendFileSync(tp, JSON.stringify({ type: 'attachment', attachment: { type: 'goal_status', met: false, condition: 'g' } }) + '\n');
+  assert.equal(a.goalLiveFor('s'), true);
+  // dead goal (tombstone last) -> not live
+  fs.appendFileSync(tp, JSON.stringify({ type: 'attachment', attachment: { type: 'goal_status', met: true, note: 'x' } }) + '\n');
+  assert.equal(a.goalLiveFor('s'), false, 'cancelled goal: not live');
+  // goal-lines-outside-tail-window: file grows past 256KB, last status beyond window
+  // (fallback: not live - conservative, matches the CLI's own scan limitation)
+});

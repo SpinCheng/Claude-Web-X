@@ -64,8 +64,11 @@ const store = new Store();
 const adapter = new CcAdapter(store, process.env.CR_ROOT || undefined, path.join(DATA_DIR, 'trash'), path.join(DATA_DIR, 'renames.json'));
 const runner = new Runner({ store, claudePath: cfg.claudePath, yolo: cfg.yolo !== false, port: cfg.port, uploadsDir: path.join(DATA_DIR, 'uploads') });
 // v162: cancelling a run tombstones the session's /goal so the next resume
-// never resurrects a goal the user manually stopped
+// never resurrects a goal the user manually stopped.
+// v180: ONLY when a goal is actually live - unconditional writes polluted
+// goal-less sessions with 目标已停止 markers and directives on every stop.
 runner.onCancelWrite = (sessionId) => {
+  if (!adapter.goalLiveFor(sessionId)) return false; // no live goal: no bookkeeping
   handoff.noteSelfWrite(sessionId); // v175: our bookkeeping must not trip the 8s foreign-writer window
   return adapter.appendGoalTombstone(sessionId);
 };
