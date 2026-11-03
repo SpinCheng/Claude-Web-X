@@ -40,3 +40,4 @@ docs/mockup-*
 # debug scratch (session dumps) - never commit
 sess.tmp.json
 *.tmp.json
+AGENTS.md
