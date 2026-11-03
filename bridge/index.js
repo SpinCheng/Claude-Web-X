@@ -65,7 +65,10 @@ const adapter = new CcAdapter(store, process.env.CR_ROOT || undefined, path.join
 const runner = new Runner({ store, claudePath: cfg.claudePath, yolo: cfg.yolo !== false, port: cfg.port, uploadsDir: path.join(DATA_DIR, 'uploads') });
 // v162: cancelling a run tombstones the session's /goal so the next resume
 // never resurrects a goal the user manually stopped
-runner.onCancelWrite = (sessionId) => adapter.appendGoalTombstone(sessionId);
+runner.onCancelWrite = (sessionId) => {
+  handoff.noteSelfWrite(sessionId); // v175: our bookkeeping must not trip the 8s foreign-writer window
+  return adapter.appendGoalTombstone(sessionId);
+};
 const handoff = new Handoff({ store, locksDir: path.join(DATA_DIR, 'locks') });
 const ctxprobe = new CtxProbe({ runner, adapter, cachePath: path.join(DATA_DIR, 'ctx-probe.json'), defaultCwd: cfg.defaultCwd, helperHome: path.join(DATA_DIR, 'helper-home') });
 const paths = {

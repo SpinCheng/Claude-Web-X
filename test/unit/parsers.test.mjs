@@ -2,7 +2,7 @@
 // judgment pitfalls documented in CLAUDE.md (转录格式 section).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLine, fenceTitle, synthesizeFileDiff, taskPart, applyBoard, bindCreated, boardSnapshot } from '../../bridge/parsers-cc.js';
+import { applyLine, fenceTitle, synthesizeFileDiff, taskPart, applyBoard, bindCreated, boardSnapshot, GOAL_CANCEL_DIRECTIVE } from '../../bridge/parsers-cc.js';
 
 const run = (lines, rec = {}) => { // rec defaults to a seeded (empty) record like _ensureSession creates
   const events = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
@@ -412,9 +412,9 @@ test('v173: Stop hook feedback folds at PREFIX level (agent-wait shape included)
   assert.equal(r2.k, 'goalhold', 'armed + structured shape still upgrades');
 });
 
-test('v174: [goal-cancelled] directive folds (machine text for the model)', () => {
-  const a = run([user({ message: { role: 'user', content: '[goal-cancelled] 用户已手动停止当前目标。除非用户明确重新提出，不要再继续或恢复该目标的执行；直接回应用户新消息即可。' } })]);
-  assert.equal(a.events.length, 0);
-  const b = run([user({ message: { role: 'user', content: '[goal-cancelled] 开头的普通消息也折叠（固定哨兵前缀）' } })]);
-  assert.equal(b.events.length, 0);
+test('v175: user-voice cancel directive folds by exact full-string match', () => {
+  const a = run([user({ message: { role: 'user', content: GOAL_CANCEL_DIRECTIVE } })]);
+  assert.equal(a.events.length, 0, 'the authored constant folds - never a bubble');
+  const b = run([user({ message: { role: 'user', content: '先到这里：开头相似但不完全相同的消息正常显示' } })]);
+  assert.equal(b.events.length, 1, 'only the exact authored string folds');
 });

@@ -22,6 +22,7 @@ export class Handoff {
     this.locksDir = opts.locksDir;
     try { fs.mkdirSync(this.locksDir, { recursive: true }); } catch { /* later ops will fail softly */ }
     this.lastPhoneRun = new Map(); // sessionId -> ms when our last runner child exited
+    this.lastSelfWrite = new Map(); // v175: sessionId -> ms of our own bookkeeping writes
   }
 
   // Runner wiring: remember when OUR run ended so post-run transcript writes
@@ -31,6 +32,13 @@ export class Handoff {
   }
   phoneRunStarted(sessionId) {
     if (sessionId) this.lastPhoneRun.delete(sessionId);
+  }
+
+  // v175: bookkeeping WE append outside a run (goal tombstone + cancel
+  // directive on user stop) must never trip the foreign-writer 8s window -
+  // register the moment; arbitration treats writes at/before it as ours.
+  noteSelfWrite(sessionId) {
+    if (sessionId) this.lastSelfWrite.set(sessionId, Date.now());
   }
 
   transcriptMtime(sessionId) {
@@ -54,7 +62,9 @@ export class Handoff {
     if (mtime && since < WRITE_GRACE_MS) {
       // ignore writes that are just our own finished run settling
       const mine = this.lastPhoneRun.get(sessionId) || 0;
-      if (mtime > mine + WRITE_GRACE_MS) {
+      // v175: ...or our own cancel bookkeeping (tombstone + directive)
+      const self = this.lastSelfWrite.get(sessionId) || 0;
+      if (mtime > Math.max(mine, self) + WRITE_GRACE_MS) {
         return { ok: false, reason: 'recent-local-write', lastWriteMs: mtime, sinceMs: since };
       }
     }

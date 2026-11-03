@@ -12,6 +12,11 @@
 // prev value -> caller swallows it; 'disarm' = a genuinely new title (a real
 // desktop rename) -> desktop is authoritative, pin goes away; null = no fence
 // action (no pin / same-as-pinned title / malformed blank record).
+// v175: 取消目标的模型可见声明（用户口吻——真实-find 96ea9734：机器前缀在模型
+// 处权威性不足，目标叙事会赢「顺便继续推进目标」）。adapter 写入、解析层折叠，
+// 双方共用此常量（全串精确匹配，唯作者）。
+export const GOAL_CANCEL_DIRECTIVE = '先到这里：我手动停止了刚才的目标任务，它已经作废。之后只处理我新发的消息，不要再继续或恢复那个目标，除非我明确重新提出。';
+
 export function fenceTitle(pin, customTitle) {
   if (!pin || typeof customTitle !== 'string') return null;
   const t = customTitle.trim();
@@ -164,11 +169,9 @@ export function applyLine(id, obj, patch, events, rec) {
         // user line - machine text aimed at the model, never a human bubble.
         // The model acknowledges the goal in its reply, so nothing is lost.
         if (/^A session-scoped Stop hook is now active with condition:/.test(text)) return null;
-        // v174: the cancel-time directive we append ourselves (adapter
-        // appendGoalTombstone) - machine text aimed at the MODEL, folded here
-        // so it never renders as a human bubble.
-        if (/^\[goal-cancelled\] /.test(text)) return null;
-        // v158: the agent-guard Stop hook's block reason rides as an injected
+        // v175: 取消目标的声明行（adapter 自写，用户口吻进模型上下文）——
+        // 解析层按全串精确匹配折叠，绝不进用户气泡。
+        if (text === GOAL_CANCEL_DIRECTIVE) return null;        // v158: the agent-guard Stop hook's block reason rides as an injected
         // user turn (same shape as the /goal directive) - machine text, fold.
         if (/^\[agent-wait\] /.test(text)) return null;
         // v162: /goal's Stop-hook block feedback rides as a user turn whose

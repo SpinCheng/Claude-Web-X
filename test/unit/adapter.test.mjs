@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CcAdapter } from '../../bridge/adapter-cc.js';
+import { GOAL_CANCEL_DIRECTIVE } from '../../bridge/parsers-cc.js';
 
 // renamesPath='' keeps pins in memory (no fs writes); store.get returns a
 // minimal record like the one _ensureSession seeds.
@@ -86,5 +87,5 @@ test('v174: appendGoalTombstone also writes the model-visible cancellation direc
   assert.equal(JSON.parse(lines[1]).attachment.type, 'goal_status');
   const d = JSON.parse(lines[2]);
   assert.equal(d.type, 'user');
-  assert.ok(/^\[goal-cancelled\] /.test(d.message.content), 'directive carries the fold prefix + model-facing wording');
+  assert.equal(d.message.content, GOAL_CANCEL_DIRECTIVE, 'v175: user-voice directive, exact authored constant');
 });
