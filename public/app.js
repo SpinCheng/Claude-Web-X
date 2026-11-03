@@ -155,8 +155,7 @@ window.addEventListener('pageshow', (e) => {
 function handleAppend(d) {
   if (d.id !== state.currentId) return;
   const prevLen = state.turns.length;
-  // v165: goal 生命周期事件改 goal 活性（胶囊「目标」段/面板分区）
-  if ((d.events || []).some((e) => e && (e.k === 'goal' || e.k === 'goalhold'))) refreshActivity();
+  const hasGoalEv = (d.events || []).some((e) => e && (e.k === 'goal' || e.k === 'goalhold'));
   // optimistic-fold can edit a turn EARLIER than the tail; track the first
   // index touched so renderTail re-renders from there (children stay aligned)
   let editStart = prevLen - 1;
@@ -169,6 +168,9 @@ function handleAppend(d) {
     // and only reaches the subscriber looking at this page
     if (ev.k === 'title' && ev.title) $('d-title').textContent = ev.title;
   }
+  // v183: goal 活性在 applyEventToTurns 循环内才更新（旧值渲染=停止后胶囊不消失
+  // 的真因——此前 refresh 在循环前跑，读到的是还活着的目标）——刷新必须在其后
+  if (hasGoalEv) refreshActivity();
   // a stop marker means the turn ENDED (any driver): close the live view so
   // the finished turn re-renders collapsed
   if ((d.events || []).some((e) => e.k === 'stop')) {

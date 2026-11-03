@@ -792,3 +792,6 @@ button { font-family: inherit; }
 .ac-goalrow .txt { min-width: 0; flex: 1 1 auto; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 
+
+/* v183: 胶囊目标段状态词（方案B——与转录 cmdout 标记同族着色） */
+.ac-pill .stw-run { color: var(--acc-strong); font-size: 12px; font-weight: 500; }

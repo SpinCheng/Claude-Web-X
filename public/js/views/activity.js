@@ -134,8 +134,10 @@ function renderPill(el, b, hasBoard, ags, goal) {
     let first = true;
     const sep = () => { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '·'; btn.append(s); };
     if (goal) {
+      // v183 方案B：目标段带状态词（进行中=珊瑚；等待判定不区分——活 goal 一态覆盖）
       const s = document.createElement('span'); s.append('目标 ');
-      if (hasBoard) { const n = document.createElement('span'); n.className = 'of'; n.textContent = b.n + '/' + b.total; s.append(n); }
+      const w = document.createElement('span'); w.className = 'stw-run'; w.textContent = '进行中';
+      s.append(w);
       btn.append(s); first = false;
     }
     if (hasBoard && !goal) {
