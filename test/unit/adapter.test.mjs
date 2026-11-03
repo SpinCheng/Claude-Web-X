@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CcAdapter } from '../../bridge/adapter-cc.js';
+import { Store } from '../../bridge/store.js';
 import { GOAL_CANCEL_DIRECTIVE } from '../../bridge/parsers-cc.js';
 
 // renamesPath='' keeps pins in memory (no fs writes); store.get returns a
@@ -103,10 +104,44 @@ test('v174: appendGoalTombstone also writes the model-visible cancellation direc
 test('v180: goalLiveFor reads the parser flag on the record (window-proof)', () => {
   const recs = new Map();
   const store = { get: (id) => recs.get(id), upsert(p) { recs.set(p.id, { ...recs.get(p.id), ...p }); }, drop(id) { recs.delete(id); } };
-  const a = new CcAdapter(store, 'Z:\nonexistent', '', '');
+  const a = new CcAdapter(store, 'Z:\\nonexistent', '', '');
   assert.equal(a.goalLiveFor('s'), false, 'no record -> not live');
   recs.set('s', { transcriptPath: 'x', _goalLive: true });
   assert.equal(a.goalLiveFor('s'), true, 'parser flag true -> live');
   recs.set('s', { transcriptPath: 'x', _goalLive: false });
   assert.equal(a.goalLiveFor('s'), false);
+});
+
+// v184: readTranscript replays the file from zero - it must run on a SCRATCH
+// record, not the live one. The live record's cross-line flags describe the
+// file's END state; inheriting them fired a ghost goal 'resumed' on the first
+// user line predating the /goal (and armed _goalHoldArmed on the live record)
+// every time the detail view re-read the transcript.
+test('v184: readTranscript replays on a scratch record (no goal ghost, no live-flag writes)', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-ghost-'));
+  const proj = path.join(tmp, 'projects', 'T--e2e');
+  fs.mkdirSync(proj, { recursive: true });
+  const tp = path.join(proj, 'cm3.jsonl');
+  const now = new Date().toISOString();
+  const lines = [
+    // plain human line BEFORE the /goal: the ghost fired exactly here
+    { type: 'user', timestamp: now, cwd: tmp, origin: { kind: 'human' }, message: { role: 'user', content: 'goal 测试' } },
+    { type: 'user', timestamp: now, cwd: tmp, message: { role: 'user', content: '<command-name>/goal</command-name>\n<command-message>goal</command-message>\n<command-args>回复ok</command-args>' } },
+    { type: 'system', subtype: 'local_command', timestamp: now, content: '<local-command-stdout>Goal set: 回复ok</local-command-stdout>' },
+    { type: 'user', timestamp: now, cwd: tmp, message: { role: 'user', content: 'A session-scoped Stop hook is now active with condition: "回复ok". Briefly acknowledge the goal.' } },
+    { type: 'system', timestamp: now, subtype: 'stop' },
+  ];
+  fs.writeFileSync(tp, lines.map((o) => JSON.stringify(o)).join('\n') + '\n');
+  const store = new Store();
+  const a = new CcAdapter(store, path.join(tmp, 'projects'), path.join(tmp, 'trash'), '');
+  a._ensureSession(tp, 'T--e2e'); // boot backfill, same path watch discovery takes
+  assert.equal(store.get('cm3')._goalLive, true, 'drains own the live flags');
+  const out = a.readTranscript('cm3', 400, 0);
+  assert.deepEqual(
+    out.events.map((e) => e.k + (e.st ? ':' + e.st : '')),
+    ['user', 'user', 'goal:set', 'stop', 'goal:interrupted'],
+    'historical sequence only - set/interrupted render, no resumed ghost',
+  );
+  assert.equal(store.get('cm3')._goalHoldArmed, undefined, 'replay must not arm flags on the live record');
+  assert.equal(store.get('cm3')._goalLive, true, 'replay leaves the drain-owned flag intact');
 });

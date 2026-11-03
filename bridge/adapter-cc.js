@@ -214,8 +214,11 @@ export class CcAdapter extends EventEmitter {
   // renames, CLI test values) and a naive replay disarms the fence, letting
   // the pre-rename title win again (the v40b production bug - boot replay
   // killed the 16:49 pin via a day-old "new" line).
-  _applyLine(id, obj, patch, events, live = false) {
-    const ev = applyLine(id, obj, patch, events, this.store.get(id));
+  // recOverride: replays that must NOT see (or mutate) the live record's
+  // cross-line flags pass a scratch object here (agents.js passes rec=null
+  // for the same reason).
+  _applyLine(id, obj, patch, events, live = false, recOverride) {
+    const ev = applyLine(id, obj, patch, events, recOverride !== undefined ? recOverride : this.store.get(id));
     // write-fence (v39): Desktop re-emits its cached pre-rename title in
     // metadata flushes; swallow exactly that stale value, disarm on real news
     const pin = this.renames.get(id);
@@ -403,10 +406,18 @@ export class CcAdapter extends EventEmitter {
     if (!rec || !rec.transcriptPath) return null;
     const t = new Tailer(rec.transcriptPath);
     const events = [];
+    // v184: replays run on a SCRATCH record. The live record's cross-line
+    // flags (_goalLive/_cmdEnv/...) describe the file's END state; feeding
+    // them to a from-zero replay fired a ghost goal 'resumed' on the first
+    // user line predating the /goal (and armed _goalHoldArmed on the live
+    // record) every time the detail view re-read the transcript. Replay-local
+    // state still evolves within the file, so set/interrupted/resumed render
+    // exactly where they historically occurred.
+    const scratch = {};
     for (const line of t.readAll()) {
       let obj;
       try { obj = JSON.parse(line); } catch { continue; }
-      const ev = this._applyLine(id, obj, {}, events);
+      const ev = this._applyLine(id, obj, {}, events, false, scratch);
       if (ev) events.push(ev);
     }
     const end = Math.max(0, events.length - Math.max(0, before | 0));

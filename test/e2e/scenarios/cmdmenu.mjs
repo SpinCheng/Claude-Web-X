@@ -45,7 +45,11 @@ await withEnv(async (h, page) => {
   assert((await page.ev('document.querySelector(".cmdout").textContent')).indexOf('Total cost') >= 0, 'cmdout carries the stdout text');
   assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.every(function(x){return x.textContent.indexOf("local-command-caveat") < 0 && x.textContent.indexOf("Stop hook") < 0})})()'), 'no caveat/hook leakage into human bubbles');
 
-  // /goal shape: system carrier + hook line (hook folds, Goal-set shows)
+  // /goal shape: system carrier + hook line (hook folds, Goal-set shows).
+  // v178: the "Goal set:" stdout line is folded INTO the set event (no raw
+  // cmdout panel); v184: replay isolation killed the ghost 'resumed' panel
+  // that the live record's _goalLive flag used to inject before the first
+  // user bubble - lifecycle panels are exactly set + interrupted.
   writeSession(h, 'T--e2e', 'cm3', [
     user(1, 'goal 测试', h.tmp),
     { type: 'user', timestamp: new Date(Date.now() - 110_000).toISOString(), cwd: h.tmp,
@@ -57,7 +61,9 @@ await withEnv(async (h, page) => {
   ]);
   assert(await waitSession('cm3'), 'goal session visible');
   await page.open('cm3');
-  assert(await page.waitFor('document.querySelectorAll(".cmdout").length === 1'), 'goal stdout via system carrier renders');
+  assert(await page.waitFor('document.querySelectorAll(".cmdout:not(.goal)").length === 0'), 'goal stdout folded into the set event (v178: no raw cmdout panel)');
+  assert(await page.waitFor('(function(){var g=[].slice.call(document.querySelectorAll(".cmdout.goal")); var st=g.filter(function(x){return x.querySelector(".st-set")}); var sp=g.filter(function(x){return x.querySelector(".st-stop")}); return g.length===2 && st.length===1 && sp.length===1})()'), 'goal lifecycle panels: exactly set + interrupted (no resumed ghost)');
+  assert(await page.waitFor('(function(){var t=document.querySelector(".cmdout.goal").textContent; return t.indexOf("目标已设定")>=0 && t.indexOf("回复ok")>=0})()'), 'set panel carries the Goal-set wording + condition');
   assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.every(function(x){return x.textContent.indexOf("Stop hook") < 0})})()'), 'hook injection never a human bubble');
   await page.open('cm1');
 
