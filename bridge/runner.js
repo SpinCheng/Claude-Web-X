@@ -364,7 +364,7 @@ export class Runner extends EventEmitter {
     // for both JSON decision and exit-2) - the only keepalive that works in
     // headless is the model itself polling via TaskOutput, which a
     // system-prompt rule reliably instructs.
-    args.push('--append-system-prompt', '[后台代理规则] 当你启动了 run_in_background 的后台代理（Agent/Task 工具）后：在所有后台代理完成之前，禁止结束你的回复——必须用 TaskOutput 逐一轮询等待它们完成并整合结果；收到系统提醒仍有未完成的后台代理时，同样继续等待，直到全部完成。超时止损：任一后台代理超过 5 分钟仍未完成，用 TaskStop 停掉它，基于已拿到的部分结果继续，并向用户说明哪个代理被止损。');
+    args.push('--append-system-prompt', '[后台代理规则] 当你启动了 run_in_background 的后台代理（Agent/Task 工具）后：在所有后台代理完成之前，禁止结束你的回复——必须用 TaskOutput 逐一轮询等待它们完成并整合结果；收到系统提醒仍有未完成的后台代理时，同样继续等待，直到全部完成。');
     const child = spawn(this.resolveClaude(), args, {
       cwd,
       // bashToolEnv: prepend the detected git dirs so the CLI's Bash tool
