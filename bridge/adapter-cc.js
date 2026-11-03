@@ -279,28 +279,13 @@ export class CcAdapter extends EventEmitter {
   // something - unconditional writes put 目标已停止 markers and cancel
   // directives into GOAL-LESS sessions on every stop (real-find: this very
   // conversation got one; 3a7a2f44's model then quoted the bogus directive).
-  // Liveness = the parser's replay state for the transcript tail: scan the
-  // LAST goal_status line the way the CLI's own restore does.
+  // Source of truth = the parser's replay flag on the store record
+  // (rec._goalLive, maintained on every drain incl. the full boot replay) -
+  // a tail-window scan was tried first and MISSED the sentinel on real
+  // goal sessions (api-request-blobs push it far beyond 256KB - e792d7af).
   goalLiveFor(id) {
     const rec = this.store.get(id);
-    if (!rec || !rec.transcriptPath) return false;
-    let tail = '';
-    try {
-      const st = fs.statSync(rec.transcriptPath);
-      const len = Math.min(256 * 1024, st.size);
-      const buf = Buffer.alloc(len);
-      const fd = fs.openSync(rec.transcriptPath, 'r');
-      try { fs.readSync(fd, buf, 0, len, Math.max(0, st.size - len)); } finally { fs.closeSync(fd); }
-      tail = buf.toString('utf8');
-    } catch { return false; }
-    const ls = tail.split('\n').filter(Boolean);
-    for (let i = ls.length - 1; i >= 0; i--) {
-      let o; try { o = JSON.parse(ls[i]); } catch { continue; }
-      if (o.type === 'attachment' && o.attachment && o.attachment.type === 'goal_status') {
-        return !(o.attachment.met || o.attachment.failed);
-      }
-    }
-    return false;
+    return !!(rec && rec._goalLive);
   }
 
   // v162: tombstone a session's /goal after a user-cancelled run. The CLI's
