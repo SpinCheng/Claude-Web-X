@@ -334,15 +334,12 @@ export function applyLine(id, obj, patch, events, rec) {
           const so = String(obj.content || '').match(/^\s*<local-command-stdout>([\s\S]*?)<\/local-command-stdout>\s*$/);
           if (so && so[1].trim()) {
             const txt = so[1].trim();
-            // v165: /goal 的 cmdout 信封（"Goal set: <条件>"）→ goal 事件（前端走
-            // cmdout 面板通道中文渲染）；与 goal_status attachment 行共用事件形状
+            // v178: /goal 的 cmdout 信封（"Goal set: <条件>"）是「设定」事件的
+            // 唯一展示源——它在文件序上紧跟 /goal 命令泡（sentinel attachment
+            // 行在命令泡之前，用它展示会把提醒顶到命令上方——真机 4037478e）。
             const gs = txt.match(/^Goal set:\s*([\s\S]+)$/);
             if (gs) {
               if (rec) { rec._goalLive = true; rec._goalCond = gs[1].trim(); rec._goalCancelled = false; }
-              // v177: 与 sentinel 双向去重——谁先到谁发「设定」，后到者静默
-              // （v165b 只挡了 sentinel 在后的方向；6b03224e 是 sentinel 在前）
-              if (rec && rec._goalSetSeen) return null;
-              if (rec) rec._goalSetSeen = true;
               return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond: gs[1].trim() };
             }
             return { k: 'cmdout', ts: obj.timestamp || '', text: txt };
@@ -372,7 +369,7 @@ export function applyLine(id, obj, patch, events, rec) {
         if (!at || at.type !== 'goal_status') return null;
         const cond = String(at.condition || '');
         if (at.met || at.failed) {
-          if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; rec._goalSetSeen = false; } // v177: 终线复位设定去重——新 goal 的 set 必须能再显示
+          if (rec) { rec._goalLive = false; rec._goalInterrupted = false; rec._goalHoldArmed = false; }
           // v177: 用户取消（墓碑）后 CLI 的会话状态仍会幽灵武装 Stop hook——
           // 后续 met/failed 是幽灵判定噪音（真机 6b03224e：取消后 hook 复活
           // 跑检查并写 met=「已完成」）。停止行本身照常展示并武装压制；
@@ -386,16 +383,13 @@ export function applyLine(id, obj, patch, events, rec) {
           return { k: 'goal', ts: obj.timestamp || '', st: at.met ? 'met' : 'failed', cond };
         }
         // v177: 取消后的非 sentinel 检查行（幽灵 hook 写入）全部静默；
-        // sentinel = 用户重新 /goal = 重启 goal 显示
+        // sentinel = 用户重新 /goal = 解除压制（展示由随后的 cmdout 负责）
         if (rec && rec._goalCancelled) {
           if (!at.sentinel) return null;
           rec._goalCancelled = false;
         }
         if (rec) { rec._goalLive = true; rec._goalCond = cond; }
-        if (at.sentinel && rec && !rec._goalSetSeen) {
-          rec._goalSetSeen = true; // v177: sentinel-first 顺序同样登记，后续 cmdout 去重
-          return { k: 'goal', ts: obj.timestamp || '', st: 'set', cond };
-        }
+        // v178: sentinel 只置状态不展示（文件序在命令泡之前，展示会错位）
         return null;
       }
       default:

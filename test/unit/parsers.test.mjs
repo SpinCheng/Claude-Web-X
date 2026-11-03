@@ -384,10 +384,10 @@ test('v165b: sentinel dedupes behind the cmdout envelope; silent-kill resume via
   // cmdout 信封在前、sentinel 在后：只发一条 set
   const a = run2([goalCmd(), goalAtt({ sentinel: true })]);
   assert.equal(a.filter((e) => e.k === 'goal' && e.st === 'set').length, 1, 'cmdout envelope owns the set event');
-  // sentinel 单独出现（无 cmdout，异常驱动兜底）：发 set
+  // sentinel 单独出现（无 cmdout，异常驱动）：v178 起只置状态不展示
   const rec2 = {};
   const b = (() => { const evs = []; const patch = { est: { tools: 0, think: 0, prose: 0 } }; const e = applyLine('s', goalAtt({ sentinel: true }), patch, evs, rec2); if (e) evs.push(e); return evs; })();
-  assert.equal(b.filter((e) => e.k === 'goal' && e.st === 'set').length, 1, 'sentinel alone still reports set');
+  assert.equal(b.length, 0, 'v178: sentinel alone tracks state, no display event');
   // /goal 信封行本身：不触发恢复
   const c = run2([user({ message: { role: 'user', content: '/goal 汇总新闻为报告' } })]);
   assert.equal(c.filter((e) => e.k === 'goal' && e.st === 'resumed').length, 0);
@@ -437,4 +437,25 @@ test('v177: post-cancel ghost goal events are suppressed; a new /goal re-arms', 
   assert.deepEqual(g.map((e) => e.st), ['set', 'interrupted', 'stopped', 'set'],
     'ghost checks/resume/met suppressed; new sentinel re-arms');
   assert.equal(rec._goalCancelled, false, 'new goal cleared the flag');
+});
+
+test('v178: cmdout is the sole set display source - position rides the command bubble', () => {
+  const rec = {};
+  const evs = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
+  const seq = [
+    goalAtt({ sentinel: true }),   // CLI writes the sentinel BEFORE the command bubble
+    user({ message: { role: 'user', content: '/goal 汇总新闻' } }), // the command bubble
+    { type: 'system', subtype: 'local_command', timestamp: 't', content: '<local-command-stdout>Goal set: 汇总新闻</local-command-stdout>' }, // stdout right after
+  ];
+  for (const o of seq) { const e = applyLine('s', o, patch, evs, rec); if (e) evs.push(e); }
+  // exactly ONE set event and it comes AFTER the user bubble (correct position)
+  const setIdx = evs.findIndex((e) => e.k === 'goal');
+  const userIdx = evs.findIndex((e) => e.k === 'user');
+  assert.equal(evs.filter((e) => e.k === 'goal').length, 1, 'single set event');
+  assert.ok(setIdx > userIdx, 'set event renders BELOW the /goal command bubble');
+  // sentinel alone (no cmdout) tracks state but displays nothing
+  const rec2 = {};
+  const r2 = applyLine('s', goalAtt({ sentinel: true }), {}, [], rec2);
+  assert.equal(r2, null, 'sentinel alone: state only, no display');
+  assert.equal(rec2._goalLive, true, 'but goal is tracked live for the panel');
 });
