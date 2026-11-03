@@ -78,7 +78,7 @@ test('v162: appendGoalTombstone writes a met goal_status the restore logic yield
 test('v174: appendGoalTombstone also writes the model-visible cancellation directive', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-gc-'));
   const tp = path.join(tmp, 's.jsonl');
-  fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'hi' } }) + '\n');
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', uuid: '11111111-0000-4000-8000-0000000000aa', message: { role: 'user', content: 'hi' } }) + '\n');
   const store = { get: () => ({ transcriptPath: tp }), upsert() {}, drop() {} };
   const a = new CcAdapter(store, 'Z:\nonexistent', '', '');
   a.appendGoalTombstone('s');
@@ -87,5 +87,8 @@ test('v174: appendGoalTombstone also writes the model-visible cancellation direc
   assert.equal(JSON.parse(lines[1]).attachment.type, 'goal_status');
   const d = JSON.parse(lines[2]);
   assert.equal(d.type, 'user');
-  assert.equal(d.message.content, GOAL_CANCEL_DIRECTIVE, 'v175: user-voice directive, exact authored constant');
+  assert.equal(d.message.content, GOAL_CANCEL_DIRECTIVE, 'v176: user-voice directive, exact authored constant');
+  assert.ok(d.uuid && d.uuid.length === 36, 'v176: uuid present - uuid-less lines are DROPPED by the CLI context builder');
+  assert.equal(d.parentUuid, JSON.parse(lines[0]).uuid, 'parentUuid chains to the previous last line');
+  assert.equal(d.sessionId, 's');
 });

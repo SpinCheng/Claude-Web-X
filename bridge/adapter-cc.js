@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { Tailer } from './tailer.js';
 import { AgentTracker } from './agents.js';
@@ -295,17 +296,34 @@ export class CcAdapter extends EventEmitter {
       fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({
         type: 'attachment', attachment: { type: 'goal_status', met: true, failed: false, condition: '', note: 'cancelled by user (claude-web stop)' },
       }) + '\n');
-      // v174→v175: the tombstone only speaks to the CLI's restore logic - the
-      // MODEL never sees attachment lines, so the goal narrative lives on in
-      // the conversation history and the next resume "helpfully" continues it
-      // (real-find b7e1e575, then 96ea9734: even a [goal-cancelled] machine-
-      // prefix line lost authority to the user's own /goal wording - "顺便
-      // 继续推进目标"). The cancellation must read in the USER's voice: the
-      // stop IS the user's act, recorded faithfully. Parser folds by exact
-      // full-string match (we authored the constant).
+      // v174→v176: the tombstone only speaks to the CLI's restore logic - the
+      // MODEL never sees attachment lines, so the goal narrative lives on and
+      // the next resume "helpfully" continues it. Two earlier directive
+      // attempts (machine prefix, then user voice) were NO-OPS: the CLI's
+      // context builder DROPS lines without a uuid chain (probe-verified:
+      // uuid-less line invisible, uuid-chained line quoted verbatim). The
+      // directive now carries uuid/parentUuid/sessionId - parent = the
+      // current last line's uuid, read from the tail before appending.
+      const lastUuid = (() => {
+        try {
+          const st = fs.statSync(rec.transcriptPath);
+          const len = Math.min(64 * 1024, st.size);
+          const buf = Buffer.alloc(len);
+          const fd = fs.openSync(rec.transcriptPath, 'r');
+          try { fs.readSync(fd, buf, 0, len, Math.max(0, st.size - len)); } finally { fs.closeSync(fd); }
+          const ls = buf.toString('utf8').split('\n').filter(Boolean);
+          for (let i = ls.length - 1; i >= 0; i--) {
+            const u = JSON.parse(ls[i]).uuid;
+            if (u) return u;
+          }
+        } catch { /* fall through */ }
+        return null;
+      })();
       fs.appendFileSync(rec.transcriptPath, JSON.stringify({
         type: 'user', timestamp: new Date().toISOString(),
+        uuid: crypto.randomUUID(), parentUuid: lastUuid, sessionId: id,
         message: { role: 'user', content: GOAL_CANCEL_DIRECTIVE },
+        userType: 'external',
       }) + '\n');
       return true;
     } catch { return false; }
