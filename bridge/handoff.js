@@ -65,6 +65,15 @@ export class Handoff {
       // v175: ...or our own cancel bookkeeping (tombstone + directive)
       const self = this.lastSelfWrite.get(sessionId) || 0;
       if (mtime > Math.max(mine, self) + WRITE_GRACE_MS) {
+        // v179 诊断：无法离线复现的 409——拒绝时落盘三个时间戳，下次复现即有精确数据
+        try {
+          fs.appendFileSync(path.join(this.locksDir, '..', 'arb.log'),
+            new Date().toISOString() + ' sid=' + sessionId.slice(0, 8) +
+            ' mtime=' + new Date(mtime).toISOString() +
+            ' lastPhoneRun=' + (mine ? new Date(mine).toISOString() : 'none') +
+            ' selfWrite=' + (self ? new Date(self).toISOString() : 'none') +
+            ' sinceMs=' + Math.round(since) + '\n');
+        } catch { /* diagnostics best-effort */ }
         return { ok: false, reason: 'recent-local-write', lastWriteMs: mtime, sinceMs: since };
       }
     }
