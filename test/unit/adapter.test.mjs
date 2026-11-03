@@ -61,8 +61,8 @@ test('v162: appendGoalTombstone writes a met goal_status the restore logic yield
   const store = { get: () => ({ transcriptPath: tp }), upsert() {}, drop() {} };
   const a = new CcAdapter(store, 'Z:\\nonexistent', '', '');
   assert.equal(a.appendGoalTombstone('s'), true);
-  const last = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean).pop();
-  const o = JSON.parse(last);
+  const ls = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean);
+  const o = JSON.parse(ls[ls.length - 2]); // v174: tombstone, then the directive
   assert.equal(o.type, 'attachment');
   assert.equal(o.attachment.type, 'goal_status');
   assert.equal(o.attachment.met, true, 'met=true makes the CLI goal-restore (xun) give up');
@@ -70,6 +70,21 @@ test('v162: appendGoalTombstone writes a met goal_status the restore logic yield
   fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'x' } })); // no trailing \n
   a.appendGoalTombstone('s');
   const lines = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean);
-  assert.equal(lines.length, 2, 'previous line not concatenated');
+  assert.equal(lines.length, 3, 'previous line not concatenated (tombstone + directive appended)');
   assert.equal(JSON.parse(lines[1]).attachment.type, 'goal_status');
+});
+
+test('v174: appendGoalTombstone also writes the model-visible cancellation directive', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-gc-'));
+  const tp = path.join(tmp, 's.jsonl');
+  fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { role: 'user', content: 'hi' } }) + '\n');
+  const store = { get: () => ({ transcriptPath: tp }), upsert() {}, drop() {} };
+  const a = new CcAdapter(store, 'Z:\nonexistent', '', '');
+  a.appendGoalTombstone('s');
+  const lines = fs.readFileSync(tp, 'utf8').split('\n').filter(Boolean);
+  assert.equal(lines.length, 3, 'original + tombstone + directive');
+  assert.equal(JSON.parse(lines[1]).attachment.type, 'goal_status');
+  const d = JSON.parse(lines[2]);
+  assert.equal(d.type, 'user');
+  assert.ok(/^\[goal-cancelled\] /.test(d.message.content), 'directive carries the fold prefix + model-facing wording');
 });

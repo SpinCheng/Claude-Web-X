@@ -295,6 +295,17 @@ export class CcAdapter extends EventEmitter {
       fs.appendFileSync(rec.transcriptPath, pre + JSON.stringify({
         type: 'attachment', attachment: { type: 'goal_status', met: true, failed: false, condition: '', note: 'cancelled by user (claude-web stop)' },
       }) + '\n');
+      // v174: the tombstone only speaks to the CLI's restore logic - the MODEL
+      // never sees attachment lines, so the goal narrative lives on in the
+      // conversation history and the next resume "helpfully" continues it
+      // (real-find b7e1e575: cancelled goal resumed on 今天几号). A user-type
+      // directive line is the CLI's own channel INTO the model's context (the
+      // /goal arming directive uses this shape) - append the cancellation
+      // declaration right after the tombstone. Parser folds it by prefix.
+      fs.appendFileSync(rec.transcriptPath, JSON.stringify({
+        type: 'user', timestamp: new Date().toISOString(),
+        message: { role: 'user', content: '[goal-cancelled] 用户已手动停止当前目标。除非用户明确重新提出，不要再继续或恢复该目标的执行；直接回应用户新消息即可。' },
+      }) + '\n');
       return true;
     } catch { return false; }
   }

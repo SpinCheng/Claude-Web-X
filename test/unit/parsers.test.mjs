@@ -411,3 +411,10 @@ test('v173: Stop hook feedback folds at PREFIX level (agent-wait shape included)
   const r2 = applyLine('s', user({ message: { role: 'user', content: structured } }), {}, [], rec);
   assert.equal(r2.k, 'goalhold', 'armed + structured shape still upgrades');
 });
+
+test('v174: [goal-cancelled] directive folds (machine text for the model)', () => {
+  const a = run([user({ message: { role: 'user', content: '[goal-cancelled] 用户已手动停止当前目标。除非用户明确重新提出，不要再继续或恢复该目标的执行；直接回应用户新消息即可。' } })]);
+  assert.equal(a.events.length, 0);
+  const b = run([user({ message: { role: 'user', content: '[goal-cancelled] 开头的普通消息也折叠（固定哨兵前缀）' } })]);
+  assert.equal(b.events.length, 0);
+});

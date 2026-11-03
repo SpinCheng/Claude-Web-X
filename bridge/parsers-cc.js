@@ -164,6 +164,10 @@ export function applyLine(id, obj, patch, events, rec) {
         // user line - machine text aimed at the model, never a human bubble.
         // The model acknowledges the goal in its reply, so nothing is lost.
         if (/^A session-scoped Stop hook is now active with condition:/.test(text)) return null;
+        // v174: the cancel-time directive we append ourselves (adapter
+        // appendGoalTombstone) - machine text aimed at the MODEL, folded here
+        // so it never renders as a human bubble.
+        if (/^\[goal-cancelled\] /.test(text)) return null;
         // v158: the agent-guard Stop hook's block reason rides as an injected
         // user turn (same shape as the /goal directive) - machine text, fold.
         if (/^\[agent-wait\] /.test(text)) return null;
