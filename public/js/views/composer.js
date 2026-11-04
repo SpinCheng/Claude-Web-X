@@ -856,6 +856,8 @@ $('attach-input').addEventListener('change', async (e) => {
 $('perm').onclick = openPermSheet;
 $('msg-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !IS_TOUCH) { e.preventDefault(); sendMessage(false); }
+  // v195：Ctrl/Cmd+Enter 恒发送（触屏外接键盘/桌面双保险；与 Enter 语义不冲突）
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendMessage(false); }
 });
 $('msg-input').addEventListener('input', () => {
   autoGrow();

@@ -14,9 +14,10 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
   updateAgentNode, updateAgentClocks, tickTurnDur } from './js/views/transcript.js';
 import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
 import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity, refreshActivity } from './js/views/activity.js';
-import { renderList } from './js/views/list.js';
 import { openArchive, closeArchive, renderArchive } from './js/views/archive.js';
-import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
+import { closeFileTree, syncFtMode } from './js/views/filetree.js';
+import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner, updateDetailEmpty } from './js/views/detail.js';
+import { renderList, syncSel } from './js/views/list.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
 import { updateComposer, renderQueuePanel } from './js/views/composer.js';
 
@@ -36,6 +37,7 @@ async function saveToken() {
 function enterApp() {
   $('gate').classList.add('hidden');
   $('list').classList.remove('hidden');
+  applyWide(); // v195：宽屏则右栏同时上屏（无会话=空态）
   connectWs();
   fetchSessions(); // HTTP bootstrap so the list shows even before WS settles
   setInterval(() => { if (state.currentId) updateTokenRing(); }, 15000);
@@ -82,6 +84,30 @@ function fetchSessions() {
     .catch(() => {});
 }
 
+/* ---------------- v195 PC 双栏壳层（roadmap 13 · B 方案）----------------
+   ≥1024px：#list/#arch 左栏常驻 + #detail 右栏同屏共挂；断点由 matchMedia
+   单点驱动（CSS 只认 body.wide，不重复媒体查询）。跨断点 resize 对可见节点
+   重跑 markCapped（限高测量依赖布局尺寸）。 */
+const WIDE_MQ = window.matchMedia('(min-width:1024px)');
+function applyWide() {
+  const wide = WIDE_MQ.matches;
+  if (state.wide === wide && document.body.classList.contains('wide') === wide) return;
+  state.wide = wide;
+  document.body.classList.toggle('wide', wide);
+  syncFtMode(); // v195：文件树第三栏形态钩子（body.ft-open）
+  if (wide) {
+    if (!state.currentId) $('detail').classList.remove('hidden'); // 右栏上屏（空态）
+  } else if (!state.currentId) {
+    // 回窄屏且无会话：恢复互斥（列表页独占）
+    $('detail').classList.add('hidden');
+    $('list').classList.remove('hidden');
+  }
+  updateDetailEmpty();
+  if (state.currentId) markCapped(); // 跨断点：可见节点重跑限高测量
+}
+WIDE_MQ.addEventListener ? WIDE_MQ.addEventListener('change', applyWide) : WIDE_MQ.addListener(applyWide);
+applyWide(); // boot 即定壳（gate 阶段只挂 class，token 后 enterApp 补空态）
+
 /* ---------------- view routing ---------------- */
 window.addEventListener('popstate', (e) => {
   // an open bubble absorbs back (close it, stay in the detail view)
@@ -107,6 +133,13 @@ window.addEventListener('popstate', (e) => {
     sendWs({ type: 'unsubscribe' });
     state.currentId = null;
     state.turns = [];
+    syncSel(null); // v195
+    updateDetailEmpty(); // v195
+    closeFileTree(); // v195：无会话即无 cwd，树随反选收起（不擦面板偏好）
+    if (state.wide) {
+      $('detail').classList.remove('hidden'); // 宽屏右栏常驻：反选=空态，左栏保持原状
+      return;
+    }
     $('detail').classList.add('hidden');
     state.archOpen = !!(e.state && e.state.cr === 'arch');
     if (state.archOpen) { $('arch').classList.remove('hidden'); renderArchive(); }
@@ -138,6 +171,15 @@ function doDeleteSession() {
     .then((j) => {
       if (!j.ok) { toast('删除失败：' + (j.error || '')); return; }
       state.currentId = null;
+      syncSel(null); // v195
+      updateDetailEmpty(); // v195
+      if (state.wide) {
+        // 宽屏右栏常驻：回空态；宽屏 detail 条目是 replaceState 上来的，
+        // back() 会离开应用根条目——原地反选即可
+        closeFileTree(); // v195：无会话即无 cwd（不擦面板偏好）
+        $('detail').classList.remove('hidden');
+        return;
+      }
       $('detail').classList.add('hidden');
       // v185: a detail opened from the archive page returns there
       if (state.archOpen) $('arch').classList.remove('hidden');

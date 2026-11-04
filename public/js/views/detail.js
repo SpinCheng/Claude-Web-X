@@ -15,7 +15,14 @@ import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurn
 import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
 import { seedActivity, resetActivity, refreshActivity } from './activity.js';
-import { resetFileTree, closeFileTree } from './filetree.js';
+import { resetFileTree, closeFileTree, openFileTree } from './filetree.js';
+import { syncSel } from './list.js';
+
+// v195 宽屏空态：右栏常驻但未选会话（覆盖右栏；窄屏永不可见）
+function updateDetailEmpty() {
+  const el = $('detail-empty');
+  if (el) el.classList.toggle('hidden', !(state.wide && !state.currentId && state.token));
+}
 
 /* ---------------- history (system back = leave detail) ---------------- */
 function openDetail(id) {
@@ -28,9 +35,14 @@ function openDetail(id) {
   state.attach = [];
   renderAttachChips();
   disarmFork(); // branch arming never crosses a session switch
-  $('list').classList.add('hidden');
-  $('arch').classList.add('hidden'); // v185: detail can open over the archive page too
+  // v195 宽屏双栏：左栏常驻不隐藏；窄屏保持互斥切换
+  if (!state.wide) {
+    $('list').classList.add('hidden');
+    $('arch').classList.add('hidden'); // v185: detail can open over the archive page too
+  }
   $('detail').classList.remove('hidden');
+  syncSel(id); // v195: 左栏选中高亮实时翻转
+  updateDetailEmpty();
   // setDraft AFTER the page is visible: its autoGrow measures scrollHeight,
   // which is 0 under display:none - refilled drafts used to collapse to 0px
   setDraft(id);
@@ -84,10 +96,15 @@ function openDetail(id) {
   renderWaitBanner();
   updateRunStatus();
   resetFileTree(); // v193 文件树：切会话跟随新 cwd 重建（打开态保持）
+  // v195 宽屏：文件树面板按用户偏好随会话自动展开（localStorage 记忆）
+  if (state.wide && localStorage.getItem('cr_ft_panel') === '1') openFileTree();
   // unique state+url per entry: adjacent identical detail entries (open A,
-  // back out, open B...) are silently traversed by Chromium - first back dead
+  // back out, open B...) are silently traversed by Chromium - first back dead.
+  // v195 宽屏改 replaceState：URL 可分享、栈不增长、back 不吃会话切换（列表
+  // 常驻，无需压栈）；窄屏维持 pushState 语义。
   state.detailSeq++;
-  history.pushState({ cr: 'detail', n: state.detailSeq }, '', '#s/' + state.detailSeq);
+  if (state.wide) history.replaceState({ cr: 'detail', n: state.detailSeq }, '', '#s/' + state.detailSeq);
+  else history.pushState({ cr: 'detail', n: state.detailSeq }, '', '#s/' + state.detailSeq);
 }
 function closeDetail() { // via the ← button only
   state.provisional = false; // adoption auto-opens the real session (v64 seed)
@@ -100,8 +117,14 @@ function closeDetail() { // via the ← button only
   state.agentView = null; // v112
   resetActivity(); // v154
   closeFileTree(); // v193 文件树随详情关闭
+  syncSel(null); // v195
+  updateDetailEmpty(); // v195：宽屏右栏常驻 → 显示空态而非隐藏
   $('agent-sheet').classList.add('hidden');
   const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
+  if (state.wide) {
+    $('detail').classList.remove('hidden'); // 右栏留在屏上显示空态
+    return;
+  }
   $('detail').classList.add('hidden');
   // v185: return to wherever the detail was opened from (list or archive);
   // state.archOpen is maintained by app.js popstate + archive.js
@@ -308,4 +331,4 @@ function renderWaitBanner() {
     : '等待权限确认' + (w.tool ? ' · ' + w.tool : '') + '——在电脑端批准后自动继续';
 }
 
-export { openDetail, openDetailProvisional, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner, loadOlder, updateHistoryPill };
+export { openDetail, openDetailProvisional, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner, loadOlder, updateHistoryPill, updateDetailEmpty };

@@ -37,10 +37,11 @@ const ftRelOf = (p, n) => (p ? p.replace(/\/+$/, '') + '/' + n : n);
 
 function openFileTree() {
   ftOpen = true;
+  syncFtMode();
   const rec = state.sessions.find((x) => x.id === state.currentId);
   $('ft-proj').textContent = rec && rec.cwd ? shortPath(rec.cwd) : '';
   $('ft-toggle').classList.add('active');
-  $('ft-scrim').classList.remove('hidden');
+  $('ft-scrim').classList.remove('hidden'); // 宽屏由 CSS display:none 压掉
   $('ft-drawer').classList.remove('hidden');
   if (ftDir.has('') && ftExp.has('')) renderTree();
   else ftLoad('');
@@ -48,16 +49,24 @@ function openFileTree() {
 function closeFileTree() {
   if (!ftOpen) return;
   ftOpen = false;
+  syncFtMode();
   $('ft-toggle').classList.remove('active');
   $('ft-scrim').classList.add('hidden');
   $('ft-drawer').classList.add('hidden');
   closeBubble('row-actions');
-  // 收起即销毁：短动作不保鲜，重开走一次懒加载
+  // 收起即销毁：短动作不保鲜，重开走一次懒加载（面板偏好只由用户显式
+  // 开关写入——代码路径（closeDetail/popstate）关闭不擦 localStorage）
   ftDir = new Map(); ftExp = new Set(); ftLoading = new Set();
   ftFilter = 'all'; ftQuery = ''; ftStats = null;
   $('ft-q').value = '';
   $('ft-find-row').classList.add('hidden');
   syncSeg();
+}
+// v195 双形态：窄=右缘抽屉；宽=第三栏 242px（纯 CSS 差异）。body.ft-open 供
+// 1024~1280 档的左栏自动收窄规则（342→262 保转录可读）；断点切换由 app.js
+// applyWide 回调同步
+export function syncFtMode() {
+  document.body.classList.toggle('ft-open', state.wide && ftOpen);
 }
 // 切会话：跟随新 cwd 重建（打开态保持打开）
 function resetFileTree() {
@@ -246,8 +255,19 @@ function ftCopy(t, label) {
 function syncSeg() {
   $('ft-seg').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.f === ftFilter));
 }
-$('ft-toggle').onclick = () => (ftOpen ? closeFileTree() : openFileTree());
-$('ft-close').onclick = closeFileTree;
+$('ft-toggle').onclick = () => {
+  if (ftOpen) {
+    closeFileTree();
+    if (state.wide) { try { localStorage.setItem('cr_ft_panel', '0'); } catch { /* quota */ } }
+  } else {
+    openFileTree();
+    if (state.wide) { try { localStorage.setItem('cr_ft_panel', '1'); } catch { /* quota */ } }
+  }
+};
+$('ft-close').onclick = () => {
+  closeFileTree();
+  if (state.wide) { try { localStorage.setItem('cr_ft_panel', '0'); } catch { /* quota */ } }
+};
 $('ft-scrim').onclick = closeFileTree;
 $('ft-find').onclick = () => {
   const row = $('ft-find-row');

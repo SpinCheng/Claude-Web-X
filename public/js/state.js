@@ -13,6 +13,7 @@ export const state = {
   ws: null, wsTimer: null, wsRetry: 1000,
   sessions: [],
   currentId: null,
+  wide: false,        // v195: ≥1024px 双栏壳（app.js matchMedia 驱动，断点单一来源）
   detailSeq: 0,       // monotonic id for detail history entries - every
                       // pushState({cr:'detail'}) MUST be unique (state AND
                       // url): adjacent identical entries are silently

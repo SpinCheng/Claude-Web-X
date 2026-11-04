@@ -179,7 +179,8 @@ function renderRow(s, inPinSection = false) {
   // never color alone) and the trailing ⋯ (v35 session ops)
   const el = document.createElement('button');
   el.type = 'button';
-  el.className = 'srow' + (state.batchSel.has(s.id) ? ' sel' : '');
+  el.className = 'srow' + (state.batchSel.has(s.id) ? ' sel' : '') + (state.currentId === s.id ? ' on' : '');
+  el.dataset.id = s.id; // v195: 宽屏选中高亮 syncSel 的翻转锚点
   el.innerHTML =
     '<span class="lamp" data-st="' + st + '"></span>' +
     '<span class="srow-main">' +
@@ -324,5 +325,13 @@ $('b-selall').onclick = () => {
   renderList();
   updateBatchBar();
 };
+
+// v195 宽屏：选中高亮跟随 detail 会话切换实时翻转（renderRow 渲染时已带 .on，
+// 此函数只翻转已渲染行，不触发重渲——sessions 帧重渲走 renderRow 的同判据）
+export function syncSel(id) {
+  document.querySelectorAll('#groups .srow').forEach((r) => {
+    r.classList.toggle('on', !!id && r.dataset.id === id);
+  });
+}
 
 export { renderList, renderRow, setBatch };

@@ -810,6 +810,61 @@ button { font-family: inherit; }
 .ft-stat { flex: none; display: flex; align-items: center; gap: 10px; padding: 7px 14px 11px;
   font: 400 10px/1 var(--mono); color: var(--dim); box-shadow: inset 0 1px 0 rgba(54, 51, 45, .6); }
 .ft-stat .d { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); flex: none; }
+
+/* ---------- v195 PC 双栏（roadmap 13 · B 方案定稿） ----------
+   body.wide 由 app.js matchMedia(≥1024px) 驱动（断点单一来源，CSS 不重复媒体查询）。
+   壳层：#list/#arch 342px 常驻左栏 + #detail flex 右栏，两页同屏共挂；
+   #detail-main 窄屏 display:contents（布局零影响），宽屏成为右栏主列。
+   内容列 860px 居中（bar 与背景不限宽保持"壳"感）；气泡绝对上限 620/700px
+   （百分比随栏宽放大、CJK 行长失控——定稿裁定）；#act/#jump 钉内容列右缘。 */
+#detail-main { display: contents; }
+body.wide { display: flex; align-items: stretch; }
+body.wide #list, body.wide #arch { width: 342px; flex: none; border-right: 1px solid rgba(54, 51, 45, .6); }
+body.wide #gate { flex: 1; }
+body.wide #detail { flex: 1; min-width: 0; flex-direction: row; }
+body.wide #detail-main { display: flex; flex-direction: column; flex: 1; min-width: 0; position: relative; }
+body.wide #back { display: none; } /* 宽屏列表常驻：无返回钮 */
+body.wide #detail .chat,
+body.wide #detail .composer,
+body.wide #detail .hist-more,
+body.wide #detail .wait-banner { max-width: 860px; margin-left: auto; margin-right: auto; width: 100%; }
+body.wide #detail .chat { padding-left: clamp(18px, 6%, 72px); padding-right: clamp(18px, 6%, 72px); }
+body.wide #act { right: max(20px, calc(50% - 430px)); } /* 锚 detail-main：内容列右缘，三栏时也不悬空 */
+body.wide #jump { position: absolute; left: auto; right: max(14px, calc(50% - 430px)); margin: 0; }
+body.wide .bubble.user { max-width: min(80%, 620px); }
+body.wide .final-card { max-width: min(100%, 700px); }
+/* 全宽模态收窄居中（防横跨双栏盖列表）；默认底 sheet 已 520px 居中无需动 */
+body.wide .overlay.bub .sheet.bubble { flex: 0 1 620px; margin-left: auto; margin-right: auto; }
+body.wide .overlay.top .sheet { flex: 0 1 620px; margin-left: auto; margin-right: auto; }
+/* 文件树第三栏形态（v195，roadmap 13 scope 追加）：scrim 隐、静态列 242px；
+   1024~1280 展开时左栏自动收窄（342→262）保转录可读；≥1280 三栏全宽共处 */
+body.wide #ft-drawer { position: static; width: 242px; max-width: none; flex: none; animation: none; box-shadow: inset 1px 0 0 rgba(54, 51, 45, .6); }
+body.wide #ft-scrim { display: none !important; }
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  body.wide.ft-open #list, body.wide.ft-open #arch { width: 262px; }
+}
+/* 宽屏空态：右栏常驻但未选会话（覆盖整个右栏，会话动作不暴露） */
+.detail-empty { position: absolute; inset: 0; z-index: 4; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; }
+.detail-empty svg { color: var(--faint); }
+.detail-empty .t { font-size: 14px; color: var(--dim); margin: 0; }
+.detail-empty .s { font-size: 12px; color: var(--faint); margin: 0; }
+/* 左栏选中行（宽屏实时翻转；窄屏列表与详情互斥，.on 不可见、无副作用） */
+.srow.on { background: var(--acc-tint); box-shadow: inset 3px 0 0 var(--acc); }
+/* hover 态（触屏无 hover 天然跳过；现交互反馈全挂 :active） */
+@media (hover: hover) {
+  .srow:hover { background: rgba(46, 43, 38, .45); }
+  .srow.on:hover { background: var(--acc-tint); }
+  .pgroup-head:hover { background: rgba(46, 43, 38, .7); }
+  .icon-btn:hover { background: var(--panel2); color: var(--fg); }
+  .cbtn:hover { background: var(--panel2); color: var(--fg); }
+  .at-row:hover, .frow:hover { background: rgba(46, 43, 38, .55); }
+  .cm-row:hover, .opt:hover { background: var(--panel2); }
+}
+/* focus-visible 基线（roadmap 13 实现红线） */
+button:focus-visible, input:focus-visible, textarea:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid currentColor; outline-offset: -1px;
+}
 /* v111: executed-command stdout panel - right side, under the command bubble */
 .cmdout { max-width: 86%; width: fit-content; background: var(--panel2); border-radius: 4px 12px 12px 12px; padding: 8px 12px; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; margin-top: 4px; }
 

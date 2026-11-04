@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=194">
+  <link rel="stylesheet" href="/style.css?v=195">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v194</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v195</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -117,6 +117,11 @@
 
   <!-- transcript detail -->
   <div id="detail" class="page hidden">
+    <!-- v195 PC 双栏（roadmap 13）：#detail-main 收纳右栏主列（header..composer）。
+         窄屏 display:contents（布局零影响）；宽屏 flex:1 主列，#ft-drawer 以第三栏
+         形态成为它的 flex 兄弟。绝对定位件（#act/#jump）宽屏锚定本列（position:relative），
+         窄屏穿透锚定 #detail。#html-prev 为 fixed 全屏页，两种形态都不受包裹影响。 -->
+    <div id="detail-main">
     <header class="bar detail-bar">
       <button id="back" class="icon-btn" title="返回列表" aria-label="返回列表">
         <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
@@ -146,29 +151,6 @@
     </button>
     <!-- v154 会话活动悬浮件：胶囊/面板两态。#detail 子节点（非 #chat——renderTail 1:1 红线），activity.js 渲染 -->
     <div id="act" class="hidden"></div>
-    <!-- v193 项目文件树（roadmap 12 定稿）：手机=右缘遮挡抽屉 82vw + 轻 scrim
-         点外即收；不动 history（短动作不保鲜），收起即销毁。cwd=当前会话项目，
-         切会话自动跟随重建（detail.js openDetail -> resetFileTree） -->
-    <div id="ft-scrim" class="ft-scrim hidden"></div>
-    <aside id="ft-drawer" class="ft-drawer hidden" aria-label="项目文件树">
-      <header class="ft-bar">
-        <div class="d-title"><b>文件</b><span id="ft-proj"></span></div>
-        <button id="ft-find" class="icon-btn" title="过滤文件名" aria-label="过滤文件名">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        </button>
-        <button id="ft-close" class="icon-btn" title="收起" aria-label="收起">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </header>
-      <div id="ft-find-row" class="ft-find hidden"><input id="ft-q" type="text" placeholder="过滤已加载的文件名" spellcheck="false" autocomplete="off"></div>
-      <div class="seg ft-seg" id="ft-seg" role="tablist">
-        <button type="button" data-f="all" class="on">全部</button>
-        <button type="button" data-f="tracked">已跟踪</button>
-        <button type="button" data-f="untracked">未跟踪</button>
-      </div>
-      <div id="ft-tree" class="ft-tree"></div>
-      <div id="ft-bar" class="ft-stat hidden"><span class="d"></span><span id="ft-stats"></span></div>
-    </aside>
     <div id="composer" class="composer">
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div id="cmd-menu" class="cmd-menu hidden"><div id="cmd-menu-list" class="cmd-menu-list"></div></div>
@@ -219,6 +201,38 @@
           </button>
         </div>
       </div>
+    </div>
+
+    </div><!-- /#detail-main -->
+    <!-- v193 项目文件树（roadmap 12 定稿）：手机=右缘遮挡抽屉 82vw + 轻 scrim
+         点外即收；宽屏（v195）=右缘第三栏 242px（scrim 隐、localStorage 记开关）。
+         不动 history（短动作不保鲜），窄屏收起即销毁。cwd=当前会话项目，
+         切会话自动跟随重建（detail.js openDetail -> resetFileTree） -->
+    <div id="ft-scrim" class="ft-scrim hidden"></div>
+    <aside id="ft-drawer" class="ft-drawer hidden" aria-label="项目文件树">
+      <header class="ft-bar">
+        <div class="d-title"><b>文件</b><span id="ft-proj"></span></div>
+        <button id="ft-find" class="icon-btn" title="过滤文件名" aria-label="过滤文件名">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button id="ft-close" class="icon-btn" title="收起" aria-label="收起">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div id="ft-find-row" class="ft-find hidden"><input id="ft-q" type="text" placeholder="过滤已加载的文件名" spellcheck="false" autocomplete="off"></div>
+      <div class="seg ft-seg" id="ft-seg" role="tablist">
+        <button type="button" data-f="all" class="on">全部</button>
+        <button type="button" data-f="tracked">已跟踪</button>
+        <button type="button" data-f="untracked">未跟踪</button>
+      </div>
+      <div id="ft-tree" class="ft-tree"></div>
+      <div id="ft-bar" class="ft-stat hidden"><span class="d"></span><span id="ft-stats"></span></div>
+    </aside>
+    <!-- v195 宽屏空态：右栏常驻但未选会话（桌面首开）——覆盖整个右栏，会话动作不暴露 -->
+    <div id="detail-empty" class="detail-empty hidden">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <p class="t">从左侧选择一个会话</p>
+      <p class="s">或点左上「新建任务」开始</p>
     </div>
 
     <!-- v105 in-app preview page: same-origin http links AND artifact files
@@ -406,6 +420,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=194"></script>
+  <script type="module" src="/app.js?v=195"></script>
 </body>
 </html>
