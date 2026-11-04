@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=192">
+  <link rel="stylesheet" href="/style.css?v=193">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v192</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v193</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -126,6 +126,10 @@
         <span id="d-meta" class="mono dim"></span>
       </div>
       <span id="d-driver" class="chip">…</span>
+      <!-- v193 项目文件树入口（roadmap 12）：cwd=当前会话项目；打开态珊瑚（.active） -->
+      <button id="ft-toggle" class="icon-btn" title="项目文件树" aria-label="项目文件树">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+      </button>
       <button id="del" class="icon-btn danger" title="删除会话" aria-label="删除会话">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
       </button>
@@ -142,6 +146,29 @@
     </button>
     <!-- v154 会话活动悬浮件：胶囊/面板两态。#detail 子节点（非 #chat——renderTail 1:1 红线），activity.js 渲染 -->
     <div id="act" class="hidden"></div>
+    <!-- v193 项目文件树（roadmap 12 定稿）：手机=右缘遮挡抽屉 82vw + 轻 scrim
+         点外即收；不动 history（短动作不保鲜），收起即销毁。cwd=当前会话项目，
+         切会话自动跟随重建（detail.js openDetail -> resetFileTree） -->
+    <div id="ft-scrim" class="ft-scrim hidden"></div>
+    <aside id="ft-drawer" class="ft-drawer hidden" aria-label="项目文件树">
+      <header class="ft-bar">
+        <div class="d-title"><b>文件</b><span id="ft-proj"></span></div>
+        <button id="ft-find" class="icon-btn" title="过滤文件名" aria-label="过滤文件名">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button id="ft-close" class="icon-btn" title="收起" aria-label="收起">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div id="ft-find-row" class="ft-find hidden"><input id="ft-q" type="text" placeholder="过滤已加载的文件名" spellcheck="false" autocomplete="off"></div>
+      <div class="seg ft-seg" id="ft-seg" role="tablist">
+        <button type="button" data-f="all" class="on">全部</button>
+        <button type="button" data-f="tracked">已跟踪</button>
+        <button type="button" data-f="untracked">未跟踪</button>
+      </div>
+      <div id="ft-tree" class="ft-tree"></div>
+      <div id="ft-bar" class="ft-stat hidden"><span class="d"></span><span id="ft-stats"></span></div>
+    </aside>
     <div id="composer" class="composer">
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div id="cmd-menu" class="cmd-menu hidden"><div id="cmd-menu-list" class="cmd-menu-list"></div></div>
@@ -379,6 +406,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=192"></script>
+  <script type="module" src="/app.js?v=193"></script>
 </body>
 </html>

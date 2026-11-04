@@ -766,6 +766,50 @@ button { font-family: inherit; }
 .at-bf { display: flex; gap: 8px; align-items: center; padding: 7px 10px 5px; font-size: 11px; color: var(--dim); }
 .at-bf .k { font: 400 10px/1 var(--mono); background: var(--panel2); border-radius: 5px; padding: 3px 6px; color: var(--dim); }
 .at-bf .k:last-child { margin-left: auto; }
+/* ---------- v193 项目文件树（roadmap 12 定稿）：手机右缘遮挡抽屉 ----------
+   82vw 滑入 + 轻 scrim 点外即收；不动 history；收起即销毁（重建成本低）。
+   树=缩进树（--ft-depth 行缩进，行单元复用为主渲染件——PC 右栏面板（条目 13）
+   落地时同单元复用）。git 角标只标注不筛除（用户裁定：untracked/ignored 行
+   文字降灰但照常可开/预览/插入）。 */
+.ft-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .22); z-index: 8; }
+.ft-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 82%; max-width: 480px;
+  background: var(--bg); box-shadow: 0 -6px 28px rgba(12, 10, 8, .45), 0 14px 44px rgba(0, 0, 0, .5);
+  display: flex; flex-direction: column; z-index: 9; animation: ftIn .22s ease; }
+@keyframes ftIn { from { transform: translateX(40px); opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .ft-drawer { animation: none; } }
+.ft-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 14px;
+  box-shadow: inset 0 -1px 0 rgba(54, 51, 45, .6); }
+.ft-find { flex: none; padding: 8px 12px 0; }
+.ft-find input { width: 100%; background: var(--panel); color: var(--fg); border: 0; border-radius: 10px;
+  padding: 9px 12px; font: 13px var(--sans); box-shadow: inset 0 1px 0 var(--ink-hi); }
+.seg { display: flex; margin: 8px 12px 2px; background: var(--panel); border-radius: 11px; padding: 3px; }
+.seg button { flex: 1; border: 0; background: none; color: var(--dim); font: 600 11.5px var(--sans); padding: 6px 0; border-radius: 9px; cursor: pointer; }
+.seg button.on { background: var(--panel2); color: var(--fg); box-shadow: var(--sh-1); }
+.ft-tree { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 2px 0 10px; }
+/* 行单元：真 button；⋯/角标用 span（嵌套交互纪律）。--ft-depth 缩进 */
+.frow { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 12px; min-height: 40px;
+  padding-left: calc(12px + var(--ft-depth, 0) * 17px); background: none; border: 0; color: var(--fg);
+  font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; }
+.frow:active { background: rgba(46, 43, 38, .55); }
+.frow .tw { flex: none; width: 13px; height: 13px; display: flex; align-items: center; justify-content: center; color: var(--faint); }
+.frow.open .tw svg { transform: rotate(90deg); }
+.frow .tw.leaf { visibility: hidden; }
+.frow .ic { flex: none; color: var(--dim); display: flex; }
+.frow .nm { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.frow.un .nm { color: var(--dim); }
+.frow.un .ic { color: var(--faint); }
+.frow .side { flex: none; display: flex; align-items: center; gap: 5px; }
+.gitb { font: 400 9px/1 var(--mono); border-radius: 5px; padding: 2.5px 5px; flex: none; }
+.gitb.unt { background: rgba(201, 163, 106, .14); color: #C9A36A; }
+.gitb.ign { background: var(--panel2); color: var(--dim); }
+.cnt { font: 400 9.5px/1 var(--mono); color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 2.5px 6px; flex: none; }
+.more { flex: none; color: var(--faint); display: flex; padding: 6px; cursor: pointer; }
+.more:active { color: var(--fg); }
+.ft-more { padding: 10px 14px; font-size: 11px; color: var(--faint); }
+.ft-stat { flex: none; display: flex; align-items: center; gap: 10px; padding: 7px 14px 11px;
+  font: 400 10px/1 var(--mono); color: var(--dim); box-shadow: inset 0 1px 0 rgba(54, 51, 45, .6); }
+.ft-stat .d { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); flex: none; }
 /* v111: executed-command stdout panel - right side, under the command bubble */
 .cmdout { max-width: 86%; width: fit-content; background: var(--panel2); border-radius: 4px 12px 12px 12px; padding: 8px 12px; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; margin-top: 4px; }
 
@@ -774,7 +818,7 @@ button { font-family: inherit; }
    间隙减半 81→39px）；hist-more 全展至 103px 仅 3px 交叠——行文居中、胶囊贴右，无视觉碰。
    非模态纪律：无遮罩层、不拦会话页交互；面板可长期存在（overscroll auto）。 */
 #detail { position: relative; }
-#act { position: absolute; top: 100px; right: 10px; z-index: 6; }
+#act { position: absolute; top: 100px; right: 20px; z-index: 6; } /* v193: 右距 10→20px（用户裁定） */
 .ac-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2); color: var(--fg);
   border: 0; border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 500; white-space: nowrap;
   box-shadow: var(--sh-2), inset 0 1px 0 var(--ink-hi); font-variant-numeric: tabular-nums; cursor: pointer;
