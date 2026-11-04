@@ -93,6 +93,19 @@ test('CLI-injected [Image: source] turn is folded out', () => {
   assert.equal(events.length, 0);
 });
 
+test('2.1.308 [Image: original …] echo line (beside image tool_result) is folded out', () => {
+  const marker = '[Image: original 1225x2322, displayed at 1055x2000. Multiply coordinates by 1.16 to map to original image.]';
+  const { events } = run([user({ origin: null, message: { role: 'user', content: marker } })]);
+  assert.equal(events.filter((e) => e.k === 'user').length, 0);
+});
+
+test('inline [Image: original …] marker is stripped from pasted-image human text', () => {
+  const marker = '[Image: original 1463x3000, displayed at 975x2000. Multiply coordinates by 1.50 to map to original image.]';
+  const { events } = run([user({ origin: null, message: { role: 'user', content: '看看这张截图 ' + marker } })]);
+  assert.equal(events[0].k, 'user');
+  assert.equal(events[0].text, '看看这张截图');
+});
+
 test('tool_use carries id (pairing key); toolres items extract text/err/images', () => {
   const { events } = run([
     assistant([{ type: 'tool_use', id: 'tu9', name: 'Bash', input: { command: 'ls' } }]),

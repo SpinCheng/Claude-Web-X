@@ -157,6 +157,19 @@ export function applyLine(id, obj, patch, events, rec) {
             return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
           }
         }
+        // 2.1.308 pasted-image markers ("[Image: original WxH, displayed at
+        // WxH. …]") persist INLINE inside the human line's text (the image
+        // data itself never lands in the transcript) - strip so the bubble
+        // shows the typed text verbatim (the optimistic twin matches by text)
+        // and so rawText/_cmdEnv arming below sees the same string. A
+        // marker-ONLY line is the CLI's synthetic echo beside an image-bearing
+        // tool_result (real-find 8786f2b0: the model's own Read() of a PNG
+        // leaked two of these as mystery right bubbles); the composer blocks
+        // empty-text sends, so it is never a human message - fold it.
+        if (!images.length) {
+          text = text.replace(/\[Image: original \d+x\d+(?:, displayed at \d+x\d+)?\.[^\]]*\]/g, '').trim();
+          if (!text) return null;
+        }
         const rawText = text;
         text = stripReminder(text);
         if (!text && !images.length) return null;
