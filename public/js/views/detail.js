@@ -15,6 +15,7 @@ import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurn
 import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
 import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
 import { seedActivity, resetActivity, refreshActivity } from './activity.js';
+import { resetFileTree, closeFileTree } from './filetree.js';
 
 /* ---------------- history (system back = leave detail) ---------------- */
 function openDetail(id) {
@@ -82,6 +83,7 @@ function openDetail(id) {
   fetchQueue(id);
   renderWaitBanner();
   updateRunStatus();
+  resetFileTree(); // v193 文件树：切会话跟随新 cwd 重建（打开态保持）
   // unique state+url per entry: adjacent identical detail entries (open A,
   // back out, open B...) are silently traversed by Chromium - first back dead
   state.detailSeq++;
@@ -97,6 +99,7 @@ function closeDetail() { // via the ← button only
   state.orphanToolRes.clear();
   state.agentView = null; // v112
   resetActivity(); // v154
+  closeFileTree(); // v193 文件树随详情关闭
   $('agent-sheet').classList.add('hidden');
   const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
   $('detail').classList.add('hidden');

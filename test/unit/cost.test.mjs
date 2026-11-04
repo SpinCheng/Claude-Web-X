@@ -9,6 +9,7 @@ const fakeEl = () => ({
   addEventListener: () => {},
   classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
   dataset: {}, // composer.js runs setPerm at module scope (ctxring -> detail -> composer)
+  querySelectorAll: () => [], // filetree.js wires #ft-seg at module scope (detail -> filetree)
   style: {},
 });
 globalThis.matchMedia = globalThis.matchMedia || (() => ({ matches: false }));

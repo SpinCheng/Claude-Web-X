@@ -681,6 +681,9 @@ function atPick(rel, isDir) {
   autoGrow(); updateComposer(); saveDraft(); // 程序赋值不触发 input，手动收尾
   input.focus();
 }
+// 文件树（roadmap 12）借力：光标处插入 @rel␣——与 @ 选择器同一插入语义，
+// 但无 token 上下文（atToken=null 分支）
+function insertRef(rel, isDir) { atToken = null; atPick(rel, isDir); }
 $('msg-input').addEventListener('input', atOnInput);
 $('msg-input').addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('at-menu').classList.contains('hidden')) hideAtMenu();
@@ -907,4 +910,4 @@ if (window.ResizeObserver && composerEl) {
   }).observe(composerEl);
 }
 
-export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setDraft, disarmFork };
+export { updateComposer, fetchQueue, renderQueuePanel, renderAttachChips, openNewModal, setDraft, disarmFork, insertRef };

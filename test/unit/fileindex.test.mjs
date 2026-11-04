@@ -10,7 +10,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   scanAtTokens, collectAtAttachments, insideRoot, browseDir,
-  repoFileList, clearIndexCache, MAX_AT_ATTACH,
+  repoFileList, clearIndexCache, MAX_AT_ATTACH, treeDir, repoStats, parseStatusZ,
 } from '../../bridge/lib/fileindex.js';
 import { bashToolEnv } from '../../bridge/lib/platform.js';
 
@@ -159,6 +159,67 @@ test('repoFileList: file-index-include negation re-admits an ignored dir', async
   fs.writeFileSync(inc, '!skipme/\n');
   const withInc = await repoFileList(dir, inc);
   assert.ok(withInc && withInc.includes('skipme/x.txt'), 'include-file negation re-admits (selector index only)');
+  clearIndexCache();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---------- v193 file tree: readdir truth + git annotation layer ----------
+test('parseStatusZ: ?? / !! sets, collapsed dirs, rename second field skipped', () => {
+  const out = ['?? new.txt', '?? wholedir/', '!! node_modules/', 'R  a.js', 'orig-a.js', '!! local.log'].map((l) => l + '\0').join('');
+  const p = parseStatusZ(out);
+  assert.deepEqual([...p.unt].sort(), ['new.txt', 'wholedir']);
+  assert.deepEqual([...p.ign].sort(), ['local.log', 'node_modules']);
+  assert.equal(p.u, 2);
+  assert.equal(p.i, 2);
+});
+
+test('treeDir: disk truth + tracked/untracked/ignored badges + counts', async () => {
+  const dir = tmpRepo();
+  fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'skipme'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'node_modules'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'README.md'), 'x');
+  fs.writeFileSync(path.join(dir, 'src', 'app.js'), 'x');
+  fs.writeFileSync(path.join(dir, 'src', 'extra.txt'), 'x');        // untracked file in tracked dir
+  fs.writeFileSync(path.join(dir, 'skipme', 'x.txt'), 'x');         // untracked whole dir (?? collapse)
+  fs.writeFileSync(path.join(dir, 'node_modules', 'p.js'), 'x');    // ignored
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\n');
+  // staged set = the tree's 已跟踪 layer (pure index, NO --others); the
+  // global-ignore neutralizer file rides along so only intended things stay untracked
+  git(['add', 'README.md', 'src/app.js', '.gitignore', '.e2e-no-global-ignore'], dir);
+  clearIndexCache();
+  const root = await treeDir(dir, '');
+  assert.ok(root, 'root listing');
+  const byName = Object.fromEntries(root.entries.map((e) => [e.n, e]));
+  assert.equal(byName.src.d, 1, 'dir flag');
+  assert.equal(byName.src.c, 1, 'dir tracked count = staged files under it (app.js only)');
+  assert.equal(byName.src.g, null, 'mixed dir: no badge');
+  assert.equal(byName.skipme.g, 'unt', 'fully untracked dir badge (?? collapse)');
+  assert.equal(byName.skipme.c, 0, 'untracked dir count');
+  assert.equal(byName.node_modules.g, 'ign', 'ignored dir badge (check-ignore)');
+  assert.equal(byName['README.md'].t, true, 'staged file flag');
+  const src = await treeDir(dir, 'src');
+  const b2 = Object.fromEntries(src.entries.map((e) => [e.n, e]));
+  assert.equal(b2['app.js'].t, true, 'tracked');
+  assert.equal(b2['app.js'].g, null, 'tracked file: no badge');
+  assert.equal(b2['extra.txt'].t, false, 'untracked file not staged');
+  assert.equal(b2['extra.txt'].g, 'unt', 'untracked badge');
+  assert.equal(await treeDir(dir, '..'), null, 'escape rejected');
+  const stats = await repoStats(dir);
+  assert.equal(stats.t, 4, 'staged: .gitignore + neutralizer + README.md + src/app.js');
+  assert.equal(stats.u, 2, 'untracked: skipme/ collapse + src/extra.txt');
+  assert.equal(stats.i, 1, 'ignored: node_modules/');
+  clearIndexCache();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('treeDir: >500 entries truncated (more flag)', async () => {
+  const dir = tmpRepo();
+  for (let i = 0; i < 505; i++) fs.writeFileSync(path.join(dir, 'f' + String(i).padStart(4, '0') + '.txt'), 'x');
+  clearIndexCache();
+  const out = await treeDir(dir, '');
+  assert.equal(out.entries.length, 500);
+  assert.equal(out.more, true);
   clearIndexCache();
   fs.rmSync(dir, { recursive: true, force: true });
 });

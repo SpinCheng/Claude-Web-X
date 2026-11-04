@@ -15,7 +15,7 @@
 // 单条消息代附上限 4；不修改原文（v190 用户文本逐字纪律）。
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CI_PATHS, bashToolEnv } from './platform.js';
 
@@ -155,4 +155,147 @@ export function collectAtAttachments(text, cwd) {
     // 其余（二进制/未知扩展/超限文本）= 纯路径降级，不产出
   }
   return out;
+}
+
+// ---- 项目文件树数据面（roadmap 12，v193）----
+// 磁盘真相：readdir 逐层懒加载（未跟踪/被 ignore 的都在）；git 只作标注层：
+// tracked=纯 index 清单（git ls-files，无 --others——@ 选择器的混合索引会把
+// 未跟踪也算进来，树的「已跟踪」语义必须是 staged 集）、untracked=
+// `git status --porcelain`（?? 折叠目录按前缀展开判定）、ignored=
+// `git check-ignore --stdin` 批查。用户裁定「git 视角不筛 git」——
+// untracked/ignored 行照常可开/预览/插入，仅角标置灰。
+const GIT_ENV = () => ({ ...process.env, ...bashToolEnv(process.env), windowsHide: true });
+
+// 纯 index（staged）文件清单，3s TTL；非 git -> null
+export async function trackedFileList(cwd) {
+  const hit = _idxCache.get('trk:' + cwd);
+  if (hit && Date.now() - hit.at < 3000) return hit.files;
+  let files = null;
+  try {
+    const { stdout } = await new Promise((resolve, reject) => {
+      execFile('git', ['ls-files', '-z'], {
+        cwd, timeout: 5000, maxBuffer: 32 * 1024 * 1024, env: GIT_ENV(),
+      }, (err, out) => (err ? reject(err) : resolve({ stdout: out })));
+    });
+    files = stdout.split('\0').filter(Boolean);
+  } catch { /* 非 git / git 缺失 -> 无标注层 */ }
+  _idxCache.set('trk:' + cwd, { files, at: Date.now() });
+  return files;
+}
+
+// porcelain -z --ignored（折叠目录保持一行，node_modules 不会炸开）；
+// 3s TTL 缓存。返回 { unt:Set, ign:Set, u, i } 或 null（非 git）。
+const _stCache = new Map(); // cwd -> {parsed, at}
+export async function gitStatusZ(cwd) {
+  const hit = _stCache.get(cwd);
+  if (hit && Date.now() - hit.at < 3000) return hit.parsed;
+  let parsed = null;
+  try {
+    const { stdout } = await new Promise((resolve, reject) => {
+      execFile('git', ['status', '--porcelain', '-z', '--ignored'], {
+        cwd, timeout: 5000, maxBuffer: 16 * 1024 * 1024, env: GIT_ENV(),
+      }, (err, out) => (err ? reject(err) : resolve({ stdout: out })));
+    });
+    parsed = parseStatusZ(stdout);
+  } catch { /* 非 git / 超时 -> 无标注层 */ }
+  _stCache.set(cwd, { parsed, at: Date.now() });
+  return parsed;
+}
+// porcelain -z：字段 = `XY <path>`\0；R/C 条目跟第二个 \0 字段（原路径）要跳过
+export function parseStatusZ(out) {
+  const unt = new Set(), ign = new Set();
+  const toks = String(out).split('\0');
+  for (let k = 0; k < toks.length; k++) {
+    const f = toks[k];
+    if (!f) continue;
+    const xy = f.slice(0, 2);
+    const p = f.slice(3).replace(/\/$/, '');
+    if (xy === '??') unt.add(p);
+    else if (xy === '!!') ign.add(p);
+    else if (xy[0] === 'R' || xy[0] === 'C') k++; // 折掉 rename 原路径字段
+  }
+  return { unt, ign, u: unt.size, i: ign.size };
+}
+
+// check-ignore 批查：stdin 喂 NUL 分隔路径，stdout 返回被忽略的路径集合。
+// 退出码 1 = 全都不忽略（不是错误）；非 git（128）-> 空集。
+async function checkIgnore(cwd, paths) {
+  const out = await new Promise((resolve) => {
+    const child = spawn('git', ['check-ignore', '-z', '--stdin'], { cwd, env: GIT_ENV() });
+    let buf = '';
+    child.stdout.on('data', (c) => { buf += c.toString('utf8'); });
+    child.on('error', () => resolve(null));
+    child.on('close', () => resolve(buf));
+    child.stdin.write(paths.join('\0') + '\0');
+    child.stdin.end();
+  }).catch(() => null);
+  if (!out) return new Set();
+  return new Set(out.split('\0').filter(Boolean));
+}
+
+// 一层目录：{ entries:[{n,d,g,c,t}], more, capped }。g='unt'|'ign'|null；
+// c=目录内被跟踪文件数（索引推得，不触盘）；t=已跟踪（文件在索引/目录含
+// 跟踪后代）。单层 >500 截断（more=true）；深度上限 12（capped=true）。
+export async function treeDir(cwd, rel = '') {
+  if (!cwd || typeof rel !== 'string') return null;
+  const root = path.resolve(cwd);
+  const abs = path.resolve(root, rel || '.');
+  if (!insideRoot(root, abs)) return null;
+  const depth = rel.split('/').filter(Boolean).length;
+  if (depth >= 12) return { entries: [], more: false, capped: true };
+  let names;
+  try { names = fs.readdirSync(abs, { withFileTypes: true }); } catch { return null; }
+  const dirs = [], files = [];
+  for (const e of names) {
+    try {
+      if (e.isDirectory()) dirs.push(e.name);
+      else if (e.isFile()) files.push(e.name);
+    } catch { /* raced away */ }
+  }
+  const srt = (a, b) => a.toLowerCase().localeCompare(b.toLowerCase());
+  dirs.sort(srt); files.sort(srt);
+  const all = dirs.concat(files);
+  const more = all.length > 500;
+  const shown = more ? all.slice(0, 500) : all;
+
+  const tracked = await trackedFileList(cwd).catch(() => null);
+  const relOf = (n) => (rel ? rel.replace(/\/+$/, '') + '/' : '') + n;
+  let unt = null;
+  let ignSet = new Set();
+  if (tracked) {
+    const st = await gitStatusZ(cwd).catch(() => null);
+    unt = st ? st.unt : new Set();
+    if (shown.length) ignSet = await checkIgnore(cwd, shown.map(relOf)).catch(() => new Set());
+  }
+  const trackedSet = tracked ? new Set(tracked) : null;
+  const underUnt = (rp) => { // 自己或祖先被 ?? 折叠收录
+    if (unt.has(rp)) return true;
+    for (const e of unt) if (rp.startsWith(e + '/')) return true;
+    return false;
+  };
+  const entries = shown.map((n, idx) => {
+    const rp = relOf(n);
+    const isDir = idx < dirs.length; // shown 保持 dirs 在前的顺序
+    if (isDir) {
+      let c = 0;
+      if (trackedSet) { const pre = rp + '/'; for (const f of tracked) if (f.startsWith(pre)) c++; }
+      let g = null;
+      if (tracked && unt.has(rp)) g = 'unt';            // 整目录未跟踪（?? 折叠行）
+      else if (ignSet.has(rp)) g = 'ign';
+      return { n, d: 1, g, c, t: c > 0 };
+    }
+    let g = null;
+    if (tracked && underUnt(rp)) g = 'unt';
+    else if (ignSet.has(rp)) g = 'ign';
+    return { n, d: 0, g, t: trackedSet ? trackedSet.has(rp) : false };
+  });
+  return { entries, more, capped: false };
+}
+
+// 项目根统计（ftbar）：跟踪=|staged 索引|、未跟踪/忽略=porcelain 计数；非 git -> null
+export async function repoStats(cwd) {
+  const tracked = await trackedFileList(cwd).catch(() => null);
+  if (!tracked) return null;
+  const st = await gitStatusZ(cwd).catch(() => null);
+  return { t: tracked.length, u: st ? st.u : 0, i: st ? st.i : 0 };
 }

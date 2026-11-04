@@ -10,6 +10,7 @@ import assert from 'node:assert';
 const fakeEl = () => ({
   addEventListener: () => {},
   classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+  querySelectorAll: () => [], // filetree.js wires #ft-seg at module scope (detail -> filetree)
 });
 globalThis.matchMedia = globalThis.matchMedia || (() => ({ matches: false }));
 globalThis.localStorage = globalThis.localStorage || {

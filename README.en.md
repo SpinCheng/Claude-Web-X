@@ -119,6 +119,7 @@ Sessions are files: desktop, terminal and phone all write the same transcripts; 
 - Context ring (Desktop-parity accounting via CLI `/context` probe); cost panel (official / multiplier / custom per-model rates)
 - Attachments (compressed images, inlined text), artifact preview (locked to the project dir, XSS-hardened; html and md both get a sandboxed render + source dual tab), Markdown export, per-turn changed-files rollup, in-session fork
 - @ remote file references (v192): type `@` to fuzzy-pick PC-side project files/dirs (full git index fetched once, filtered locally; dirs are referenceable too); at send time the bridge proxies content along — text ≤24KB inlined into the prompt, project images ride the conversation natively, oversized/binary degrade to the plain path (the model fetches it itself)
+- Project file tree (v194): a right-edge drawer from the detail header browses the session's project (lazy per-dir loading; >500 entries per level truncate, depth caps at 12); git badges annotate untracked/ignored without filtering them out; tap a file to preview, ⋯/right-click to insert an @ reference or copy the path/name
 - Message queue (edit/reorder/jump), optimistic bubbles (breathing dot → confirmed, red on stop)
 
 ## Directory layout

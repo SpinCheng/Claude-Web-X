@@ -7,7 +7,7 @@ import { readModelCatalog } from '../lib/models.js';
 import { CI_PATHS } from '../lib/platform.js';
 import { collectCommands, collectSkills } from '../lib/commands.js';
 import { pickUserPrompts, buildSuggestPrompt } from '../titlegen.js';
-import { repoFileList, browseDir } from '../lib/fileindex.js';
+import { repoFileList, browseDir, treeDir, repoStats } from '../lib/fileindex.js';
 
 export function register(router, ctx) {
   const { cfg, store, adapter, runner, ctxprobe, hub } = ctx;
@@ -64,6 +64,20 @@ export function register(router, ctx) {
     if (files) { json(res, 200, { ok: true, repo: true, total: files.length, files }); return; }
     const b = browseDir(cwd, '') || { dirs: [], files: [] };
     json(res, 200, { ok: true, repo: false, ...b });
+  });
+
+  // v193 project file tree (roadmap 12): one directory per call - lazy expand,
+  // disk truth (readdir), git as an ANNOTATION layer only (unt/ign badges;
+  // "git 视角不筛 git" ruling: flagged rows stay openable/previewable/insertable).
+  router.get('/api/sessions/:id/tree', async (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    const rec = store.get(r.params.id);
+    if (!rec) { json(res, 404, { error: 'not found' }); return; }
+    const cwd = rec.cwd || cfg.defaultCwd || '';
+    if (!cwd) { json(res, 404, { error: 'no project dir' }); return; }
+    const out = await treeDir(cwd, r.url.searchParams.get('p') || '');
+    if (!out) { json(res, 403, { error: 'outside project dir' }); return; }
+    json(res, 200, { ok: true, ...out, stats: await repoStats(cwd) });
   });
 
   router.get('/api/sessions', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { sessions: hub.mergedSessions() }); });
