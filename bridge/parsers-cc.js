@@ -48,6 +48,13 @@ export function applyLine(id, obj, patch, events, rec) {
     // the expanded prompt body". Any NON-user line disarms - a local-type
     // command (no body) must not swallow the human's next real message.
     if (obj.type !== 'user' && rec) rec._cmdEnv = false;
+    // v191 结算速率（roadmap 05）：非 assistant 行的 ts = 下一段模型输出的
+    // 计时起点（通常是 tool_result / api-request——间隔≈收到输入到吐完本行
+    // 的真实耗时，含 thinking）。累加挂 rec（跨行状态，_cmdEnv 先例）。
+    if (obj.type !== 'assistant' && rec) {
+      const bt = Date.parse(obj.timestamp || '');
+      if (Number.isFinite(bt)) rec._rateBase = bt;
+    }
     switch (obj.type) {
       case 'user': {
         // compaction continuation (2.1.308): the CLI injects the resume
@@ -266,6 +273,24 @@ export function applyLine(id, obj, patch, events, rec) {
             patch.usageFirst = total;
             patch.fixedTok = Math.min(200_000, Math.max(0, Math.round(total - fu / 2.5)));
           }
+          // v191 结算速率累加：Σout / Σ间隔，按 message.model 分桶（与圆环/
+          // 模型标签同源）。链式基点——assistant 行自己也成为下一行的基点，
+          // 连续 assistant 行绝不重叠计时；无 ts / 无基点 / 非正间隔整行跳过
+          // 速率贡献（token 计量不受影响，那是 cost-state 的账）。
+          if (rec) {
+            const at = Date.parse(obj.timestamp || '');
+            if (Number.isFinite(at)) {
+              const base = rec._rateBase;
+              if (Number.isFinite(base) && at > base) {
+                const name = String((obj.message && obj.message.model) || '');
+                rec._rate = rec._rate || {};
+                const bk = rec._rate[name] || (rec._rate[name] = { out: 0, ms: 0 });
+                bk.out += u.output_tokens || 0;
+                bk.ms += at - base;
+              }
+              rec._rateBase = at;
+            }
+          }
         }
         const parts = [];
         for (const p of content) {
@@ -330,6 +355,17 @@ export function applyLine(id, obj, patch, events, rec) {
           models[name] = { inTok: m.inputTokens || 0, outTok: m.outputTokens || 0, cacheRead: m.cacheReadInputTokens || 0, cacheCreate: m.cacheCreationInputTokens || 0, usd: mu };
         }
         const stats = { usd: (usd || obj.totalCostUSD || null), inTok, outTok, cacheRead, cacheCreate, models };
+        // v191: 结算速率随 stats 下发（原始和数随行、除法留给前端）——只在
+        // cost-state 落地时刷新，即费用面板的「结算」口径；无累加数据不带键。
+        if (rec && rec._rate) {
+          let rOut = 0, rMs = 0;
+          const rModels = {};
+          for (const [name, b] of Object.entries(rec._rate)) {
+            rOut += b.out; rMs += b.ms;
+            rModels[name] = { out: b.out, ms: b.ms };
+          }
+          stats.rate = { out: rOut, ms: rMs, models: rModels };
+        }
         patch.cost = stats;
         // 2.1.308 occasionally flushes two cost-state lines back-to-back at
         // process exit (distinct snapshots; once in 39 here) - collapse

@@ -113,6 +113,62 @@ test('marker-ONLY line folds even mid-word variants stay safe (anchored full mac
   assert.equal(events[0].text, '这个格式是 [Image: original 1225x2322...] 对吧');
 });
 
+// ---------- v191 结算速率（roadmap 05：Σout ÷ Σ间隔，分模型，随 cost-state 下发） ----------
+const asstRate = (ts, model, out) => ({ type: 'assistant', timestamp: ts, message: { role: 'assistant', model, usage: { input_tokens: 10, output_tokens: out }, content: [{ type: 'text', text: 'ok' }] } });
+const tsUser = (ts) => ({ type: 'user', timestamp: ts, origin: { kind: 'human' }, message: { role: 'user', content: 'go' } });
+const tsToolRes = (ts, id) => ({ type: 'user', timestamp: ts, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'r' }] }] } });
+const ISO = (s) => '2026-11-05T00:00:' + String(s).padStart(2, '0') + '.000Z';
+
+test('v191 settle rate: Σout ÷ Σinterval, chained base, rides cost-state stats', () => {
+  const rec = {};
+  const { events } = run([
+    tsUser(ISO(0)),
+    asstRate(ISO(10), 'm1', 120),      // 10s from the user line
+    tsToolRes(ISO(30), 't1'),          // resets the base (tool_result carries ts)
+    asstRate(ISO(45), 'm1', 180),      // 15s from the tool_result
+    costState(1, 1, 0.01),
+  ], rec);
+  assert.deepEqual(rec._rate, { m1: { out: 300, ms: 25000 } });
+  const st = events[events.length - 1];
+  assert.equal(st.k, 'stats');
+  assert.deepEqual(st.stats.rate, { out: 300, ms: 25000, models: { m1: { out: 300, ms: 25000 } } });
+});
+
+test('v191 settle rate: per-model buckets', () => {
+  const rec = {};
+  const { events } = run([
+    tsUser(ISO(0)),
+    asstRate(ISO(10), 'm1', 100),
+    tsUser(ISO(20)),
+    asstRate(ISO(35), 'm2', 200),
+    costState(1, 1, 0.01),
+  ], rec);
+  assert.deepEqual(rec._rate, { m1: { out: 100, ms: 10000 }, m2: { out: 200, ms: 15000 } });
+  const st = events[events.length - 1];
+  assert.deepEqual(st.stats.rate.models, { m1: { out: 100, ms: 10000 }, m2: { out: 200, ms: 15000 } });
+  assert.equal(st.stats.rate.out, 300);
+  assert.equal(st.stats.rate.ms, 25000);
+});
+
+test('v191 settle rate: no-ts / zero-interval lines contribute nothing (no divide blowups)', () => {
+  const rec = {};
+  run([
+    tsUser(ISO(0)),
+    { type: 'assistant', message: { role: 'assistant', model: 'm1', usage: { input_tokens: 1, output_tokens: 999 }, content: [{ type: 'text', text: 'x' }] } }, // no ts
+    asstRate(ISO(0), 'm1', 50),        // same ts as base -> zero interval, skip
+    tsUser(ISO(1)),
+    asstRate(ISO(11), 'm1', 70),       // the only contributor: 10s
+    costState(1, 1, 0.01),
+  ], rec);
+  assert.deepEqual(rec._rate, { m1: { out: 70, ms: 10000 } });
+});
+
+test('v191 settle rate: no accumulation -> stats carry no rate key', () => {
+  const { events } = run([user(), costState(1, 1, 0.01)]);
+  const st = events[events.length - 1];
+  assert.equal(st.stats.rate, undefined);
+});
+
 test('tool_use carries id (pairing key); toolres items extract text/err/images', () => {
   const { events } = run([
     assistant([{ type: 'tool_use', id: 'tu9', name: 'Bash', input: { command: 'ls' } }]),
