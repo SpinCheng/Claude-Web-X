@@ -157,28 +157,16 @@ export function applyLine(id, obj, patch, events, rec) {
             return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
           }
         }
-        // 2.1.308 persists pasted images as marker TEXT inline in the human
-        // line (content is a plain string - the image data never enters the
-        // transcript and no structural field flags where it was; the marker
-        // IS the only trace, so text matching is the only possible signal).
-        // Anchored to the FULL machine format incl. the "Multiply coordinates"
-        // tail so quoted/truncated forms in human typing don't hit. A match is
-        // RESTORED as a placeholder image part with the dims kept (v189 用户
-        //裁定: user content is never silently deleted - the bubble shows an
-        // image chip) and stripped from the text so the optimistic twin still
-        // matches verbatim. A marker-ONLY line is the CLI's synthetic echo
-        // beside an image-bearing tool_result (real-find 8786f2b0: the model's
-        // own Read() of a PNG leaked two as mystery right bubbles) - nothing
-        // human to keep, fold it.
-        if (!images.length) {
-          const IMGM = /\[Image: original (\d+)x(\d+)(?:, displayed at (\d+)x(\d+))?\. Multiply coordinates by [\d.]+ to map to original image\.\]/g;
-          const found = [...text.matchAll(IMGM)];
-          if (found.length) {
-            text = text.replace(IMGM, '').trim();
-            if (!text) return null; // marker-only = synthetic echo line, fold
-            for (const m of found) images.push({ ph: true, w: +m[1], h: +m[2] });
-          }
-        }
+        // 2.1.308 image markers. TWO shapes, opposite verdicts (v190 用户裁定):
+        // a marker-ONLY line is the CLI's synthetic echo beside an
+        // image-bearing tool_result (real-find 8786f2b0: the model's own
+        // Read() of a PNG leaked two as mystery right bubbles) - machine
+        // bookkeeping, fold. A marker INLINE in human text is the user's own
+        // content (pasted image or typed reference; the image bytes never
+        // enter the transcript) - leave VERBATIM: never stripped, never
+        // restyled as an image placeholder. The optimistic-twin dedup in the
+        // PWA compares marker-insensitively instead.
+        if (!images.length && /^\[Image: original \d+x\d+(?:, displayed at \d+x\d+)?\. Multiply coordinates by [\d.]+ to map to original image\.\]\s*$/.test(text)) return null;
         const rawText = text;
         text = stripReminder(text);
         if (!text && !images.length) return null;

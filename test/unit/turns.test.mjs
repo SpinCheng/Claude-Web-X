@@ -101,6 +101,23 @@ test('queued dispatch still folds into a pending optimistic twin', () => {
   assert.equal(userTurns()[0].optimistic, false);
 });
 
+test('v190: transcript text carrying an inline image marker folds into the typed-text twin (marker-insensitive dedup)', () => {
+  // the CLI persists a pasted image as marker text INSIDE the human line; the
+  // composer's optimistic bubble never carries it. Display stays verbatim -
+  // only the dedup comparison ignores the marker, and the twin ADOPTS the
+  // transcript text so live view matches later replay.
+  const marker = '[Image: original 1463x3000, displayed at 975x2000. Multiply coordinates by 1.50 to map to original image.]';
+  const typed = '看看这张截图';
+  state.turns = [];
+  state.turns.push({ role: 'user', text: typed, ts: '', optimistic: true });
+  state.turns.push({ role: 'bot', think: [], tools: [], texts: [], steps: [], ts: '' });
+  const at = applyEventToTurns({ k: 'user', ts: '4', text: typed + ' ' + marker });
+  assert.notEqual(at, null, 'fold returns the edited index');
+  assert.equal(userTurns().length, 1, 'no duplicate bubble');
+  assert.equal(userTurns()[0].text, typed + ' ' + marker, 'adopted transcript text (verbatim marker)');
+  assert.equal(userTurns()[0].optimistic, false);
+});
+
 test('fileChanges merges edits per file (case-insensitive) with ± lines', () => {
   const t = { steps: [
     { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'D:\\x\\A.ts', old_string: 'a\nb', new_string: 'a1\nb1\nc1' }) } },

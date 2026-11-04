@@ -99,19 +99,18 @@ test('2.1.308 [Image: original …] echo line (beside image tool_result) is fold
   assert.equal(events.filter((e) => e.k === 'user').length, 0);
 });
 
-test('inline [Image: original …] marker -> text stripped + placeholder image part (v189: never silently deleted)', () => {
+test('inline [Image: original …] marker in human text stays VERBATIM (v190 用户裁定：我的输入是文本)', () => {
   const marker = '[Image: original 1463x3000, displayed at 975x2000. Multiply coordinates by 1.50 to map to original image.]';
   const { events } = run([user({ origin: null, message: { role: 'user', content: '看看这张截图 ' + marker } })]);
   assert.equal(events[0].k, 'user');
-  assert.equal(events[0].text, '看看这张截图');
-  assert.deepEqual(events[0].images, [{ ph: true, w: 1463, h: 3000 }]);
+  assert.equal(events[0].text, '看看这张截图 ' + marker);
+  assert.equal(events[0].images, undefined);
 });
 
-test('quoted/truncated marker text (no machine tail) is left verbatim', () => {
+test('marker-ONLY line folds even mid-word variants stay safe (anchored full machine format)', () => {
   const { events } = run([user({ message: { role: 'user', content: '这个格式是 [Image: original 1225x2322...] 对吧' } })]);
   assert.equal(events[0].k, 'user');
   assert.equal(events[0].text, '这个格式是 [Image: original 1225x2322...] 对吧');
-  assert.equal(events[0].images, undefined); // no emit key when nothing to carry
 });
 
 test('tool_use carries id (pairing key); toolres items extract text/err/images', () => {

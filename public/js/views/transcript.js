@@ -36,6 +36,15 @@ function buildTurns(events) {
   }
   if (!stopped) markLiveTurn();
 }
+// v190: the CLI persists a pasted image as marker TEXT inline in the human
+// line ("[Image: original WxH, …]") - the composer's text never carries it.
+// Display stays VERBATIM (user ruling: my input is text, no placeholder
+// restyling); only the optimistic-twin DEDUP compares marker-insensitively,
+// so the transcript confirm folds into the on-screen bubble instead of
+// double-bubbling. On fold the turn ADOPTS the transcript text - live view
+// and later replay render identically.
+const IMG_MARK = / ?\[Image: original \d+x\d+(?:, displayed at \d+x\d+)?\. Multiply coordinates by [\d.]+ to map to original image\.\]/g;
+const sameUserText = (a, b) => (a === b) || a.replace(IMG_MARK, '').trim() === b.replace(IMG_MARK, '').trim();
 function applyEventToTurns(ev) {
   const T = state.turns;
   if (ev.k === 'user') {
@@ -59,7 +68,7 @@ function applyEventToTurns(ev) {
     for (let i = T.length - 1; i >= Math.max(0, T.length - 12); i--) {
       const t = T[i];
       if (t.role !== 'user') continue;
-      if (t.text !== ev.text) continue;
+      if (!sameUserText(t.text, ev.text)) continue;
       if (!t.optimistic) {
         const tsKnown = !!(ev.ts && t.ts);
         if (queuedDispatch) continue; // not this event's twin - keep it, push fresh
@@ -72,6 +81,7 @@ function applyEventToTurns(ev) {
       }
       t.optimistic = false;
       t.ts = ev.ts || t.ts;
+      t.text = ev.text || t.text; // adopt transcript text (marker verbatim) - replay-stable
       if (ev.images && ev.images.length) t.images = ev.images;
       return i; // edited an earlier turn: caller must re-render from here
     }
@@ -738,17 +748,6 @@ function renderTurn(t) {
       d.textContent = t.text;
     }
     for (const im of t.images || []) {
-      if (im.ph) {
-        // v189: pasted-image placeholder - the transcript only kept the CLI's
-        // marker text; restore the image's PRESENCE as a chip (dims from the
-        // marker), never silently drop what the user sent
-        const chip = document.createElement('span');
-        chip.className = 'img-ph';
-        chip.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5zM8 9a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0z"/></svg>';
-        chip.appendChild(document.createTextNode('图片 ' + im.w + '×' + im.h));
-        d.appendChild(chip);
-        continue;
-      }
       const img = document.createElement('img');
       img.className = 'bubble-img';
       img.alt = '附件图片';

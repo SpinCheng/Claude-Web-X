@@ -617,9 +617,6 @@ button { font-family: inherit; }
 .cwd-trigger.on .chev { transform: rotate(180deg); }
 #cwd-picker .sheet.bubble { margin-bottom: 172px; padding: 12px 12px 6px; } /* 抬到表单中部，尾指向触发行；宽度走气泡基类 flex */
 #cwd-picker .cwd-empty { padding: 14px 8px; color: var(--faint); font-size: 12.5px; }
-/* v189 图片占位芯片：转录只留了标记文本，气泡内还原图的存在（非珊瑚——非活态） */
-.img-ph { display: inline-flex; align-items: center; gap: 5px; margin: 3px 2px 0; padding: 5px 9px; background: var(--panel2);
-  border-radius: 8px; color: var(--dim); font: 500 11px var(--mono); box-shadow: inset 0 1px 0 var(--ink-hi); }
 .approval-card .ap-session { font-size: 12px; margin-bottom: 6px; }
 .approval-card .ap-tool { font-size: 15px; color: var(--acc-strong); margin-bottom: 8px; }
 .approval-card .ap-input { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-height: 34dvh; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--fg); margin: 0 0 12px; }
