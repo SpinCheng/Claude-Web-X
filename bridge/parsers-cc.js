@@ -157,18 +157,27 @@ export function applyLine(id, obj, patch, events, rec) {
             return { k: 'cmdout', ts: obj.timestamp || '', text: so[1].trim() };
           }
         }
-        // 2.1.308 pasted-image markers ("[Image: original WxH, displayed at
-        // WxH. …]") persist INLINE inside the human line's text (the image
-        // data itself never lands in the transcript) - strip so the bubble
-        // shows the typed text verbatim (the optimistic twin matches by text)
-        // and so rawText/_cmdEnv arming below sees the same string. A
-        // marker-ONLY line is the CLI's synthetic echo beside an image-bearing
-        // tool_result (real-find 8786f2b0: the model's own Read() of a PNG
-        // leaked two of these as mystery right bubbles); the composer blocks
-        // empty-text sends, so it is never a human message - fold it.
+        // 2.1.308 persists pasted images as marker TEXT inline in the human
+        // line (content is a plain string - the image data never enters the
+        // transcript and no structural field flags where it was; the marker
+        // IS the only trace, so text matching is the only possible signal).
+        // Anchored to the FULL machine format incl. the "Multiply coordinates"
+        // tail so quoted/truncated forms in human typing don't hit. A match is
+        // RESTORED as a placeholder image part with the dims kept (v189 用户
+        //裁定: user content is never silently deleted - the bubble shows an
+        // image chip) and stripped from the text so the optimistic twin still
+        // matches verbatim. A marker-ONLY line is the CLI's synthetic echo
+        // beside an image-bearing tool_result (real-find 8786f2b0: the model's
+        // own Read() of a PNG leaked two as mystery right bubbles) - nothing
+        // human to keep, fold it.
         if (!images.length) {
-          text = text.replace(/\[Image: original \d+x\d+(?:, displayed at \d+x\d+)?\.[^\]]*\]/g, '').trim();
-          if (!text) return null;
+          const IMGM = /\[Image: original (\d+)x(\d+)(?:, displayed at (\d+)x(\d+))?\. Multiply coordinates by [\d.]+ to map to original image\.\]/g;
+          const found = [...text.matchAll(IMGM)];
+          if (found.length) {
+            text = text.replace(IMGM, '').trim();
+            if (!text) return null; // marker-only = synthetic echo line, fold
+            for (const m of found) images.push({ ph: true, w: +m[1], h: +m[2] });
+          }
         }
         const rawText = text;
         text = stripReminder(text);
