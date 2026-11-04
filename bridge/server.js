@@ -27,6 +27,7 @@ import * as routesSessions from './routes/sessions.js';
 import * as routesMessage from './routes/message.js';
 import { TitleGen } from './titlegen.js';
 import { Pins } from './pins.js';
+import { Archives } from './archives.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -35,7 +36,10 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   const UPLOADS_DIR = paths.uploadsDir || path.join(__dirname, 'data', 'uploads');
   // v125: session pins (bridge/data/pins.json; in-memory when no path - tests)
   const pins = new Pins(paths.pinsPath);
-  const hub = createHub({ cfg, store, runner, pins });
+  // v185: session archive registry (bridge/data/archived.json) - view filter
+  // only, never touches transcripts (delete-vs-archive stays strictly split)
+  const archives = new Archives(paths.archivesPath);
+  const hub = createHub({ cfg, store, runner, pins, archives });
   // v115: LLM auto-title for phone-created sessions (cfg.titleGen=false off);
   // v121: its suggest() also backs the rename modal's manual ✦ button
   // v159: helper runs (titlegen/ctxprobe) live in their own CLAUDE_CONFIG_DIR
@@ -43,7 +47,7 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   // (real-find: the titlegen one-shot flashed as a list row for ~23s)
   const HELPER_HOME = paths.helperHome || path.join(__dirname, 'data', 'helper-home');
   const titlegen = new TitleGen({ runner, adapter, store, enabled: cfg.titleGen !== false, helperHome: HELPER_HOME });
-  const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR, titlegen, pins };
+  const ctx = { cfg, store, adapter, runner, handoff, paths, ctxprobe, hub, UPLOADS_DIR, titlegen, pins, archives };
 
   const router = createRouter();
   routesPairing.register(router, ctx);     // panel first: same-machine, no token
@@ -72,6 +76,17 @@ export function createServer(cfg, store, adapter, runner, handoff, paths = {}, c
   // ------- wire adapter events -------
   store.on('session', hub.broadcastSessionsSoon);
   adapter.on('append', (a) => {
+    // v185 活跃反归档：归档会话转录又动了（桌面端/CLI 在用）→ 自动解除，
+    // 防"归档了却有人在跑"的隐性状态。live drain 才走到这（boot 重放
+    // emitAppends=false），不会把 boot 时的存量归档误恢复。
+    if (archives.has(a.id)) {
+      archives.set(a.id, false);
+      hub.broadcastSessionsSoon();
+      hub.broadcast({
+        type: 'notify', event: 'auto-unarchive', sessionId: a.id,
+        title: (store.get(a.id) || {}).title || '',
+      });
+    }
     hub.broadcast({ type: 'append', ...a });
     // transcript writing again = the PC answered the prompt; drop the banner
     hub.waitClear(a.id);

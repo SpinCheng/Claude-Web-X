@@ -5,7 +5,7 @@
 import { WebSocketServer } from 'ws';
 import { authOk } from './auth.js';
 
-export function createHub({ cfg, store, runner, pins }) {
+export function createHub({ cfg, store, runner, pins, archives }) {
   const clients = new Set(); // ws sockets; ws.subId = subscribed session id
   const waitings = new Map(); // sessionId -> waiting (permission prompt)
   const approvals = new Map(); // id -> {runId, sessionId, tool, input, resolve, timer}
@@ -28,9 +28,11 @@ export function createHub({ cfg, store, runner, pins }) {
       // runId rides along so a client that loads mid-run (no run frame seen)
       // can still cancel it - the list-page stop action and the composer
       // stop button both need it. pinned/pinnedAt (v125) drive the list's
-      // 置顶 section.
+      // 置顶 section. archived/archivedAt (v185): view filter only - the
+      // client hides archived rows from the main list; search still sees them.
       const pinnedAt = (pins && pins.get(s.id)) || 0;
-      return { ...s, pinned: !!pinnedAt, pinnedAt, running: !!live, runId: live ? live.runId : null, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
+      const archivedAt = (archives && archives.get(s.id)) || 0;
+      return { ...s, pinned: !!pinnedAt, pinnedAt, archived: !!archivedAt, archivedAt, running: !!live, runId: live ? live.runId : null, queued: runner.queuedFor(s.id).length, waiting: waitings.get(s.id) || null, lastRun: out || null, lastOutcome: s.lastOutcome || (out ? out.state : '') };
     });
   }
 

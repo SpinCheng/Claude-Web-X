@@ -170,6 +170,7 @@ export function register(router, ctx) {
     const result = adapter.archiveSession(r.params.id);
     if (!result.ok) { json(res, 404, { error: result.error }); return; }
     ctx.pins.drop(r.params.id); // a trashed session has no list row to pin
+    ctx.archives.drop(r.params.id); // ...nor an archive row (v185)
     try { fs.rmSync(path.join(ctx.UPLOADS_DIR, r.params.id), { recursive: true, force: true }); } catch { /* nothing stored */ }
     json(res, 200, result);
   });
@@ -186,6 +187,27 @@ export function register(router, ctx) {
     ctx.pins.set(r.params.id, on);
     json(res, 200, { ok: true, pinned: on });
     hub.broadcastSessionsSoon(); // list re-renders from the sessions frame
+  });
+
+  // v185: archive = pure view filter (zero file ops - strictly split from
+  // delete's trash move). archived.json (pins.json precedent); the sessions
+  // frame carries the flag so every client re-renders. Running sessions
+  // refuse (409 busy) like delete - archiving something in flight only to
+  // have auto-unarchive yank it back is noise, not a feature.
+  router.post('/api/sessions/:id/archive', (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    if (!store.get(r.params.id)) { json(res, 404, { error: 'not found' }); return; }
+    if (runner.activeRunFor(r.params.id)) { json(res, 409, { error: 'busy' }); return; }
+    ctx.archives.set(r.params.id, true);
+    json(res, 200, { ok: true });
+    hub.broadcastSessionsSoon();
+  });
+  router.post('/api/sessions/:id/unarchive', (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    if (!store.get(r.params.id)) { json(res, 404, { error: 'not found' }); return; }
+    ctx.archives.set(r.params.id, false);
+    json(res, 200, { ok: true });
+    hub.broadcastSessionsSoon();
   });
 
   // rename (v34): append a native custom-title line - the same record the

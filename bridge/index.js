@@ -80,6 +80,7 @@ const paths = {
   hookCmd: hookCmdPath(),
   uploadsDir: path.join(DATA_DIR, 'uploads'),
   pinsPath: path.join(DATA_DIR, 'pins.json'),
+  archivesPath: path.join(DATA_DIR, 'archived.json'),
 };
 const { server } = createServer(cfg, store, adapter, runner, handoff, paths, ctxprobe);
 

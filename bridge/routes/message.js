@@ -21,6 +21,12 @@ export function register(router, ctx) {
     const id = r.params.id;
     const text = String(jsonIn.text || '').trim();
     if (!text) { json(res, 400, { error: 'text required' }); return; }
+    // v185: messaging an archived session un-archives it FIRST (never a 409
+    // for being archived) - the user clearly wants it alive again
+    if (ctx.archives && ctx.archives.has(id)) {
+      ctx.archives.set(id, false);
+      hub.broadcastSessionsSoon();
+    }
     // our own run writing the transcript is not a foreign writer: skip the
     // mtime arbitration and let the busy path queue the follow-up instead
     const arb = runner.activeRunFor(id)
