@@ -195,7 +195,7 @@ export class Runner extends EventEmitter {
   // stream's init line and reported via an 'update' event.
   start(text, cwd, opts = {}) {
     if (!text) return { error: 'bad-request' };
-    const r = this._spawnRun([], text, cwd || os.homedir(), null, opts.perm || 'auto', opts.model || '', opts.effort || '');
+    const r = this._spawnRun([], text, cwd || os.homedir(), null, opts.perm || 'auto', opts.model || '', opts.effort || '', opts.attachments || []);
     // v115: mark phone-created sessions so titlegen fires on the first run's
     // end (set post-spawn: the immediate 'running' frame predates it, the
     // 'end' frame - the one titlegen listens for - always carries it)
@@ -304,15 +304,17 @@ export class Runner extends EventEmitter {
     // stay open - closing it immediately after write stalls the CLI). Text-ish
     // attachments are inlined into the prompt instead (the relay may not have
     // vision, but it can always read text).
+    // v192: a.abs = an @-referenced PROJECT file (lib/fileindex.js synthesized
+    // it after the cwd guard) - read in place instead of the uploads dir.
     let stdinMsg = null;
     let prompt = text;
     const imgs = [];
     for (const a of attachments) {
       const isImg = /^image\//.test(a.type || '') || /\.(png|jpe?g|webp|gif)$/i.test(a.file || '');
       if (isImg) imgs.push(a);
-      else if (this.uploadsDir) {
+      else if (a.abs || this.uploadsDir) {
         try {
-          const full = path.join(this.uploadsDir, a.file);
+          const full = a.abs || path.join(this.uploadsDir, a.file);
           const buf = fs.readFileSync(full);
           if (buf.length <= 24 * 1024) {
             prompt += '\n\n[附件 ' + a.name + ']\n```\n' + buf.toString('utf8').slice(0, 24 * 1024) + '\n```';
@@ -326,7 +328,7 @@ export class Runner extends EventEmitter {
       const content = [{ type: 'text', text: prompt }];
       for (const a of imgs) {
         try {
-          const data = fs.readFileSync(path.join(this.uploadsDir, a.file)).toString('base64');
+          const data = fs.readFileSync(a.abs || path.join(this.uploadsDir, a.file)).toString('base64');
           const mt = /^image\//.test(a.type || '') ? a.type : 'image/png';
           content.push({ type: 'image', source: { type: 'base64', media_type: mt, data } });
         } catch { /* vanished upload: skip */ }

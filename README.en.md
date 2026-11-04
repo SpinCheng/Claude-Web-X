@@ -118,6 +118,7 @@ Sessions are files: desktop, terminal and phone all write the same transcripts; 
 - Continue a session or start a task (pick a working dir); per-message permission mode (auto / phone approval cards with Edit ±diff and session-level always-allow), model and reasoning effort
 - Context ring (Desktop-parity accounting via CLI `/context` probe); cost panel (official / multiplier / custom per-model rates)
 - Attachments (compressed images, inlined text), artifact preview (locked to the project dir, XSS-hardened; html and md both get a sandboxed render + source dual tab), Markdown export, per-turn changed-files rollup, in-session fork
+- @ remote file references (v192): type `@` to fuzzy-pick PC-side project files/dirs (full git index fetched once, filtered locally; dirs are referenceable too); at send time the bridge proxies content along — text ≤24KB inlined into the prompt, project images ride the conversation natively, oversized/binary degrade to the plain path (the model fetches it itself)
 - Message queue (edit/reorder/jump), optimistic bubbles (breathing dot → confirmed, red on stop)
 
 ## Directory layout

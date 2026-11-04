@@ -1,6 +1,7 @@
 // routes/message.js - write-side: send/queue/cancel/takeover
 import { authOk, readBody } from '../lib/auth.js';
 import { normAttachments } from './attachments.js';
+import { collectAtAttachments } from '../lib/fileindex.js';
 
 export function register(router, ctx) {
   const { cfg, runner, handoff, hub } = ctx;
@@ -39,7 +40,12 @@ export function register(router, ctx) {
     // v40 branch: branchFrom must be THIS session (the thread being forked);
     // the CLI forks it into a new session id via --fork-session
     const forkFrom = jsonIn.branchFrom === id ? id : '';
-    const out = runner.send(id, text, { perm: jsonIn.perm === 'ask' ? 'ask' : 'auto', model: String(jsonIn.model || ''), effort: String(jsonIn.effort || ''), forkFrom, attachments: normAttachments(id, jsonIn.attachments, ctx) });
+    // v192 @-attachment scan (roadmap 11): word-boundary @path tokens in the
+    // text become proxy attachments (cwd-guarded; text<=24KB inline / image
+    // stdin / anything else degrades to the plain path). Text itself is never
+    // rewritten (v190 verbatim discipline).
+    const atFiles = collectAtAttachments(text, (ctx.store.get(id) || {}).cwd || '');
+    const out = runner.send(id, text, { perm: jsonIn.perm === 'ask' ? 'ask' : 'auto', model: String(jsonIn.model || ''), effort: String(jsonIn.effort || ''), forkFrom, attachments: [...normAttachments(id, jsonIn.attachments, ctx), ...atFiles] });
     if (out.queued) { json(res, 202, { ok: true, queued: true, position: out.position }); return; }
     if (out.error === 'queue-full') { res.writeHead(503); res.end('{"error":"queue-full"}'); return; }
     if (out.error === 'busy') { res.writeHead(409); res.end('{"error":"busy"}'); return; }
@@ -52,7 +58,8 @@ export function register(router, ctx) {
     const jsonIn = await readJson(req);
     const text = String(jsonIn.text || '').trim();
     if (!text) { json(res, 400, { error: 'text required' }); return; }
-    const out = runner.start(text, jsonIn.cwd || cfg.defaultCwd || '', { perm: jsonIn.perm === 'ask' ? 'ask' : 'auto', model: String(jsonIn.model || ''), effort: String(jsonIn.effort || '') });
+    const cwd = jsonIn.cwd || cfg.defaultCwd || '';
+    const out = runner.start(text, cwd, { perm: jsonIn.perm === 'ask' ? 'ask' : 'auto', model: String(jsonIn.model || ''), effort: String(jsonIn.effort || ''), attachments: collectAtAttachments(text, cwd) });
     if (out.error) { res.writeHead(out.error === 'overloaded' ? 503 : 400); res.end(JSON.stringify({ error: out.error })); return; }
     json(res, 202, { ok: true, runId: out.runId });
   });

@@ -7,6 +7,7 @@ import { readModelCatalog } from '../lib/models.js';
 import { CI_PATHS } from '../lib/platform.js';
 import { collectCommands, collectSkills } from '../lib/commands.js';
 import { pickUserPrompts, buildSuggestPrompt } from '../titlegen.js';
+import { repoFileList, browseDir } from '../lib/fileindex.js';
 
 export function register(router, ctx) {
   const { cfg, store, adapter, runner, ctxprobe, hub } = ctx;
@@ -41,6 +42,29 @@ export function register(router, ctx) {
   });
 
   router.get('/api/ping', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { ok: true, version: '0.1.0' }); });
+
+  // v192 @ picker data plane (roadmap 11): full git index in one shot, the
+  // client filters locally (v109 slash-menu precedent - zero per-keystroke
+  // requests). Non-git cwd degrades to a readdir root listing; ?p= browses one
+  // directory (fallback lane, cwd-guarded - the base item 12 builds on).
+  router.get('/api/sessions/:id/files', async (req, res, r) => {
+    if (!guard(req, res, r)) return;
+    const rec = store.get(r.params.id);
+    if (!rec) { json(res, 404, { error: 'not found' }); return; }
+    const cwd = rec.cwd || cfg.defaultCwd || '';
+    if (!cwd) { json(res, 404, { error: 'no project dir' }); return; }
+    const p = r.url.searchParams.get('p');
+    if (p !== null) {
+      const b = browseDir(cwd, p);
+      if (!b) { json(res, 403, { error: 'outside project dir' }); return; }
+      json(res, 200, { ok: true, repo: false, ...b });
+      return;
+    }
+    const files = await repoFileList(cwd);
+    if (files) { json(res, 200, { ok: true, repo: true, total: files.length, files }); return; }
+    const b = browseDir(cwd, '') || { dirs: [], files: [] };
+    json(res, 200, { ok: true, repo: false, ...b });
+  });
 
   router.get('/api/sessions', (req, res, r) => { if (guard(req, res, r)) json(res, 200, { sessions: hub.mergedSessions() }); });
 

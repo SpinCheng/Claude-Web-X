@@ -263,6 +263,8 @@ function setDraft(id) {
   clearCmdChip();
   hideCmdMenu();
   cmdList = null; cmdListFor = null; state.cmdNames = null;
+  hideAtMenu();   // v192: @ 气泡与索引随会话重置
+  atIdx = null; atIdxFor = null;
   let v = '';
   try { v = localStorage.getItem(draftKey(id)) || ''; } catch { /* */ }
   const input = $('msg-input');
@@ -510,6 +512,185 @@ document.addEventListener('click', (e) => {
   hideCmdMenu();
 });
 
+/* ---------- v192 @ 远程文件选择器（roadmap 11 · 方案A 直选同构） ----------
+   输入 @（词边界，防 user@host/中文@x 误判）唤起锚定气泡：空查询=项目根平铺
+   （目录+根文件），继续输入即全局模糊（派生目录行也命中）；点谁插谁——文件
+   插 `@path␣`、目录插 `@dir/␣`，纯文本不做 chip（队列/编辑/转录渲染天然兼容）。
+   索引=桥 /files 一次拉取本地过滤（v109 先例，10s 内复用）；非 git cwd 退化为
+   readdir 首层。发送代附在桥侧完成（lib/fileindex.js），前端只管选择与插入。 */
+const AT_DIR_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>';
+const AT_DOC_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+const AT_MAX_ROWS = 50;
+const atCi = (a, b) => a.toLowerCase().localeCompare(b.toLowerCase());
+let atIdx = null;      // 派生后的索引（repo 形态或 readdir 兜底形态）
+let atIdxFor = null;   // 索引所属会话
+let atToken = null;    // 活动 @token {start,end,q}（end=光标）
+
+// 与桥侧 scanAtTokens 同语义镜像（bridge/lib/fileindex.js 是权威副本）：
+// 词内遇 prose 标点即截断（「@a.md，看看」的 q=a.md），插入时只替换真 token
+const AT_STOP = /[,;:!?'"‘’“”…—·，。、；：！？（）【】《》〈〉「」『』]/u;
+function atDetect() {
+  const input = $('msg-input');
+  const pos = input.selectionStart == null ? input.value.length : input.selectionStart;
+  const m = input.value.slice(0, pos).match(/@([^\s@]*)$/u);
+  if (!m) return null;
+  const start = pos - m[0].length;
+  const prev = start > 0 ? input.value[start - 1] : '';
+  if (prev && /[\p{L}\p{N}_]/u.test(prev)) return null; // 词边界：前一字符是词字符则不是引用
+  const stop = m[1].search(AT_STOP);
+  if (stop === 0) return null;                         // @后紧跟标点：不是引用
+  const q = stop < 0 ? m[1] : m[1].slice(0, stop);
+  const end = start + 1 + q.length;
+  if (stop >= 0 && pos > end) return null;             // 标点已终结 token，光标在正文里：收起
+  return { start, end, q };
+}
+// 索引拉取+派生（顶层目录/根文件/全目录集，客户端一次算好）
+function ensureAtIndex() {
+  const id = state.currentId;
+  if (!id) return Promise.resolve(null);
+  if (atIdx && atIdxFor === id && Date.now() - atIdx.at < 10_000) return Promise.resolve(atIdx);
+  atIdxFor = id;
+  return api('/api/sessions/' + encodeURIComponent(id) + '/files')
+    .then((r) => r.json())
+    .then((j) => {
+      if (atIdxFor !== id) return atIdx; // 会话已切换：迟到响应弃用
+      atIdx = atPrepare(j);
+      return atIdx;
+    })
+    .catch(() => { if (atIdxFor === id) atIdx = null; return null; });
+}
+function atPrepare(j) {
+  if (!j || !j.repo) return { repo: false, dirs: (j && j.dirs) || [], files: (j && j.files) || [], at: Date.now() };
+  const files = j.files || [];
+  const topDirs = new Set(); const rootFiles = []; const allDirs = new Set();
+  for (const f of files) {
+    const i = f.indexOf('/');
+    if (i < 0) rootFiles.push(f);
+    else {
+      topDirs.add(f.slice(0, i));
+      let p = f;
+      for (;;) { const k = p.lastIndexOf('/'); if (k <= 0) break; p = p.slice(0, k); allDirs.add(p); }
+    }
+  }
+  return { repo: true, total: files.length, files, at: Date.now(),
+    topDirs: [...topDirs].sort(atCi), rootFiles: rootFiles.sort(atCi), allDirs: [...allDirs].sort(atCi) };
+}
+function hideAtMenu() { $('at-menu').classList.add('hidden'); atToken = null; }
+// 行构建全程 createElement/textContent（路径是外部数据，拼 HTML = XSS 面）
+function atRowEl(r, q) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'at-row' + (r.dir ? ' dir' : '');
+  const ic = document.createElement('span');
+  ic.className = 'ic';
+  ic.innerHTML = r.dir ? AT_DIR_ICON : AT_DOC_ICON; // 静态 SVG 串，无插值
+  const nm = document.createElement('span');
+  nm.className = 'nm';
+  if (!q) {
+    nm.textContent = r.p;
+  } else {
+    const hit = r.p.toLowerCase().indexOf(q);
+    if (hit < 0) nm.textContent = r.p; // 防御：不该发生
+    else {
+      const before = r.p.slice(0, hit);
+      const after = r.p.slice(hit + q.length);
+      if (before) { const s = document.createElement('span'); s.className = 'pre'; s.textContent = before; nm.appendChild(s); }
+      const hb = document.createElement('b'); hb.textContent = r.p.slice(hit, hit + q.length); nm.appendChild(hb);
+      const k = after.lastIndexOf('/');
+      if (k >= 0) {
+        const s1 = document.createElement('span'); s1.className = 'pre'; s1.textContent = after.slice(0, k + 1); nm.appendChild(s1);
+        const s2 = document.createElement('span'); s2.textContent = after.slice(k + 1); nm.appendChild(s2);
+      } else if (after) {
+        const s1 = document.createElement('span'); s1.textContent = after; nm.appendChild(s1);
+      }
+    }
+  }
+  b.append(ic, nm);
+  b.addEventListener('click', () => atPick(r.p, r.dir));
+  return b;
+}
+function renderAtMenu() {
+  if (!atToken) return;
+  const q = atToken.q.toLowerCase();
+  const listEl = $('at-menu-list');
+  listEl.innerHTML = '';
+  let rows = [];
+  let matched = 0;
+  if (!atIdx) {
+    const e = document.createElement('div');
+    e.className = 'at-empty';
+    e.textContent = '载入项目索引…';
+    listEl.appendChild(e);
+  } else if (atIdx.repo) {
+    if (q) {
+      const ds = atIdx.allDirs.filter((d) => d.toLowerCase().includes(q));
+      const fs = atIdx.files.filter((f) => f.toLowerCase().includes(q));
+      matched = ds.length + fs.length;
+      rows = ds.map((p) => ({ p, dir: true })).concat(fs.map((p) => ({ p, dir: false }))).slice(0, AT_MAX_ROWS);
+    } else {
+      matched = atIdx.total;
+      rows = atIdx.topDirs.map((p) => ({ p, dir: true })).concat(atIdx.rootFiles.map((p) => ({ p, dir: false }))).slice(0, AT_MAX_ROWS);
+    }
+  } else {
+    const ds = atIdx.dirs.filter((d) => d.toLowerCase().includes(q));
+    const fs = atIdx.files.filter((f) => f.toLowerCase().includes(q));
+    matched = ds.length + fs.length;
+    rows = ds.map((p) => ({ p, dir: true })).concat(fs.map((p) => ({ p, dir: false }))).slice(0, AT_MAX_ROWS);
+  }
+  if (atIdx && !rows.length) {
+    const e = document.createElement('div');
+    e.className = 'at-empty';
+    const mono = document.createElement('span');
+    mono.className = 'mono';
+    mono.textContent = '@' + atToken.q;
+    e.append('无匹配文件', document.createElement('br'), mono, ' 将按原文发送 — 模型会自行在项目里找');
+    listEl.appendChild(e);
+  }
+  for (const r of rows) listEl.appendChild(atRowEl(r, q));
+  $('at-bt').textContent = atIdx && atIdx.repo && q ? '搜索' : '项目文件';
+  $('at-idx').textContent = atIdx && atIdx.repo
+    ? (q ? matched + ' / ' + atIdx.total : 'git 索引 · ' + atIdx.total)
+    : '未建索引 · 目录浏览';
+  $('at-hint').textContent = !atIdx ? '目录可直接引用'
+    : atIdx.repo ? (q ? '继续输入即过滤' : '目录可直接引用') : '未建 git 索引 · 仅首层浏览';
+  $('at-k').textContent = rows.length ? '点选插入 @引用' : '换个片段试试';
+  $('at-menu').classList.remove('hidden');
+}
+function atOnInput() {
+  const v = $('msg-input').value;
+  if (!cmdChip && !v.startsWith('/') && state.currentId) {
+    const t = atDetect();
+    if (t) {
+      atToken = t;
+      ensureAtIndex().then(() => { if (atToken) renderAtMenu(); });
+      renderAtMenu(); // 缓存命中即时渲染；未命中先出载入态
+      return;
+    }
+  }
+  hideAtMenu();
+}
+function atPick(rel, isDir) {
+  const input = $('msg-input');
+  const ins = '@' + rel + (isDir ? '/ ' : ' ');
+  const pos = atToken ? atToken.start : (input.selectionStart == null ? input.value.length : input.selectionStart);
+  const end = atToken ? atToken.end : pos;
+  input.value = input.value.slice(0, pos) + ins + input.value.slice(Math.max(end, pos));
+  const c = pos + ins.length;
+  try { input.setSelectionRange(c, c); } catch { /* detached */ }
+  hideAtMenu();
+  autoGrow(); updateComposer(); saveDraft(); // 程序赋值不触发 input，手动收尾
+  input.focus();
+}
+$('msg-input').addEventListener('input', atOnInput);
+$('msg-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('at-menu').classList.contains('hidden')) hideAtMenu();
+});
+document.addEventListener('click', (e) => {
+  if ($('at-menu').classList.contains('hidden')) return;
+  if (e.target.closest && (e.target.closest('#at-menu') || e.target.id === 'msg-input')) return;
+  hideAtMenu();
+});
+
 function clearComposer() {
   clearCmdChip(); // v110: a sent message consumes its chip too (fail paths re-set it)
   const input = $('msg-input');
@@ -517,6 +698,7 @@ function clearComposer() {
   try { if (state.currentId) localStorage.removeItem(draftKey(state.currentId)); } catch { /* */ }
   autoGrow();       // collapse the grown height back to one line
   hideCmdMenu();    // sending or clearing dismisses the completion menu
+  hideAtMenu();     // v192: same dismissal for the @ picker
   updateComposer(); // re-evaluate the button: running+empty => stop, not amber queue-send
 }
 function restoreComposer(text, atts) {

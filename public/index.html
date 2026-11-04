@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=191">
+  <link rel="stylesheet" href="/style.css?v=192">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v191</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v192</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -145,6 +145,13 @@
     <div id="composer" class="composer">
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div id="cmd-menu" class="cmd-menu hidden"><div id="cmd-menu-list" class="cmd-menu-list"></div></div>
+      <!-- v192 @ 远程文件选择器（roadmap 11 · 方案A）：cmd-menu 直系锚定气泡，
+           头部=标题+索引徽章 / 列表=cmd-menu-list 同款 40dvh 内滚 / 尾部=机注行 -->
+      <div id="at-menu" class="cmd-menu at-menu hidden">
+        <div class="at-bh"><span id="at-bt" class="bt">项目文件</span><span id="at-idx" class="idx"></span></div>
+        <div id="at-menu-list" class="cmd-menu-list"></div>
+        <div class="at-bf"><span id="at-hint">目录可直接引用</span><span class="k" id="at-k">输入即全局搜索</span></div>
+      </div>
       <div class="composer-dock">
         <div id="queue-area"></div>
         <div id="fork-chip" class="fork-chip hidden">
@@ -372,6 +379,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=191"></script>
+  <script type="module" src="/app.js?v=192"></script>
 </body>
 </html>
