@@ -28,6 +28,7 @@ function openDetail(id) {
   renderAttachChips();
   disarmFork(); // branch arming never crosses a session switch
   $('list').classList.add('hidden');
+  $('arch').classList.add('hidden'); // v185: detail can open over the archive page too
   $('detail').classList.remove('hidden');
   // setDraft AFTER the page is visible: its autoGrow measures scrollHeight,
   // which is 0 under display:none - refilled drafts used to collapse to 0px
@@ -99,7 +100,10 @@ function closeDetail() { // via the ← button only
   $('agent-sheet').classList.add('hidden');
   const hm = $('hist-more'); if (hm) hm.classList.remove('show', 'busy');
   $('detail').classList.add('hidden');
-  $('list').classList.remove('hidden');
+  // v185: return to wherever the detail was opened from (list or archive);
+  // state.archOpen is maintained by app.js popstate + archive.js
+  if (state.archOpen) $('arch').classList.remove('hidden');
+  else $('list').classList.remove('hidden');
 }
 
 // v65: provisional detail - submit jumps STRAIGHT into the conversation with
@@ -124,6 +128,7 @@ function openDetailProvisional(text, cwd) {
   disarmFork();
   state.turns = [];
   $('list').classList.add('hidden');
+  $('arch').classList.add('hidden'); // v185: uniform with openDetail
   $('detail').classList.remove('hidden');
   $('chat').innerHTML = '';
   $('d-title').textContent = truncTitle(text);

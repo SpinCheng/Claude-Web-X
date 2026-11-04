@@ -39,6 +39,7 @@ export const state = {
   listQuery: '',          // v43: list-page search box content
   batchMode: false,       // v43: list-page multi-select mode
   batchSel: new Set(),    // v43: session ids ticked in batch mode
+  archOpen: false,        // v185: the archive page is the detail-return target
   pendingBranch: false,   // a fork send is in flight; adopt its real session id
   pendingBranchRun: null, // that fork's runId (known once the 202 lands)
   histBefore: 0,      // v44 history pagination: trailing events already loaded

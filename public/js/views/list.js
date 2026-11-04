@@ -12,6 +12,7 @@ import { openNewModal } from './composer.js';
 import { openBubble } from './overlays.js';
 import { copyText } from './transcript.js';
 import { wireRowOps, openGroupCopy } from './sessops.js';
+import { renderArchive } from './archive.js';
 
 const CK_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.5l5 5 10-11"/></svg>';
 // v125 置顶: pushpin in coral (active-state semantics per the palette rules).
@@ -37,11 +38,14 @@ function projectLabel(s) {
 }
 function groupKey(s) { return s.cwd || s.project || '?'; }
 
-// sessions matching the search box (title / cwd / project slug / id prefix)
+// sessions matching the search box (title / cwd / project slug / id prefix).
+// v185: the plain list hides archived rows (pure view filter); SEARCH keeps
+// them - search is a lookup tool and must not go blind on archived sessions
+// (they render with the muted 已归档 badge, tap opens the detail normally).
 function visibleSessions() {
   const q = (state.listQuery || '').trim().toLowerCase();
   const cc = state.sessions.filter((s) => s.kind === 'cc');
-  if (!q) return cc;
+  if (!q) return cc.filter((s) => !s.archived);
   return cc.filter((s) =>
     (s.title || '').toLowerCase().includes(q) ||
     (s.cwd || '').toLowerCase().includes(q) ||
@@ -50,6 +54,13 @@ function visibleSessions() {
 }
 
 function renderList() {
+  renderMainList();
+  // the open archive page rides along: every re-render of the list (sessions
+  // frame, optimistic archive toggle, rename) refreshes it too - never drift
+  if (state.archOpen) renderArchive();
+}
+
+function renderMainList() {
   const box = $('groups');
   box.innerHTML = '';
   const cc = visibleSessions();
@@ -175,7 +186,10 @@ function renderRow(s, inPinSection = false) {
       '<span class="srow-title"></span>' +
       '<span class="srow-info"></span>' +
     '</span>' +
-    (st !== 'idle' ? '<span class="st-word" data-st="' + st + '">' + ST_WORD[st] + '</span>' : '');
+    (st !== 'idle' ? '<span class="st-word" data-st="' + st + '">' + ST_WORD[st] + '</span>' : '') +
+    // v185: search hits on archived sessions keep the row + add the muted
+    // badge (neutral palette - archive is not a state, no lamp color)
+    (s.archived ? '<span class="st-word arc">已归档</span>' : '');
   el.querySelector('.srow-title').textContent = s.title || s.id.slice(0, 8);
   // v125: rows in the 置顶 section lost their project group - the project
   // name now leads the info line (marker pin dropped, user decision v126).
@@ -222,6 +236,7 @@ function updateBatchBar() {
   $('b-selall').textContent = all ? '清空' : '全选';
   $('b-count').textContent = '已选 ' + state.batchSel.size;
   $('b-del').disabled = state.batchSel.size === 0;
+  $('b-arch').disabled = state.batchSel.size === 0;
 }
 
 function setBatch(on) {
@@ -256,6 +271,31 @@ async function runBatchDelete(ids) {
   updateBatchBar();
 }
 
+/* ---------------- v185 batch archive ---------------- */
+// reversible + zero file ops: no showConfirm (confirmation belongs to
+// destructive actions); summary toast mirrors runBatchDelete's phrasing.
+// Stays in batch mode afterwards, exactly like batch delete.
+async function batchArchive() {
+  const ids = [...state.batchSel].filter((id) => {
+    const s = state.sessions.find((x) => x.id === id);
+    return s && !s.archived; // already-archived hits (search batch pool) are no-ops
+  });
+  if (!ids.length) { toast('选中的都已在归档区'); return; }
+  let ok = 0, busy = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const r = await api('/api/sessions/' + encodeURIComponent(id) + '/archive', { method: 'POST' });
+      if (r.status === 409) busy++;       // running: skipped, not lost
+      else if (r.ok) ok++;
+      else fail++;
+    } catch { fail++; }
+    state.batchSel.delete(id);
+  }
+  toast('已归档 ' + ok + ' 个' + (busy ? '，' + busy + ' 个运行中已跳过' : '') + (fail ? '，' + fail + ' 个失败' : ''));
+  renderList(); // refreshes the open archive page too (renderList hook)
+  updateBatchBar();
+}
+
 /* ---------------- wiring ---------------- */
 $('list-search').addEventListener('input', function () {
   state.listQuery = this.value;
@@ -273,6 +313,7 @@ $('search-clear').onclick = () => {
 $('list-manage').onclick = () => setBatch(!state.batchMode);
 $('b-done').onclick = () => setBatch(false);
 $('b-del').onclick = batchDelete;
+$('b-arch').onclick = batchArchive;
 $('b-selall').onclick = () => {
   const vis = visibleSessions();
   const all = vis.length > 0 && vis.every((s) => state.batchSel.has(s.id));
@@ -284,4 +325,4 @@ $('b-selall').onclick = () => {
   updateBatchBar();
 };
 
-export { renderList };
+export { renderList, renderRow, setBatch };

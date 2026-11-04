@@ -15,6 +15,7 @@ import { sessionLive, applyEventToTurns, markLiveTurn, closeLiveTurn,
 import { onAgentFrame, tickAgentHead, closeAgentView } from './js/views/agentview.js';
 import { seedActivity, onTasksFrame, onAgentUpdate, tickActivity, resetActivity, refreshActivity } from './js/views/activity.js';
 import { renderList } from './js/views/list.js';
+import { openArchive, closeArchive, renderArchive } from './js/views/archive.js';
 import { openDetail, closeDetail, renderMeta, refreshDriver, updateRunStatus, renderWaitBanner } from './js/views/detail.js';
 import { renderModelChip, updateTokenRing } from './js/views/ctxring.js';
 import { updateComposer, renderQueuePanel } from './js/views/composer.js';
@@ -50,6 +51,8 @@ function showGate(reason) {
   $('gate-err').textContent = gateReason;
   $('list').classList.add('hidden');
   $('detail').classList.add('hidden');
+  $('arch').classList.add('hidden'); // v185
+  state.archOpen = false;
   $('gate').classList.remove('hidden');
   $('token-input').focus();
 }
@@ -98,13 +101,26 @@ window.addEventListener('popstate', (e) => {
   // fall-through to the detail-exit branch
   if (!$('html-prev').classList.contains('hidden')) { closeHtmlPreview(); return; }
   if (e.state && e.state.cr === 'htmlprev') return;
-  // system back inside detail returns to the list
+  // system back inside detail returns to wherever it opened from (list or
+  // archive) - the landed history entry decides (v185)
   if (state.currentId) {
     sendWs({ type: 'unsubscribe' });
     state.currentId = null;
     state.turns = [];
     $('detail').classList.add('hidden');
-    $('list').classList.remove('hidden');
+    state.archOpen = !!(e.state && e.state.cr === 'arch');
+    if (state.archOpen) { $('arch').classList.remove('hidden'); renderArchive(); }
+    else $('list').classList.remove('hidden');
+    return;
+  }
+  // v185: landed on/off the archive entry - sync page visibility with it
+  // (covers gesture back out of the archive page and stray #arch entries)
+  const onArch = !!(e.state && e.state.cr === 'arch');
+  if (onArch !== state.archOpen) {
+    state.archOpen = onArch;
+    $('arch').classList.toggle('hidden', !onArch);
+    $('list').classList.toggle('hidden', onArch);
+    if (onArch) renderArchive();
   }
 });
 
@@ -123,7 +139,9 @@ function doDeleteSession() {
       if (!j.ok) { toast('删除失败：' + (j.error || '')); return; }
       state.currentId = null;
       $('detail').classList.add('hidden');
-      $('list').classList.remove('hidden');
+      // v185: a detail opened from the archive page returns there
+      if (state.archOpen) $('arch').classList.remove('hidden');
+      else $('list').classList.remove('hidden');
       if (history.state && history.state.cr) history.back();
     })
     .catch(() => toast('网络错误'));
@@ -273,6 +291,19 @@ $('back').onclick = () => {
   } else closeDetail();
 };
 $('del').onclick = deleteSession;
+// v185: archive page entry + its back button (same traversal-swallow guard
+// as #back - after back(), 250ms on the same entry means Chromium dropped
+// the traversal and we close directly)
+$('list-archive').onclick = openArchive;
+$('arch-back').onclick = () => {
+  if (history.state && history.state.cr === 'arch') {
+    const n0 = history.state.n;
+    history.back();
+    setTimeout(() => {
+      if (state.archOpen && history.state && history.state.cr === 'arch' && history.state.n === n0) closeArchive();
+    }, 250);
+  } else closeArchive();
+};
 setInterval(() => { if (state.currentId) { updateRunStatus(); updateAgentClocks(); tickAgentHead(); tickTurnDur(); tickActivity(); } }, 1000);
 
 /* ---------------- wiring: transport <-> semantics ---------------- */
@@ -364,7 +395,15 @@ initWs({
     state.approvals = state.approvals.filter((a) => a.id !== d.id);
     showApproval();
   },
-  notify: (d) => toast('[' + (d.title || '').slice(0, 20) + '] ' + (d.event === 'stop' ? '已完成' : d.event)),
+  notify: (d) => {
+    // v185 活跃反归档：归档会话又有新写入被自动恢复——被动通知必须给来由，
+    // 否则用户以为归档坏了
+    if (d.event === 'auto-unarchive') {
+      toast('「' + (d.title || '会话').slice(0, 20) + '」有新活动，已自动恢复');
+      return;
+    }
+    toast('[' + (d.title || '').slice(0, 20) + '] ' + (d.event === 'stop' ? '已完成' : d.event));
+  },
 });
 setUnauthorized(() => showGate('令牌已失效（可能刚轮换过），请用新二维码重新配对'));
 

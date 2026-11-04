@@ -28,6 +28,8 @@ const I = {
   doc: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>',
   back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
   copy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  archive: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V8"/><path d="M10 12.5h4"/></svg>',
+  unarchive: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V8"/><path d="M12 16.5V11"/><path d="m9.5 13 2.5-2.5L14.5 13"/></svg>',
 };
 
 let renameId = '';
@@ -74,6 +76,16 @@ function openRowActions(id) {
   list.appendChild(actRow(I.copy, '复制信息', '复制名称 / 路径 / 会话 ID', '', () => openCopyScope(id)));
   list.appendChild(actRow(I.pencil, '重命名', '修改会话显示名', '', () => openRename(id)));
   list.appendChild(actRow(I.down, '导出 Markdown', '下载完整记录或结论摘要', '', () => openExportScope(id)));
+  // v185 归档：删除上方、低破坏性（中性色，副文案与删除严格对仗——删除=
+  // 文件级「移入回收站」，归档=视图级「移出主列表」）。运行中不显示（同
+  // 删除的防护语义；自动反归档是兜底不是邀请）。已归档会话（归档页/搜索
+  // 命中）该项翻转为「取消归档」并升为该语境的主行动色。
+  if (!running) list.appendChild(actRow(
+    s.archived ? I.unarchive : I.archive,
+    s.archived ? '取消归档' : '归档会话',
+    s.archived ? '恢复到主列表原分组' : '移出主列表，可随时恢复',
+    s.archived ? 'mark' : '',
+    () => toggleArchive(id, !s.archived)));
   list.appendChild(actRow(I.trash, '删除会话', '转录移入电脑回收站，可找回', 'danger', () => deleteFromList(id)));
   openBubble('row-actions');
 }
@@ -166,6 +178,24 @@ function togglePin(id, on) {
       const s = state.sessions.find((x) => x.id === id);
       if (s) { s.pinned = on; s.pinnedAt = on ? Date.now() : 0; renderList(); }
       toast(on ? '已置顶' : '已取消置顶');
+    })
+    .catch(() => toast('网络错误'));
+}
+
+/* ---------------- archive (v185) ---------------- */
+// optimistic like pin: bubble closes, the record flips on response and the
+// row leaves the main list (or returns from the archive page); the sessions
+// frame confirms server-side. renderList also refreshes the open archive
+// page, so both views stay in sync.
+function toggleArchive(id, on) {
+  closeBubble('row-actions');
+  api('/api/sessions/' + encodeURIComponent(id) + '/' + (on ? 'archive' : 'unarchive'), { method: 'POST' })
+    .then((r) => r.json().catch(() => ({})).then((j) => ({ r, j })))
+    .then(({ r, j }) => {
+      if (!r.ok || !j.ok) { toast('失败：' + (j.error || r.status)); return; }
+      const s = state.sessions.find((x) => x.id === id);
+      if (s) { s.archived = on; s.archivedAt = on ? Date.now() : 0; renderList(); }
+      toast(on ? '已归档 · 归档区可恢复' : '已恢复到列表');
     })
     .catch(() => toast('网络错误'));
 }
