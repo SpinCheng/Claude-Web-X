@@ -1,7 +1,7 @@
 // js/views/activity.js - 会话活动悬浮件（v154）：单悬浮件两态——收起=胶囊
 // 「待办 n/total · 代理 N」、展开=右上悬浮面板。非模态：无遮罩、不拦截会话页
 // 交互（滚动/发送照常），可长期存在；挂 #detail、非 #chat 子节点（renderTail
-// 1:1 红线）；top 让出 #hist-more 70px 下拉带（样式见 style.css #act）。
+// 1:1 红线）；top 100px=顶栏下间隙减半裁定（v188，样式见 style.css #act）。
 // 数据：待办板 = state.board（messages 快照 + 'tasks' 帧，桥侧结构化下发，
 // 前端禁 parse chip 文本）；代理 = 当前会话未完成的 state.agents（帧只达当前
 // 会话，切回靠 messages 的 agents 摘要重建；完成即移除，活跃语义）。

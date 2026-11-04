@@ -737,10 +737,11 @@ button { font-family: inherit; }
 .cmdout { max-width: 86%; width: fit-content; background: var(--panel2); border-radius: 4px 12px 12px 12px; padding: 8px 12px; font: 11.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap; word-break: break-word; max-height: 40dvh; overflow-y: auto; overscroll-behavior-y: auto; margin-top: 4px; }
 
 /* ---------- 会话活动悬浮件（v154）：胶囊/面板两态，非模态 ----------
-   挂 #act（#detail 子节点，绝对定位右上，top 让出 #hist-more 70px 下拉带）。
+   挂 #act（#detail 子节点，绝对定位右上）。top 100px（v188 裁定：顶栏≈61px 下
+   间隙减半 81→39px）；hist-more 全展至 103px 仅 3px 交叠——行文居中、胶囊贴右，无视觉碰。
    非模态纪律：无遮罩层、不拦会话页交互；面板可长期存在（overscroll auto）。 */
 #detail { position: relative; }
-#act { position: absolute; top: 142px; right: 10px; z-index: 6; }
+#act { position: absolute; top: 100px; right: 10px; z-index: 6; }
 .ac-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2); color: var(--fg);
   border: 0; border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 500; white-space: nowrap;
   box-shadow: var(--sh-2), inset 0 1px 0 var(--ink-hi); font-variant-numeric: tabular-nums; cursor: pointer;
