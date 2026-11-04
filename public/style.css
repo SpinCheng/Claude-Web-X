@@ -114,8 +114,9 @@ button { font-family: inherit; }
 .icon-btn { border: 0; background: none; color: var(--dim); width: 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; padding: 0; transition: color .12s, background .12s; }
 .icon-btn:active { background: var(--panel2); color: var(--fg); }
 .icon-btn.danger { color: var(--err); opacity: .8; }
-/* v185 归档：顶栏图标组（归档/批量/新建）组内间距收紧；brand 与组间距仍走 .bar gap */
-.ib-cluster { display: flex; gap: 2px; }
+/* v185 归档：顶栏图标组（归档/批量/新建）组内间距收紧；brand 与组间距仍走 .bar gap
+   （v186 用户裁定再减半：2px → 1px） */
+.ib-cluster { display: flex; gap: 1px; }
 
 /* ---------- top bars：融入底色，不抢内容 ---------- */
 .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(54, 51, 45, .6); }
