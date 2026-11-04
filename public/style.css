@@ -115,8 +115,12 @@ button { font-family: inherit; }
 .icon-btn:active { background: var(--panel2); color: var(--fg); }
 .icon-btn.danger { color: var(--err); opacity: .8; }
 /* v185 归档：顶栏图标组（归档/批量/新建）组内间距收紧；brand 与组间距仍走 .bar gap
-   （v186 用户裁定再减半：2px → 1px） */
+   v187 修正：flex gap 只管按钮盒之间——40px 宽的盒子才是可见间距的主体（21px 图标
+   居中，两侧各 ~9.5px 空白，gap 1px 时可见空隙仍 ~20px，v186 的 2→1 肉眼不可辨）。
+   改收窄组内按钮盒至 30px：可见间距 ≈ (30-21)+1 ≈ 10px = 原一半。命中区 30×40
+   与 pgroup-new 34px 同档，用户裁定接受 */
 .ib-cluster { display: flex; gap: 1px; }
+.ib-cluster .icon-btn { width: 30px; }
 
 /* ---------- top bars：融入底色，不抢内容 ---------- */
 .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(54, 51, 45, .6); }
