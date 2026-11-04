@@ -605,6 +605,21 @@ button { font-family: inherit; }
 .ptrack { display: flex; background: var(--bg); border-radius: 12px; padding: 3px; }
 .ptrack button { flex: 1; border: 0; background: none; color: var(--dim); font: 500 13px var(--sans); padding: 9px 0; border-radius: 9px; cursor: pointer; transition: background .15s, color .15s; }
 .ptrack button.active { background: var(--raise); color: var(--acc-strong); box-shadow: inset 0 1px 0 var(--ink-hi); font-weight: 600; }
+
+/* ---------- v189：新建任务工作目录选择器（方案A 锚定气泡）＋ 图片占位芯片 ---------- */
+.cwd-trigger { width: 100%; display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 9px 13px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.cwd-trigger:active, .cwd-trigger.on { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-tint); }
+.cwd-trigger .t-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.cwd-trigger .t-name { font-weight: 600; font-size: 14px; color: var(--fg); }
+.cwd-trigger .t-path { font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cwd-trigger .chev { flex: none; color: var(--dim); transition: transform .18s; }
+.cwd-trigger.on .chev { transform: rotate(180deg); }
+#cwd-picker .sheet.bubble { margin-bottom: 172px; padding: 12px 12px 6px; } /* 抬到表单中部，尾指向触发行；宽度走气泡基类 flex */
+#cwd-picker .cwd-empty { padding: 14px 8px; color: var(--faint); font-size: 12.5px; }
+/* v189 图片占位芯片：转录只留了标记文本，气泡内还原图的存在（非珊瑚——非活态） */
+.img-ph { display: inline-flex; align-items: center; gap: 5px; margin: 3px 2px 0; padding: 5px 9px; background: var(--panel2);
+  border-radius: 8px; color: var(--dim); font: 500 11px var(--mono); box-shadow: inset 0 1px 0 var(--ink-hi); }
 .approval-card .ap-session { font-size: 12px; margin-bottom: 6px; }
 .approval-card .ap-tool { font-size: 15px; color: var(--acc-strong); margin-bottom: 8px; }
 .approval-card .ap-input { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-height: 34dvh; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--fg); margin: 0 0 12px; }

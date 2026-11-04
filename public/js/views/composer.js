@@ -556,35 +556,19 @@ function openNewModal(presetCwd) {
   // progressive disclosure resets on every open
   $('new-cwd-box').classList.remove('on');
   $('new-cwd-manual').style.display = '';
-  const sel = $('new-cwd');
-  sel.innerHTML = '';
+  // v189 方案A：原生 select 换锚定气泡选择器（cwdSel/cwdOpts 模块态）
+  cwdOpts = [];
   const seen = new Set();
-  const opts = [];
   for (const s of state.sessions) {
     if (s.kind !== 'cc' || !s.cwd || seen.has(s.cwd)) continue;
     seen.add(s.cwd);
-    opts.push(s.cwd);
+    cwdOpts.push({ path: s.cwd });
   }
-  if (opts.length === 0) {
-    sel.innerHTML = '<option value="">（暂无已知项目，手动输入路径）</option>';
-  } else {
-    for (const c of opts) {
-      const o = document.createElement('option');
-      o.value = c;
-      o.textContent = shortPath(c) + '  —  ' + c;
-      sel.appendChild(o);
-    }
-  }
-  if (presetCwd) {
-    // target dir not among known cwds -> add it so the select can show it
-    if (![...sel.options].some((o) => o.value === presetCwd)) {
-      const o = document.createElement('option');
-      o.value = presetCwd;
-      o.textContent = shortPath(presetCwd) + '  —  ' + presetCwd;
-      sel.insertBefore(o, sel.firstChild);
-    }
-    sel.value = presetCwd;
-  }
+  // group-head preset may be a dir no session ever used - put it on top
+  if (presetCwd && !cwdOpts.some((o) => o.path === presetCwd)) cwdOpts.unshift({ path: presetCwd });
+  cwdSel = presetCwd || (cwdOpts[0] ? cwdOpts[0].path : '');
+  syncCwdTrigger();
+  closeCwdPicker();
   $('new-cwd-custom').value = '';
   $('new-text').value = '';
   $('new-err').textContent = '';
@@ -594,6 +578,53 @@ function openNewModal(presetCwd) {
   $('new-modal').classList.remove('hidden');
   $('new-text').focus();
 }
+/* ---------- v189 工作目录选择器（方案A 锚定气泡） ----------
+   触发行=两行（短名+等宽全路径+下箭头），点开锚定气泡平铺行（全局 .opt 语系，
+   选中=珊瑚勾）；点选即回落并更新触发行；scrim 点按关闭（新建任务表单保留）。
+   行必须 createElement/textContent 构建（路径是外部数据，拼 HTML= XSS 面）。 */
+let cwdSel = '';   // 当前选中路径（''=无项目，提交走 custom/桥默认）
+let cwdOpts = [];  // [{path}] 去重后的候选
+const CWD_CHECK_SVG = '<svg class="o-check" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
+function syncCwdTrigger() {
+  const t = $('new-cwd');
+  t.querySelector('.t-name').textContent = cwdSel ? shortPath(cwdSel) : '选择项目';
+  t.querySelector('.t-path').textContent = cwdSel || '点开从最近使用过的项目里选';
+  t.dataset.cwd = cwdSel; // e2e 断言锚点（原 select.value 的继任）
+}
+function renderCwdRows() {
+  const list = $('cwd-list');
+  list.innerHTML = '';
+  if (!cwdOpts.length) {
+    const p = document.createElement('p');
+    p.className = 'cwd-empty';
+    p.textContent = '暂无已知项目 — 用下方「手动输入其他路径」';
+    list.appendChild(p);
+    return;
+  }
+  for (const o of cwdOpts) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opt' + (o.path === cwdSel ? ' active' : '');
+    b.setAttribute('role', 'option');
+    b.setAttribute('aria-selected', o.path === cwdSel ? 'true' : 'false');
+    const main = document.createElement('span');
+    main.className = 'o-main';
+    const lab = document.createElement('span');
+    lab.className = 'o-label';
+    lab.textContent = shortPath(o.path);
+    const sub = document.createElement('span');
+    sub.className = 'o-sub';
+    sub.textContent = o.path;
+    main.appendChild(lab); main.appendChild(sub);
+    b.appendChild(main);
+    b.insertAdjacentHTML('beforeend', CWD_CHECK_SVG); // 静态 SVG 串，无插值
+    b.onclick = () => { cwdSel = o.path; syncCwdTrigger(); closeCwdPicker(); };
+    list.appendChild(b);
+  }
+}
+function openCwdPicker() { renderCwdRows(); $('new-cwd').classList.add('on'); $('cwd-picker').classList.remove('hidden'); }
+function closeCwdPicker() { $('cwd-picker').classList.add('hidden'); $('new-cwd').classList.remove('on'); }
+
 function submitNewSession() {
   const go = $('new-go');
   if (go.disabled) return; // POST in flight - no double submit
@@ -602,7 +633,7 @@ function submitNewSession() {
   if (!text) { $('new-err').textContent = '任务内容不能为空'; return; }
   // manual path only counts while its disclosure is open (v78)
   const custom = $('new-cwd-box').classList.contains('on') ? $('new-cwd-custom').value.trim() : '';
-  const cwd = custom || $('new-cwd').value || '';
+  const cwd = custom || cwdSel || '';
   const perm = document.querySelector('#new-perm .seg-btn.active')?.dataset.v || state.perm;
   const model = (document.querySelector('#new-perm .seg-btn.active')?.dataset.v, currentModel());
   fetch('/api/sessions/new', {
@@ -659,6 +690,9 @@ document.querySelectorAll('#new-perm button').forEach((b) => {
   };
 });
 // v78 progressive disclosure: manual path is a link, the input unfolds
+// v189：触发行开合 + scrim 关闭（气泡 open/close 均不动 history——弹层纪律）
+$('new-cwd').onclick = () => ($('cwd-picker').classList.contains('hidden') ? openCwdPicker() : closeCwdPicker());
+$('cwd-picker').onclick = (e) => { if (e.target === $('cwd-picker')) closeCwdPicker(); };
 $('new-cwd-manual').onclick = () => {
   $('new-cwd-box').classList.add('on');
   $('new-cwd-manual').style.display = 'none';

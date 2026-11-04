@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=188">
+  <link rel="stylesheet" href="/style.css?v=189">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v188</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v189</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -321,7 +321,11 @@
       </div>
       <div class="nsec" id="nsec-cwd">
         <p class="nsec-l">工作目录</p>
-        <select id="new-cwd"></select>
+        <!-- v189 方案A：原生 select 换锚定气泡选择器（触发行为两行：短名+等宽全路径） -->
+        <button type="button" id="new-cwd" class="cwd-trigger" aria-haspopup="listbox">
+          <span class="t-main"><span class="t-name">选择项目</span><span class="t-path">点开从最近使用过的项目里选</span></span>
+          <svg class="chev" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </button>
         <p class="nsec-h">决定任务归属的项目；桌面端只能看到它打开过的文件夹</p>
         <span class="nsec-link" id="new-cwd-manual" role="button" tabindex="0">＋ 手动输入其他路径</span>
         <div id="new-cwd-box" class="nsec-manual">
@@ -346,6 +350,14 @@
     </div>
   </div>
 
+  <!-- v189 工作目录选择器（方案A 锚定气泡）：挂在 new-modal 之后——同 z 下 DOM 序即层级，
+       盖在新建任务表单上；行=全局 .opt 平铺行语系 -->
+  <div id="cwd-picker" class="overlay bub hidden">
+    <div class="sheet bubble">
+      <div id="cwd-list" role="listbox"></div>
+    </div>
+  </div>
+
   <!-- confirm modal (v51): in-app window.confirm replacement (delete /
        interrupt / handoff asks). Body level like new-modal - both pages need it. -->
   <div id="confirm-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cf-title">
@@ -359,6 +371,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=188"></script>
+  <script type="module" src="/app.js?v=189"></script>
 </body>
 </html>

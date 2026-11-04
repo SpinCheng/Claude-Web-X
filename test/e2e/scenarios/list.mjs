@@ -31,8 +31,9 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!!document.querySelector(".pgroup-head .pgroup-new")'), 'new-session icon on group head');
   await page.ev('document.querySelector(".pgroup-head .pgroup-new").click()');
   assert(await page.waitFor(`!document.getElementById("new-modal").classList.contains("hidden")`), 'group-head + opens modal');
+  // v189 方案A picker: preset rides the trigger's dataset.cwd (was select.value)
   assert(await page.waitFor('(function(){var s=document.querySelector(".pgroup-head .pgroup-path");' +
-    'return s && document.getElementById("new-cwd").value === s.textContent})()'), 'cwd preset to the group project');
+    'return s && document.getElementById("new-cwd").dataset.cwd === s.textContent})()'), 'cwd preset to the group project');
   assert(await page.waitFor('!document.querySelector(".pgroup").classList.contains("closed")'), 'group stays expanded after + click');
   await page.ev('document.getElementById("new-cancel").click()');
   assert(await page.waitFor(`document.getElementById("new-modal").classList.contains("hidden")`), 'modal closes again');
