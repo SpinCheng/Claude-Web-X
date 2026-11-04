@@ -8,7 +8,7 @@
 
 - README「架构与消息流」双 mermaid 图 + 目录树。后端 `bridge/`：`server.js` 组装根 + `lib/`（router/wshub/auth/mime/models/**platform**=OS 差异单点，勿在其他模块分支 process.platform）+ `routes/` + `parsers-cc.js`（转录行判定纯函数，有单测）。前端 `public/` 免构建 vanilla JS：`app.js` 组装根（boot/gate/路由/WS 帧语义）→ `js/` + `js/views/`。函数级循环 import（求值期零交叉）：composer↔detail、list↔sessops、detail↔ctxring、transcript↔agentview。**滚动三律与 renderTail 不变量在 transcript.js 文件头**。
 - 本机细节：`LOCAL.md`；调试时间线：`docs/history.md`（均 gitignored）。docs 里只有 `screenshots/`（README 截图）入库；设计稿（`docs/design/`、`docs/mockup-*`）与方案文档不入库。
-- 测试：`npm test` = 90 单测（parsers/turns/adapter/cost/commands/agents/titlegen/runner/md）+ 13 e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）。fixture 勿走 bash 内联（反斜杠被吃）；harness 的 api() 头必须合并非替换；harness 停桥必须 `closeAllConnections()` + 等 close 回调——server.close() 不等 keep-alive 排空，Windows 允许双绑 :3799 → 新旧桥竞态应答。场景只经 run-all 跑（结尾显式 process.exit）——单场景直跑会因残留句柄不退出（历史如此，勿误判为新回归）；预览类断言先断 `#html-prev`/`#lightbox` 容器（默认 hidden），**勿断 `#hp-frame`**（静态 HTML 无 hidden，异步 fetch 未完成即假通过——已三次踩中）。
+- 测试：`npm test` = 113 单测（parsers/turns/adapter/cost/commands/agents/titlegen/runner/md）+ 13 e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）。fixture 勿走 bash 内联（反斜杠被吃）；harness 的 api() 头必须合并非替换；harness 停桥必须 `closeAllConnections()` + 等 close 回调——server.close() 不等 keep-alive 排空，Windows 允许双绑 :3799 → 新旧桥竞态应答。场景只经 run-all 跑（结尾显式 process.exit）——单场景直跑会因残留句柄不退出（历史如此，勿误判为新回归）；预览类断言先断 `#html-prev`/`#lightbox` 容器（默认 hidden），**勿断 `#hp-frame`**（静态 HTML 无 hidden，异步 fetch 未完成即假通过——已三次踩中）。
 
 ## 快速开始
 
