@@ -70,9 +70,10 @@ await withEnv(async (h, page) => {
   await page.ev('document.querySelector(".at-row").click(); true;');
   await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /@bridge\\//.test(c.textContent)})()');
 
-  // no-hit empty state (token stays plain text - bridge leaves it verbatim)
+  // v198 no-hit ruling: the menu hides outright (no empty-state list);
+  // the @token text still rides the message verbatim
   await typeAt('看 @zzz');
-  assert(await page.waitFor('(function(){var e=document.querySelector(".at-empty"); return e && /原文发送/.test(e.textContent)})()'), 'graceful no-hit state');
+  assert(await page.waitFor('document.getElementById("at-menu").classList.contains("hidden")'), 'no-hit hides the menu entirely');
 
   // v197 send composition + fail restore: tags prefix the text on the wire and
   // come back with it when the POST fails

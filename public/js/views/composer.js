@@ -436,11 +436,8 @@ function renderCmdMenu(q) {
   listEl.innerHTML = '';
   const ql = (q || '').toLowerCase();
   const hits = (cmdList || []).filter((c) => !ql || c.name.toLowerCase().startsWith(ql) || c.name.toLowerCase().includes(ql) || (c.desc || '').toLowerCase().includes(ql));
-  if (!hits.length) {
-    const e = document.createElement('div'); e.className = 'cm-empty';
-    e.textContent = '无匹配命令 — 直接发送将作为普通文本';
-    listEl.appendChild(e);
-  }
+  // v198 用户裁定：无命中=直接收起菜单，不出空态列表（文本照常作为普通内容发送）
+  if (!hits.length) { hideCmdMenu(); return; }
   for (const c of hits.slice(0, 30)) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cm-row';
     const nm = document.createElement('span'); nm.className = 'cm-name';
@@ -649,15 +646,9 @@ function renderAtMenu() {
     matched = ds.length + fs.length;
     rows = ds.map((p) => ({ p, dir: true })).concat(fs.map((p) => ({ p, dir: false }))).slice(0, AT_MAX_ROWS);
   }
-  if (atIdx && !rows.length) {
-    const e = document.createElement('div');
-    e.className = 'at-empty';
-    const mono = document.createElement('span');
-    mono.className = 'mono';
-    mono.textContent = '@' + atToken.q;
-    e.append('无匹配文件', document.createElement('br'), mono, ' 将按原文发送 — 模型会自行在项目里找');
-    listEl.appendChild(e);
-  }
+  // v198 用户裁定：无命中=直接收起菜单，不出空态列表——@token 文本照常按
+  // 原文发送（桥侧校验失败本就不改写）；继续输入/回删命中重现时自然重开
+  if (atIdx && !rows.length) { hideAtMenu(); return; }
   for (const r of rows) listEl.appendChild(atRowEl(r, q));
   $('at-bt').textContent = atIdx && atIdx.repo && q ? '搜索' : '项目文件';
   $('at-idx').textContent = atIdx && atIdx.repo
@@ -665,7 +656,7 @@ function renderAtMenu() {
     : '未建索引 · 目录浏览';
   $('at-hint').textContent = !atIdx ? '目录可直接引用'
     : atIdx.repo ? (q ? '继续输入即过滤' : '目录可直接引用') : '未建 git 索引 · 仅首层浏览';
-  $('at-k').textContent = rows.length ? '点选插入 @引用' : '换个片段试试';
+  $('at-k').textContent = '点选插入 @引用';
   $('at-menu').classList.remove('hidden');
 }
 function atOnInput() {
