@@ -51,7 +51,10 @@ await withEnv(async (h, page) => {
   await page.ev('document.getElementById("ft-toggle").click(); true;');
   assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden")'), 'drawer opens');
   assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).map(function(x){return x.textContent}); return r.some(function(t){return /src/.test(t)}) && r.some(function(t){return /skipme/.test(t)})})()'), 'root rows render');
-  assert(await page.waitFor('!!document.querySelector(".gitb.unt") && !!document.querySelector(".gitb.ign")', ), 'unt + ign badges render');
+  assert(await page.waitFor('!!document.querySelector(".gitb.unt")'), 'untracked badge renders');
+  // v199 ruling: ignored rows carry NO text badge - the .un dim IS the signal
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /node_modules/.test(x.textContent)}); return r && r.classList.contains("un") && !r.querySelector(".gitb")})()'), 'ignored row dimmed, no badge');
+  assert(await page.waitFor('!document.querySelector(".gitb.ign")'), 'no ign badges anywhere');
   assert(await page.waitFor('!document.getElementById("ft-bar").classList.contains("hidden")'), 'stat bar shows');
   assert(await page.waitFor('/3 跟踪/.test(document.getElementById("ft-stats").textContent)'), 'tracked count in stat bar');
 

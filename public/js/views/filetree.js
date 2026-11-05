@@ -14,8 +14,10 @@ import { toast } from './toast.js';
 import { openBubble, closeBubble, previewArtifact } from './overlays.js';
 import { insertRef } from './composer.js';
 
-const FT_DIR_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>';
-const FT_DOC_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+// v199 图标语系对齐文件树惯例（VSCode set）：closed-folder + file-text（页+行），
+// 旋箭头只表开合状态，不靠图标变形表达
+const FT_DIR_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>';
+const FT_DOC_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>';
 const FT_TW = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>';
 const FT_MORE = '<svg viewBox="0 0 24 24" width="14" height="14"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>';
 const FT_DEPTH_MAX = 11; // 深度上限 12（桥侧同限）：第 12 层不再给展开箭头
@@ -183,10 +185,12 @@ function ftRowEl(e, rel, depth) {
   const nm = document.createElement('span');
   nm.className = 'nm';
   nm.textContent = e.n;
-  if (e.g) {
+  // v199 用户裁定：ignored 不带文字标签——行置灰（.un）即忽略语义；
+  // untracked 保留琥珀角标（两者灰度相同会不可分辨）
+  if (e.g === 'unt') {
     const g = document.createElement('span');
-    g.className = 'gitb ' + (e.g === 'unt' ? 'unt' : 'ign');
-    g.textContent = e.g === 'unt' ? 'untracked' : 'ignored';
+    g.className = 'gitb unt';
+    g.textContent = 'untracked';
     nm.appendChild(g);
   }
   const side = document.createElement('span');

@@ -126,6 +126,8 @@ button { font-family: inherit; }
 .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(54, 51, 45, .6); }
 .bar .brand { flex: 1; min-width: 0; }
 .detail-bar { padding-left: 4px; }
+/* v199: 详情 header 右侧图标簇间距参考列表页 .ib-cluster（1px）收紧 */
+.detail-bar > #ft-toggle, .detail-bar > #del { margin-left: -5px; }
 .d-title { flex: 1; min-width: 0; }
 .d-title b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .d-title span { font-size: 10.5px; font-family: var(--mono); color: var(--faint); letter-spacing: .02em; }
@@ -417,7 +419,8 @@ button { font-family: inherit; }
 .caret { display: inline-block; width: 7px; height: 14px; background: var(--acc); vertical-align: -2px; margin-left: 3px; border-radius: 1.5px; animation: breathe 1s steps(2) infinite; }
 
 /* ---------- 跳最新 FAB ---------- */
-.fab { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: calc(136px + env(safe-area-inset-bottom)); width: 42px; height: 42px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--raise) 82%, var(--fg)); color: var(--fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--sh-3); z-index: 6; transition: transform .12s; }
+.fab { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: calc(136px + env(safe-area-inset-bottom)); width: 28px; height: 28px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--raise) 82%, var(--fg)); color: var(--fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--sh-3); z-index: 6; transition: transform .12s; }
+.fab svg { width: 14px; height: 14px; }
 .fab:active { transform: scale(.92); }
 
 /* ---------- dock 输入栏：悬浮岛 ---------- */
@@ -835,7 +838,19 @@ body.wide #detail .hist-more,
 body.wide #detail .wait-banner { max-width: 860px; margin-left: auto; margin-right: auto; width: 100%; }
 body.wide #detail .chat { padding-left: clamp(18px, 6%, 72px); padding-right: clamp(18px, 6%, 72px); }
 body.wide #act { right: max(20px, calc(50% - 430px)); } /* 锚 detail-main：内容列右缘，三栏时也不悬空 */
-body.wide #jump { position: absolute; left: auto; right: max(14px, calc(50% - 430px)); margin: 0; }
+body.wide #jump { position: absolute; left: 50%; right: auto; margin: 0 0 0 -14px; transform: none; }
+/* v199 拖宽手柄：#list(260-600, #arch 同步) 与 #ft-drawer(180-480)，localStorage 持久；
+   负 margin 与两栏各叠 3px，不占布局宽；hover/拖拽中亮 1px 珊瑚线 */
+.rg { display: none; }
+body.wide .rg { display: block; flex: none; width: 7px; margin: 0 -3px; position: relative; z-index: 10;
+  cursor: col-resize; touch-action: none; } /* z10：压过 ft-drawer 的 z9（flex 子元素 static 也认 z-index——实测翻车点） */
+body.wide .rg::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px;
+  background: transparent; transition: background .15s, opacity .15s; }
+body.wide .rg:hover::after, body.wide .rg.drag::after { background: var(--acc); opacity: .55; }
+/* v199: PC 滚动条隐去——Chromium/Windows 经典常驻条破坏三栏气质；滚轮/触板/
+   键盘滚动不受影响，移动端窄屏本就是 overlay 自动隐藏条（不动） */
+body.wide :is(.groups, .chat, .ft-tree, .cmd-menu-list, .hp-src, .fp-body, .cmdout) { scrollbar-width: none; }
+body.wide :is(.groups, .chat, .ft-tree, .cmd-menu-list, .hp-src, .fp-body, .cmdout)::-webkit-scrollbar { width: 0; height: 0; }
 /* composer 窄屏=视口级 fixed（chat 用 paddingBottom 补偿）——包含块是整窗，
    宽屏必须转锚 detail-main（absolute bottom），否则 860 列按整窗居中、脱离
    详情区（实测翻车：composer 恒 290/290 边距对齐视口中心而非内容列） */

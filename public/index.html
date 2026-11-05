@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=198">
+  <link rel="stylesheet" href="/style.css?v=199">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v198</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v199</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -116,6 +116,8 @@
   </div>
 
   <!-- transcript detail -->
+  <!-- v199 拖宽手柄（仅 body.wide 显示）：#rg-list 调左栏宽（localStorage cr_list_w，#arch 同步） -->
+  <div id="rg-list" class="rg" title="拖动调整宽度"></div>
   <div id="detail" class="page hidden">
     <!-- v195 PC 双栏（roadmap 13）：#detail-main 收纳右栏主列（header..composer）。
          窄屏 display:contents（布局零影响）；宽屏 flex:1 主列，#ft-drawer 以第三栏
@@ -207,6 +209,8 @@
     </div>
 
     </div><!-- /#detail-main -->
+    <!-- v199 拖宽手柄（仅 body.wide 显示）：#rg-ft 调第三栏宽（localStorage cr_ft_w） -->
+    <div id="rg-ft" class="rg" title="拖动调整宽度"></div>
     <!-- v193 项目文件树（roadmap 12 定稿）：手机=右缘遮挡抽屉 82vw + 轻 scrim
          点外即收；宽屏（v195）=右缘第三栏 242px（scrim 隐、localStorage 记开关）。
          不动 history（短动作不保鲜），窄屏收起即销毁。cwd=当前会话项目，
@@ -423,6 +427,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=198"></script>
+  <script type="module" src="/app.js?v=199"></script>
 </body>
 </html>

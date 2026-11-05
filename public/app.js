@@ -89,12 +89,51 @@ function fetchSessions() {
    单点驱动（CSS 只认 body.wide，不重复媒体查询）。跨断点 resize 对可见节点
    重跑 markCapped（限高测量依赖布局尺寸）。 */
 const WIDE_MQ = window.matchMedia('(min-width:1024px)');
+// v199 拖宽偏好（宽屏专用；窄屏必须清内联宽——否则 .page 被压成窄条）
+function applyColPrefs() {
+  const lw = parseInt(localStorage.getItem('cr_list_w') || '', 10);
+  if (lw >= 260 && lw <= 600) { $('list').style.width = lw + 'px'; $('arch').style.width = lw + 'px'; }
+  const fw = parseInt(localStorage.getItem('cr_ft_w') || '', 10);
+  if (fw >= 180 && fw <= 480) $('ft-drawer').style.width = fw + 'px';
+}
+function clearColPrefs() {
+  $('list').style.width = ''; $('arch').style.width = ''; $('ft-drawer').style.width = '';
+}
+// 通用拖拽：pointerdown 捕获 → move 实时 apply(x) → up 持久化由 apply 内做
+function wireRg(handle, apply) {
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { handle.setPointerCapture(e.pointerId); } catch { /* detached */ }
+    handle.classList.add('drag');
+    const move = (ev) => apply(ev.clientX);
+    const up = () => {
+      handle.classList.remove('drag');
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (state.currentId) markCapped(); // 栏宽变了，限高重测
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+}
+wireRg($('rg-list'), (x) => {
+  const w = Math.min(600, Math.max(260, Math.round(x)));
+  $('list').style.width = w + 'px'; $('arch').style.width = w + 'px';
+  try { localStorage.setItem('cr_list_w', String(w)); } catch { /* quota */ }
+});
+wireRg($('rg-ft'), (x) => {
+  const r = $('detail').getBoundingClientRect();
+  const w = Math.min(480, Math.max(180, Math.round(r.right - x)));
+  $('ft-drawer').style.width = w + 'px';
+  try { localStorage.setItem('cr_ft_w', String(w)); } catch { /* quota */ }
+});
 function applyWide() {
   const wide = WIDE_MQ.matches;
   if (state.wide === wide && document.body.classList.contains('wide') === wide) return;
   state.wide = wide;
   document.body.classList.toggle('wide', wide);
   syncFtMode(); // v195：文件树第三栏形态钩子（body.ft-open）
+  if (wide) applyColPrefs(); else clearColPrefs(); // v199：拖宽偏好只在宽屏生效
   const busy = !!(state.currentId || state.provisional);
   if (wide) {
     $('detail').classList.remove('hidden'); // 右栏常驻（无会话=空态）

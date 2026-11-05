@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withEnv, writeSession, assert, waitSession } from '../harness.mjs';
 import { PORT, TOK } from '../harness.mjs';
-import { user, assistant, text, stop, previewLines } from '../fixtures.mjs';
+import { user, assistant, text, stop, previewLines, pagedLines } from '../fixtures.mjs';
 
 const rowByTitle = (t) =>
   '(function(){var r=[].slice.call(document.querySelectorAll("#groups .srow")).find(function(x){return /' + t + '/.test(x.textContent)}); r&&r.click(); return !!r;})()';
@@ -16,9 +16,11 @@ await withEnv(async (h, page) => {
   writeSession(h, 'T--e2e', 'pl1', [user(1, '宽屏甲', h.tmp), assistant(2, [text('ok1')]), stop(3)]);
   writeSession(h, 'T--e2e', 'pl2', [user(1, '宽屏乙', h.tmp), assistant(2, [text('ok2')]), stop(3)]);
   writeSession(h, 'T--e2e', 'pv9', previewLines(h.tmp, 'ok.txt'));
+  writeSession(h, 'T--e2e', 'plt', pagedLines(140)); // tall transcript - the fab needs scroll room
   assert(await waitSession('pl1'), 'pl1 visible');
   assert(await waitSession('pl2'), 'pl2 visible');
   assert(await waitSession('pv9'), 'pv9 visible');
+  assert(await waitSession('plt'), 'plt visible');
 
   // boot WITHOUT #open: list page only; then go wide -> both panes + empty state
   await page.navigate(`http://127.0.0.1:${PORT}/?token=${TOK}`);
@@ -82,6 +84,36 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('(function(){var r=document.getElementById("html-prev").getBoundingClientRect(); return Math.round(r.width)===1280})()'), 'preview covers the full wide viewport');
   await page.ev('document.getElementById("hp-back").click(); true;');
   assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), 'preview closed');
+
+  // v199: scrollbars hidden in wide (three-pane look; wheel/keys unaffected)
+  assert(await page.waitFor('getComputedStyle(document.querySelector(".groups")).scrollbarWidth === "none" && getComputedStyle(document.getElementById("chat")).scrollbarWidth === "none"'), 'scrollbars hidden in wide');
+
+  // v199: drag-resize the left column via the #rg-list handle (CDP mouse events)
+  const rgX = await page.ev('(function(){var r=document.getElementById("rg-list").getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]})()');
+  await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rgX[0], y: rgX[1], button: 'left', clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 420, y: rgX[1] });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 420, y: rgX[1], button: 'left' });
+  assert(await page.waitFor('(function(){var w=document.getElementById("list").getBoundingClientRect().width; return Math.abs(w-420)<=4})()'), 'left column dragged to ~420px');
+  assert((await page.ev('localStorage.getItem("cr_list_w")')) === '420', 'list width persisted');
+  // drag the ft pane wider via #rg-ft
+  await page.ev('document.getElementById("ft-toggle").click(); true;');
+  assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden")'), 'ft pane opens for drag test');
+  const rgF = await page.ev('(function(){var r=document.getElementById("rg-ft").getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]})()');
+  await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rgF[0], y: rgF[1], button: 'left', clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rgF[0] - 60, y: rgF[1] });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rgF[0] - 60, y: rgF[1], button: 'left' });
+  assert(await page.waitFor('(function(){var w=document.getElementById("ft-drawer").getBoundingClientRect().width; return w>=295 && w<=308})()'), 'ft pane dragged ~60px wider');
+  assert((await page.ev('localStorage.getItem("cr_ft_w")')) !== null, 'ft width persisted');
+  await page.ev('document.getElementById("ft-toggle").click(); true;');
+  assert(await page.waitFor('document.getElementById("ft-drawer").classList.contains("hidden")'), 'ft pane closed again');
+
+  // v199: fab shrunk to 28px and centered in the DETAIL pane (tall session ->
+  // scroll up so the fab shows; pv9 is too short to overflow)
+  await page.open('plt');
+  assert(await page.waitFor('document.querySelectorAll(".turn").length >= 100'), 'tall session opened');
+  await page.ev('(function(){var c=document.getElementById("chat"); c.scrollTop = 0; return true;})()');
+  assert(await page.waitFor('!document.getElementById("jump").classList.contains("hidden")'), 'fab visible after scroll-up');
+  assert(await page.waitFor('(function(){var j=document.getElementById("jump").getBoundingClientRect(); var d=document.getElementById("detail-main").getBoundingClientRect(); return Math.round(j.width)===28 && Math.abs((j.left+j.width/2)-(d.left+d.width/2))<=2})()'), 'fab 28px, centered in the detail pane');
 
   // v196 regression: provisional detail (new task) must clear the empty overlay
   // (it used to sit on top of the composer) and keep the left pane mounted
