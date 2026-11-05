@@ -47,6 +47,9 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!!document.querySelector("#act .ac-pill")'), 'activity pill visible for the running agent');
   const pillTxt = await page.ev('(function(){var p=document.querySelector("#act .ac-pill"); return p?p.textContent:""})()');
   assert(pillTxt.indexOf('代理 1') >= 0, 'pill counts the running agent (got "' + pillTxt + '")');
+  // v203: the capsule anchors to the WHOLE detail pane (right: 20px), not the
+  // width-capped content column
+  assert(await page.waitFor('(function(){var a=document.getElementById("act").getBoundingClientRect(); var d=document.getElementById("detail").getBoundingClientRect(); return Math.abs(d.right - a.right - 20) <= 2})()'), 'pill anchored 20px from the detail pane right edge');
 
   // live-line tap opens the full-text bubble
   await page.ev('document.querySelector(".agent-live").click()');

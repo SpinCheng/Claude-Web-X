@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=202">
+  <link rel="stylesheet" href="/style.css?v=203">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v202</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v203</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -120,9 +120,9 @@
   <div id="rg-list" class="rg" title="拖动调整宽度"></div>
   <div id="detail" class="page hidden">
     <!-- v195 PC 双栏（roadmap 13）：#detail-main 收纳右栏主列（header..composer）。
-         窄屏 display:contents（布局零影响）；宽屏 flex:1 主列，#ft-drawer 以第三栏
-         形态成为它的 flex 兄弟。绝对定位件（#act/#jump）宽屏锚定本列（position:relative），
-         窄屏穿透锚定 #detail。#html-prev 为 fixed 全屏页，两种形态都不受包裹影响。 -->
+         窄屏 display:contents（布局零影响）；宽屏 flex:1 主列。#jump 宽屏锚本列
+         （position:relative）；#act 已移出（v203，以整个详情页为基准）。
+         #html-prev 为 fixed 全屏页，两种形态都不受包裹影响。 -->
     <div id="detail-main">
     <header class="bar detail-bar">
       <button id="back" class="icon-btn" title="返回列表" aria-label="返回列表">
@@ -153,8 +153,6 @@
     <button id="jump" class="fab hidden" title="跳到最新" aria-label="跳到最新">
       <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 4h2v12l5.5-5.5 1.42 1.42L12 19.84l-7.92-7.92L5.5 10.5 11 16z"/></svg>
     </button>
-    <!-- v154 会话活动悬浮件：胶囊/面板两态。#detail 子节点（非 #chat——renderTail 1:1 红线），activity.js 渲染 -->
-    <div id="act" class="hidden"></div>
     <div id="composer" class="composer">
       <div id="run-status" class="run-status hidden"><span class="lamp" data-st="running"></span><span id="run-status-text"></span></div>
       <div id="cmd-menu" class="cmd-menu hidden"><div id="cmd-menu-list" class="cmd-menu-list"></div></div>
@@ -211,6 +209,10 @@
     </div>
 
     </div><!-- /#detail-main -->
+    <!-- v154 会话活动悬浮件：胶囊/面板两态。#detail 直接子节点（v203：胶囊以整个
+         详情页为定位基准——窄屏 display:contents 本就穿透锚 #detail，宽屏不再被
+         detail-main 的 relative 拦截；非 #chat 子节点——renderTail 1:1 红线），activity.js 渲染 -->
+    <div id="act" class="hidden"></div>
     <!-- v199 拖宽手柄（仅 body.wide 显示）：#rg-ft 调第三栏宽（localStorage cr_ft_w） -->
     <div id="rg-ft" class="rg" title="拖动调整宽度"></div>
     <!-- v193 项目文件树（roadmap 12 定稿）：手机=右缘遮挡抽屉 82vw + 轻 scrim
@@ -429,6 +431,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=202"></script>
+  <script type="module" src="/app.js?v=203"></script>
 </body>
 </html>

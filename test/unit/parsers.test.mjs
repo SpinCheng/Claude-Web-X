@@ -369,6 +369,32 @@ test('board: TodoWrite overwrite -> TaskCreate -> bindCreated -> TaskUpdate life
   assert.deepEqual(snap.items[0], { id: '', s: 'a', st: 'completed', af: '' });
 });
 
+test('v203 board: all-completed batch then new TaskCreate starts a fresh cycle', () => {
+  const b = { items: [], n: 0, total: 0, _pend: [] };
+  applyBoard(b, taskPart('TaskCreate', { subject: 'old1' }), 'tu1');
+  applyBoard(b, taskPart('TaskCreate', { subject: 'old2' }), 'tu2');
+  bindCreated(b, 'tu1', 'Created task #1: old1');
+  bindCreated(b, 'tu2', 'Created task #2: old2');
+  applyBoard(b, taskPart('TaskUpdate', { taskId: 1, status: 'completed' }));
+  applyBoard(b, taskPart('TaskUpdate', { taskId: 2, status: 'completed' }));
+  assert.equal(b.n + '/' + b.total, '2/2', 'batch fully done');
+  // new batch: history completed items leave the board
+  applyBoard(b, taskPart('TaskCreate', { subject: 'new1' }), 'tu3');
+  assert.equal(b.total, 1, 'old completed items cleared');
+  assert.equal(b.n, 0);
+  assert.equal(b.items[0].s, 'new1');
+  // partial batch (one still pending): new create = same batch, nothing cleared
+  const b2 = { items: [], n: 0, total: 0, _pend: [] };
+  applyBoard(b2, taskPart('TaskCreate', { subject: 'x1' }), 'a1');
+  applyBoard(b2, taskPart('TaskCreate', { subject: 'x2' }), 'a2');
+  bindCreated(b2, 'a1', 'Created task #1: x1');
+  bindCreated(b2, 'a2', 'Created task #2: x2');
+  applyBoard(b2, taskPart('TaskUpdate', { taskId: 1, status: 'completed' }));
+  applyBoard(b2, taskPart('TaskCreate', { subject: 'x3' }), 'a3');
+  assert.equal(b2.total, 3, 'partial batch keeps its items');
+  assert.equal(b2.n, 1);
+});
+
 test('v158: synthetic "No response requested." sentinel folds out', () => {
   // kill-path bookkeeping: assistant line whose only content is the sentinel
   const a = run([assistant([{ type: 'text', text: 'No response requested.' }])]);

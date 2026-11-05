@@ -613,6 +613,14 @@ export function applyBoard(board, tb, toolUseId) {
     return recalcBoard(board);
   }
   if (tb.g === 'c') {
+    // v203 用户裁定：每批待办列表独立——上一批全部 completed 后再来的新
+    // TaskCreate = 新周期开始，历史完成项清出板（不再计入 n/total；转录内
+    // 的历史节点是逐事件渲染的，不受板影响）。部分完成（还有 pending/
+    // in_progress）时的新 create = 同批补充，不清。
+    if (board.items.length && board.items.every((x) => x.st === 'completed')) {
+      board.items = [];
+      board._pend = [];
+    }
     const item = { id: '', s: tb.s, st: 'pending', af: tb.af };
     board.items.push(item);
     board._pend.push({ toolUseId: toolUseId || '', ref: item });
