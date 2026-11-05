@@ -74,6 +74,9 @@ function closeFileTree() {
   $('ft-scrim').classList.add('hidden');
   $('ft-drawer').classList.add('hidden');
   closeBubble('row-actions');
+  // 手势/回弹残留的内联 transform 一并清掉（下次 open 重新走 ftIn 动画）
+  const dEl = $('ft-drawer');
+  dEl.style.transform = ''; dEl.style.transition = '';
   // 收起即销毁：短动作不保鲜，重开走一次懒加载（面板偏好只由用户显式
   // 开关写入——代码路径（closeDetail/popstate）关闭不擦 localStorage）
   ftDir = new Map(); ftExp = new Set(); ftLoading = new Set();
@@ -328,6 +331,57 @@ $('ft-close').onclick = () => {
   if (state.wide) { try { localStorage.setItem('cr_ft_panel', '0'); } catch { /* quota */ } }
 };
 $('ft-scrim').onclick = closeFileTree;
+
+/* v207 手势：窄屏抽屉态右缘拖拽收起（6px 起步判定竖直滑动；跟手位移→松手
+   超 1/3 宽或快甩即收，否则回弹）。宽屏面板形态不参与（static 列非 transient
+   抽屉，有拖宽手柄在管）。touch-action:none 只挂 FT_TREE_GRIP 宽的边缘条，
+   其余树体保持可滚动。 */
+const FT_TREE_GRIP = 6;
+function wireFtSwipe() {
+  const d = $('ft-drawer');
+  d.addEventListener('touchstart', (e) => {
+    if (state.wide || !ftOpen) return;
+    const t0 = e.touches[0];
+    const x0 = t0.clientX; const y0 = t0.clientY;
+    const w = d.getBoundingClientRect().width;
+    let moved = false; let cur = 0; let lastT = 0; let lastX = x0; let v = 0;
+    const move = (ev) => {
+      const t = ev.touches[0];
+      if (!moved) {
+        if (Math.abs(t.clientY - y0) > Math.abs(t.clientX - x0)) { cleanup(); return; } // 竖直滑动让给树滚动
+        if (t.clientX - x0 > FT_TREE_GRIP) moved = true; else return;
+      }
+      ev.cancelable && ev.preventDefault(); // 已判定为收起手势，拦掉树体滚动
+      cur = Math.max(0, t.clientX - x0);
+      const now = performance.now();
+      if (now - lastT > 0) { v = (t.clientX - lastX) / (now - lastT); lastT = now; lastX = t.clientX; }
+      d.style.transform = 'translateX(' + cur + 'px)';
+      d.style.transition = 'none';
+    };
+    const up = () => {
+      cleanup();
+      if (!moved) return;
+      const fling = v > 0.45; // px/ms 向右甩
+      d.style.transition = 'transform .18s ease';
+      if (cur > w / 3 || fling) {
+        d.style.transform = 'translateX(100%)';
+        setTimeout(closeFileTree, 160);
+      } else {
+        d.style.transform = ''; // 回弹
+        setTimeout(() => { d.style.transition = ''; }, 190);
+      }
+    };
+    const cleanup = () => {
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', up);
+      window.removeEventListener('touchcancel', up);
+    };
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', up);
+    window.addEventListener('touchcancel', up);
+  }, { passive: true });
+}
+wireFtSwipe();
 $('ft-find').onclick = () => {
   const row = $('ft-find-row');
   if (row.classList.contains('hidden')) { row.classList.remove('hidden'); $('ft-q').focus(); }

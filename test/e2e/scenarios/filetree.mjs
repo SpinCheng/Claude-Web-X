@@ -97,5 +97,28 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden")'), 'reopened');
   await page.ev('document.getElementById("ft-scrim").click(); true;');
   assert(await page.waitFor('document.getElementById("ft-drawer").classList.contains("hidden")'), 'scrim tap closes');
+
+  // v207: swipe-to-dismiss from the right edge. CDP touch dispatch does not
+  // hit-test into the drawer in this headless desktop context (events land on
+  // window only), so drive the SAME handler contract synthetically: real
+  // TouchEvent objects dispatched straight at the drawer node.
+  const fireTouch = (type, x) => page.ev('(function(){var d=document.getElementById("ft-drawer"); d.dispatchEvent(new TouchEvent("' + type + '", {cancelable:true, bubbles:true, touches:' + (type === 'touchend' ? '[]' : '[new Touch({identifier:1, target:d, clientX:' + x + ', clientY:450})]') + ', changedTouches:[new Touch({identifier:1, target:d, clientX:' + x + ', clientY:450})]})); return true;})()');
+  await page.ev('document.getElementById("ft-toggle").click(); true;');
+  assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden")'), 'reopened for swipe');
+  const edge = await page.ev('(function(){var r=document.getElementById("ft-drawer").getBoundingClientRect(); return [Math.round(r.right - 3), Math.round(r.width)]})()');
+  await fireTouch('touchstart', edge[0]);
+  await fireTouch('touchmove', edge[0] + Math.round(edge[1] * 0.5));
+  assert(await page.waitFor('document.getElementById("ft-drawer").style.transform.indexOf("translateX") === 0'), 'drawer tracks the finger');
+  await fireTouch('touchend', 0);
+  assert(await page.waitFor('document.getElementById("ft-drawer").classList.contains("hidden")'), 'swipe past 1/3 dismisses the drawer');
+  // small drag (< 1/3) springs back, drawer stays
+  await page.ev('document.getElementById("ft-toggle").click(); true;');
+  assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden")'), 'reopened for springback');
+  const edge2 = await page.ev('(function(){var r=document.getElementById("ft-drawer").getBoundingClientRect(); return Math.round(r.right - 3)})()');
+  await fireTouch('touchstart', edge2);
+  await fireTouch('touchmove', edge2 + 12);
+  await fireTouch('touchend', 0);
+  await new Promise((r) => setTimeout(r, 400));
+  assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden") && document.getElementById("ft-drawer").style.transform === ""'), 'small drag springs back, drawer stays open');
   assert(true, 'done');
 });
