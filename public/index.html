@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=201">
+  <link rel="stylesheet" href="/style.css?v=202">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v201</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v202</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -133,9 +133,11 @@
         <span id="d-meta" class="mono dim"></span>
       </div>
       <span id="d-driver" class="chip">…</span>
-      <!-- v193 项目文件树入口（roadmap 12）：cwd=当前会话项目；打开态珊瑚（.active） -->
+      <!-- v193 项目文件树入口（roadmap 12）：cwd=当前会话项目；打开态珊瑚（.active）。
+           v202 入口图标=双层叠文档（lucide files，资源管理器标准语义）——
+           勿与树内目录的单层文件夹图标同形 -->
       <button id="ft-toggle" class="icon-btn" title="项目文件树" aria-label="项目文件树">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2V2"/><path d="M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l5 5v9a2 2 0 0 1-2 2Z"/><path d="M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8"/></svg>
       </button>
       <button id="del" class="icon-btn danger" title="删除会话" aria-label="删除会话">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
@@ -427,6 +429,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=201"></script>
+  <script type="module" src="/app.js?v=202"></script>
 </body>
 </html>
