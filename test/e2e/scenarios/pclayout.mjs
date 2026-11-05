@@ -29,6 +29,8 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('document.body.classList.contains("wide")'), 'body.wide on breakpoint');
   assert(await page.waitFor('!document.getElementById("list").classList.contains("hidden") && !document.getElementById("detail").classList.contains("hidden")'), 'both panes mounted');
   assert(await page.waitFor('!document.getElementById("detail-empty").classList.contains("hidden")'), 'right pane shows the empty state');
+  // v204: the empty overlay covers the header too - no action icons peek out
+  assert(await page.waitFor('(function(){var e=document.getElementById("detail-empty").getBoundingClientRect(); var d=document.getElementById("del").getBoundingClientRect(); return e.top<=d.top && e.right>=d.right})()'), 'empty overlay covers the header action icons');
   assert(await page.waitFor('getComputedStyle(document.getElementById("back")).display === "none"'), 'back button hidden in wide');
 
   // open via left row: selection highlight + empty state gone

@@ -126,8 +126,10 @@ button { font-family: inherit; }
 .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(54, 51, 45, .6); }
 .bar .brand { flex: 1; min-width: 0; }
 .detail-bar { padding-left: 4px; }
-/* v201: 详情 header 右侧图标簇间距对齐列表页 .ib-cluster（1px 有效间距） */
-.detail-bar > #ft-toggle, .detail-bar > #del { margin-left: -7px; }
+/* v204: 详情 header 右侧图标簇对齐列表页——按钮 30px（ib-cluster 同尺寸；
+   只收 margin 不动尺寸是 v203 的盲区，40px 大按钮才是「间距大」的真凶）
+   + 1px 有效间距 */
+.detail-bar > #ft-toggle, .detail-bar > #del { width: 30px; height: 30px; margin-left: -7px; }
 .d-title { flex: 1; min-width: 0; }
 .d-title b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .d-title span { font-size: 10.5px; font-family: var(--mono); color: var(--faint); letter-spacing: .02em; }
@@ -878,7 +880,9 @@ body.wide #ft-scrim { display: none !important; }
   body.wide.ft-open #list, body.wide.ft-open #arch { width: 262px; }
 }
 /* 宽屏空态：右栏常驻但未选会话（覆盖整个右栏，会话动作不暴露） */
-.detail-empty { position: absolute; inset: 0; z-index: 4; background: var(--bg);
+/* 宽屏空态：右栏常驻但未选会话（覆盖整个右栏含 header——z5 与 header 同级、
+   DOM 靠后后来居上，功能图标/残留标题全部遮住；v204 用户裁定空态不露动作件） */
+.detail-empty { position: absolute; inset: 0; z-index: 5; background: var(--bg);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; }
 .detail-empty svg { color: var(--faint); }
 .detail-empty .t { font-size: 14px; color: var(--dim); margin: 0; }
