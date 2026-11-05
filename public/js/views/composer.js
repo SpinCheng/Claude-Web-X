@@ -265,6 +265,8 @@ function setDraft(id) {
   cmdList = null; cmdListFor = null; state.cmdNames = null;
   hideAtMenu();   // v192: @ 气泡与索引随会话重置
   atIdx = null; atIdxFor = null;
+  atTags = [];    // v197: 引用标签不跨会话（草稿只存文本）
+  renderAtTags();
   let v = '';
   try { v = localStorage.getItem(draftKey(id)) || ''; } catch { /* */ }
   const input = $('msg-input');
@@ -290,13 +292,18 @@ function updateComposer() {
   $('send').classList.toggle('queue', running && typed);
   $('stop').classList.toggle('hidden', !running || typed);
   $('msg-input').placeholder = running ? '继续输入以排队后续修改'
-    : (cmdChip ? ('/' + cmdChip.name + (cmdChip.argHint ? ' ' + cmdChip.argHint : '') + ' · 输入参数或说明后发送') : '提出后续修改要求');
+    : (cmdChip ? ('/' + cmdChip.name + (cmdChip.argHint ? ' ' + cmdChip.argHint : '') + ' · 输入参数或说明后发送')
+    : (atTags.length ? '@ 引用已就绪——输入说明后发送' : '提出后续修改要求'));
   renderDriverChip();
 }
 function sendMessage(force) {
   const input = $('msg-input');
   let text = input.value.trim();
-  if (cmdChip) text = ('/' + cmdChip.name + (text ? ' ' + text : '')).trim();
+  // v197: dock 标签前置组合（/ 命令最前、@ 引用随后、正文殿后——'/名 @ref 说明'）
+  const pre = [];
+  if (cmdChip) pre.push('/' + cmdChip.name);
+  if (atTags.length) pre.push(atTags.map((t) => '@' + t).join(' '));
+  if (pre.length) text = pre.join(' ') + (text ? ' ' + text : '');
   if (!text) return;
   if (!state.currentId) { if (state.provisional) toast('会话创建中，稍候再发'); return; }
   if (state.armedBranch === state.currentId) { sendFork(text, input.value); return; }
@@ -312,7 +319,9 @@ function sendFork(text, rawInput) {
   const src = state.currentId;
   const atts = state.attach.splice(0);
   renderAttachChips();
+  const sentTags = atTags.slice(); // v197
   clearComposer();
+  const tagFail = () => { if (sentTags.length) { atTags = sentTags; renderAtTags(); } };
   state.pendingBranch = true;
   state.pendingBranchRun = null;
   api('/api/sessions/' + encodeURIComponent(src) + '/message', {
@@ -327,6 +336,7 @@ function sendFork(text, rawInput) {
       if (!r.ok) {
         disarmFork();
         restoreComposer(rawInput, atts);
+        tagFail(); // v197
         const j = await r.json().catch(() => ({}));
         toast(j.error === 'busy' ? '源会话正在运行，结束后再分支' : '分支启动失败（' + r.status + '）');
         return;
@@ -335,7 +345,7 @@ function sendFork(text, rawInput) {
       state.pendingBranchRun = j.runId || null;
       toast('分支线程启动中…');
     })
-    .catch(() => { disarmFork(); restoreComposer(rawInput, atts); toast('网络错误'); });
+    .catch(() => { disarmFork(); restoreComposer(rawInput, atts); tagFail(); toast('网络错误'); });
 }
 function disarmFork() {
   state.armedBranch = null;
@@ -353,13 +363,14 @@ function _send(text, rawInput, force, attsOverride, shownTurn) {
   const atts = attsOverride || state.attach.splice(0);
   if (!attsOverride) renderAttachChips();
   const sentChip = cmdChip;
+  const sentTags = atTags.slice(); // v197: fail paths re-set the tags (chip semantics)
   clearComposer();
   // optimistic bubble (v21): at TAP time, not after the round-trip — on slow
   // links the POST latency is the same dead-tap window v18 closed for the
   // composer. Retracted by every refusal path unless the transcript already
   // folded into it (then it is a real message and stays).
   if (!shownTurn && state.currentId) shownTurn = pushOptimisticUser(text);
-  const fail = () => { restoreComposer(rawInput, atts); retractOptimisticUser(shownTurn); if (sentChip) setCmdChip(sentChip); };
+  const fail = () => { restoreComposer(rawInput, atts); retractOptimisticUser(shownTurn); if (sentChip) setCmdChip(sentChip); if (sentTags.length) { atTags = sentTags; renderAtTags(); } };
   api('/api/sessions/' + encodeURIComponent(state.currentId) + '/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -512,12 +523,13 @@ document.addEventListener('click', (e) => {
   hideCmdMenu();
 });
 
-/* ---------- v192 @ 远程文件选择器（roadmap 11 · 方案A 直选同构） ----------
+/* ---------- v192 @ 远程文件选择器（roadmap 11 · 方案A 直选同构；v197 chip 化）----------
    输入 @（词边界，防 user@host/中文@x 误判）唤起锚定气泡：空查询=项目根平铺
-   （目录+根文件），继续输入即全局模糊（派生目录行也命中）；点谁插谁——文件
-   插 `@path␣`、目录插 `@dir/␣`，纯文本不做 chip（队列/编辑/转录渲染天然兼容）。
-   索引=桥 /files 一次拉取本地过滤（v109 先例，10s 内复用）；非 git cwd 退化为
-   readdir 首层。发送代附在桥侧完成（lib/fileindex.js），前端只管选择与插入。 */
+   （目录+根文件），继续输入即全局模糊（派生目录行也命中）；点选=v197 用户裁定
+   固定成 dock 标签（/ 命令 chip 同款交互、✕ 可删），发送时前置组合成
+   `@path ` 文本——手输 @path 不经标签，桥侧扫描照常代附（lib/fileindex.js），
+   两条路殊途同归。索引=桥 /files 一次拉取本地过滤（v109 先例，10s 内复用）；
+   非 git cwd 退化为 readdir 首层。 */
 const AT_DIR_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>';
 const AT_DOC_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
 const AT_MAX_ROWS = 50;
@@ -670,20 +682,50 @@ function atOnInput() {
   hideAtMenu();
 }
 function atPick(rel, isDir) {
-  const input = $('msg-input');
-  const ins = '@' + rel + (isDir ? '/ ' : ' ');
-  const pos = atToken ? atToken.start : (input.selectionStart == null ? input.value.length : input.selectionStart);
-  const end = atToken ? atToken.end : pos;
-  input.value = input.value.slice(0, pos) + ins + input.value.slice(Math.max(end, pos));
-  const c = pos + ins.length;
-  try { input.setSelectionRange(c, c); } catch { /* detached */ }
+  if (atToken) { // 标签接管引用：输入框里的半截 @token 剥掉（/ 命令清空输入同款语义）
+    const input = $('msg-input');
+    input.value = input.value.slice(0, atToken.start) + input.value.slice(atToken.end);
+    try { input.setSelectionRange(atToken.start, atToken.start); } catch { /* detached */ }
+    saveDraft();
+    autoGrow();
+  }
   hideAtMenu();
-  autoGrow(); updateComposer(); saveDraft(); // 程序赋值不触发 input，手动收尾
-  input.focus();
+  addAtTag(rel, isDir);
+  $('msg-input').focus(); // 继续敲正文
 }
-// 文件树（roadmap 12）借力：光标处插入 @rel␣——与 @ 选择器同一插入语义，
-// 但无 token 上下文（atToken=null 分支）
-function insertRef(rel, isDir) { atToken = null; atPick(rel, isDir); }
+// v197 用户裁定：选中固定成 dock 标签（/ 命令 chip 同款交互、✕ 可删），不再
+// 写进输入框；发送时前置组合成 `@path ` 文本（转录气泡照显=v190 逐字纪律）。
+// 手输 @path 不经标签，桥侧扫描照常代附——两条路殊途同归。
+let atTags = [];        // 当前引用标签（相对路径，目录带尾 /）
+function addAtTag(rel, isDir) {
+  const t = (rel || '').replace(/\/+$/, '') + (isDir ? '/' : '');
+  if (!t || t === '/') return;
+  if (atTags.includes(t)) { toast('已在引用里：@' + t); return; }
+  if (atTags.length >= 8) { toast('引用标签最多 8 个（超出部分按纯路径发送）'); return; }
+  atTags.push(t);
+  renderAtTags();
+}
+function renderAtTags() {
+  const row = $('at-chips');
+  if (!row) return;
+  row.innerHTML = '';
+  for (const t of atTags) {
+    const tag = document.createElement('span');
+    tag.className = 'cmd-tag';
+    const nm = document.createElement('b'); nm.textContent = '@' + t;
+    nm.title = '@' + t; // 长路径悬停看全名（行内截断）
+    tag.appendChild(nm);
+    const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
+    x.setAttribute('role', 'button'); x.title = '移除引用';
+    x.addEventListener('click', (e) => { e.stopPropagation(); atTags = atTags.filter((v) => v !== t); renderAtTags(); });
+    tag.appendChild(x);
+    row.appendChild(tag);
+  }
+  row.classList.toggle('hidden', !atTags.length);
+  updateComposer();
+}
+// 文件树（roadmap 12）借力：与 @ 选择器同一标签语义（v197 起不再插文本）
+function insertRef(rel, isDir) { addAtTag(rel, isDir); }
 $('msg-input').addEventListener('input', atOnInput);
 $('msg-input').addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('at-menu').classList.contains('hidden')) hideAtMenu();
@@ -696,6 +738,8 @@ document.addEventListener('click', (e) => {
 
 function clearComposer() {
   clearCmdChip(); // v110: a sent message consumes its chip too (fail paths re-set it)
+  atTags = [];    // v197: 同 chip 语义——发送即消费，失败路径显式恢复
+  renderAtTags();
   const input = $('msg-input');
   input.value = '';
   try { if (state.currentId) localStorage.removeItem(draftKey(state.currentId)); } catch { /* */ }

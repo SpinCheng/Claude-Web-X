@@ -148,9 +148,9 @@ export function collectAtAttachments(text, cwd) {
     const disp = rel.split('\\').join('/');
     if (IMG_MIME[ext]) {
       if (st.size > IMG_LIMIT) continue;             // 超限图片：纯路径（可 Read）
-      out.push({ abs, file: disp, name: disp, type: IMG_MIME[ext] });
+      out.push({ abs, file: disp, name: disp, type: IMG_MIME[ext], at: true });
     } else if (TEXT_EXT.has(ext) && st.size <= INLINE_LIMIT) {
-      out.push({ abs, file: disp, name: disp, type: 'text/plain' });
+      out.push({ abs, file: disp, name: disp, type: 'text/plain', at: true });
     }
     // 其余（二进制/未知扩展/超限文本）= 纯路径降级，不产出
   }

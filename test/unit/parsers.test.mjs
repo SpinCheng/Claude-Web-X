@@ -535,3 +535,26 @@ test('v178: cmdout is the sole set display source - position rides the command b
   assert.equal(r2, null, 'sentinel alone: state only, no display');
   assert.equal(rec2._goalLive, true, 'but goal is tracked live for the panel');
 });
+
+// ---------- v197: 代附/附件回显附录折叠 ----------
+test('v197: @-ref appendix folds to an attref marker; tags+prose stay the bubble text', () => {
+  const { events } = run([user({ message: { role: 'user', content: '@foo.js @bar.md 看看\n\n[引用 @foo.js]\n```\nbody\n```\n\n[引用 @bar.md]\n```\nmore\n```' } })]);
+  const u = events.find((e) => e.k === 'user');
+  const m = events.find((e) => e.k === 'attref');
+  assert.ok(u && m, 'user event + marker both present');
+  assert.equal(events.indexOf(u) < events.indexOf(m), true, 'marker renders below the bubble');
+  assert.equal(u.text, '@foo.js @bar.md 看看', 'exact tags+prose = optimistic-twin-precise');
+  assert.deepEqual(m.files, ['@foo.js', '@bar.md']);
+});
+
+test('v197: upload labels ride along (incl. the saved-to variant, name trimmed)', () => {
+  const { events } = run([user({ message: { role: 'user', content: '看图\n\n[附件 shot.png 已保存到 D:\\up\\x.png，可用 Read 查看]\n\n[引用 @notes.md]\n```\nn\n```' } })]);
+  const m = events.find((e) => e.k === 'attref');
+  assert.deepEqual(m.files, ['shot.png', '@notes.md']);
+});
+
+test('v197: marker inline in prose (no blank-line prefix) stays verbatim', () => {
+  const { events } = run([user({ message: { role: 'user', content: '引用格式长这样\n[引用 @x]\n别折我' } })]);
+  assert.equal(events.filter((e) => e.k === 'attref').length, 0, 'not machine appendix shape');
+  assert.equal(events[0].text, '引用格式长这样\n[引用 @x]\n别折我');
+});

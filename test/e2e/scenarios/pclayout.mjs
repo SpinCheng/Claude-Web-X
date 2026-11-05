@@ -74,6 +74,9 @@ await withEnv(async (h, page) => {
   await page.ev(rowByTitle('预览测试'));
   assert(await page.waitFor('/预览测试/.test(document.getElementById("d-title").textContent)'), 'pv9 opened');
   await page.ev('var t=document.querySelector(".turn .trigger"); t && t.click(); true;');
+  // wait for the artifact link to render before clicking (render race - a
+  // silent no-op click used to time out the preview assertion)
+  assert(await page.waitFor('(function(){var a=[].slice.call(document.querySelectorAll(".flink")).find(function(x){return /ok\\.txt$/i.test(x.textContent)}); return !!a})()'), 'artifact link rendered');
   await page.ev('(function(){var a=[].slice.call(document.querySelectorAll(".flink")).find(function(x){return /ok\\.txt$/i.test(x.textContent)}); a && a.click(); return true;})()');
   assert(await page.waitFor('!document.getElementById("html-prev").classList.contains("hidden")'), 'preview page opened');
   assert(await page.waitFor('(function(){var r=document.getElementById("html-prev").getBoundingClientRect(); return Math.round(r.width)===1280})()'), 'preview covers the full wide viewport');

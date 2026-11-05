@@ -249,6 +249,25 @@ export function applyLine(id, obj, patch, events, rec) {
         // /name args means this line IS an envelope; the NEXT plain user
         // line (if nothing else intervenes) is its expanded prompt body
         if (rawText !== text && /^\/[^\/\s]/.test(text) && rec) rec._cmdEnv = true;
+        // v197: 代附/附件回显折叠。runner 在正文后追加 `\n\n[引用 @x]\n```…```
+        // （或 `[附件 name]`）机器附录，CLI 把整段 prompt 原样写进 user 行——
+        // 不折叠就多出一个非用户输入的大气泡。词法切分：首个附录标记前=
+        // 用户文本（含 @ 标签——乐观孪生因此仍精确匹配），其后=机器附录。
+        // 锚定完整机器格式（标记行以 \n\n 开头），正文撞上≈主动伪造（v145 先例）。
+        const AP_M = text.match(/\n\n\[(引用 @[^\]\n]+|附件[^\]\n]+)\]/);
+        if (AP_M && AP_M.index > 0) {
+          const appendix = text.slice(AP_M.index);
+          const files = [];
+          const FRE = /\[(引用 @[^\]\n]+|附件[^\]\n]+)\]/g;
+          let fm;
+          while ((fm = FRE.exec(appendix))) {
+            const lab = fm[1];
+            files.push(lab.startsWith('引用 @') ? '@' + lab.slice(4) : lab.slice(3).trim().split(' 已保存到')[0]);
+          }
+          ev.text = text.slice(0, AP_M.index);
+          events.push(ev); // user event first, marker after (companions land before the return)
+          return { k: 'attref', ts: obj.timestamp || '', files };
+        }
         return ev;
       }
       case 'assistant': {

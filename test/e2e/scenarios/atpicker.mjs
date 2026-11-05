@@ -47,22 +47,41 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('/git 索引/.test(document.getElementById("at-idx").textContent)'), 'index badge shows git lane');
   assert(await page.waitFor('document.querySelector(".at-row.dir") !== null'), 'dir rows render with folder icon');
 
-  // typing filters (hit highlight rides along); tap a FILE inserts @path + space
+  // typing filters (hit highlight rides along); tapping a FILE pins a dock TAG
+  // (v197 ruling: /-command chip semantics) - the typed @token is stripped
   await typeAt('看 @read');
   assert(await page.waitFor('(function(){var r=document.querySelectorAll(".at-row"); return r.length===1 && /README\\.md/.test(r[0].textContent)})()'), 'filter narrows to README.md');
   await page.ev('document.querySelector(".at-row").click(); true;');
-  assert(await page.waitFor('(function(){var i=document.getElementById("msg-input"); return i.value==="看 @README.md "})()'), 'pick inserts @path + trailing space at the caret');
+  assert(await page.waitFor('document.getElementById("msg-input").value === "看 "'), 'typed @token stripped on pick');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return !c.classList.contains("hidden") && /README\\.md/.test(c.textContent)})()'), 'file pinned as a dock tag');
   assert(await page.waitFor('document.getElementById("at-menu").classList.contains("hidden")'), 'menu closes after pick');
 
-  // a DIR pick inserts @dir/ (path text only - model explores, roadmap ruling)
+  // a DIR pick pins @dir/ (path text only - model explores, roadmap ruling)
   await typeAt('看 @bri');
   assert(await page.waitFor('(function(){var r=document.querySelector(".at-row"); return r && r.classList.contains("dir") && /bridge/.test(r.textContent)})()'), 'dirs rank first in hits');
   await page.ev('document.querySelector(".at-row").click(); true;');
-  assert(await page.waitFor('document.getElementById("msg-input").value === "看 @bridge/ "'), 'dir pick inserts @dir/ ');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /@bridge\\//.test(c.textContent)})()'), 'dir pick pins @bridge/ tag');
+
+  // tag x removes it (target the bridge tag specifically - README stays)
+  await page.ev('(function(){var t=[].slice.call(document.querySelectorAll("#at-chips .cmd-tag")).find(function(x){return /bridge/.test(x.textContent)}); t.querySelector(".x").click(); return true;})()');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return !/bridge/.test(c.textContent) && /README\\.md/.test(c.textContent)})()'), 'tag x removes the bridge ref, README stays');
+  await typeAt('看 @bri');
+  await page.waitFor('(function(){var r=document.querySelector(".at-row"); return r && r.classList.contains("dir")})()');
+  await page.ev('document.querySelector(".at-row").click(); true;');
+  await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /@bridge\\//.test(c.textContent)})()');
 
   // no-hit empty state (token stays plain text - bridge leaves it verbatim)
   await typeAt('看 @zzz');
   assert(await page.waitFor('(function(){var e=document.querySelector(".at-empty"); return e && /原文发送/.test(e.textContent)})()'), 'graceful no-hit state');
+
+  // v197 send composition + fail restore: tags prefix the text on the wire and
+  // come back with it when the POST fails
+  await page.ev('(function(){var orig=window.fetch, cap=null; window.fetch=function(u,o){ if(String(u).indexOf("/message")>=0){ cap=o?o.body:null; return Promise.resolve({ok:false,status:500,json:function(){return Promise.resolve({error:"dbg"})}}); } return orig(u,o); }; window.__capBody=function(){return cap}; return true;})()');
+  await typeAt('说明X');
+  await page.ev('document.getElementById("send").click(); true;');
+  assert(await page.waitFor('(function(){var b=window.__capBody(); return b && JSON.parse(b).text === "@README.md @bridge/ 说明X"})()'), 'send composes tags before the prose');
+  assert(await page.waitFor('document.getElementById("msg-input").value === "说明X"'), 'fail path restores the prose');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return !c.classList.contains("hidden") && /README\\.md/.test(c.textContent) && /bridge/.test(c.textContent)})()'), 'fail path restores the tags');
 
   // dismissals: Esc key, tap outside
   await page.ev('document.getElementById("msg-input").dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})); true;');
@@ -71,5 +90,18 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!document.getElementById("at-menu").classList.contains("hidden")'), 'reopened by typing');
   await page.ev('document.getElementById("chat").click(); true;');
   assert(await page.waitFor('document.getElementById("at-menu").classList.contains("hidden")'), 'tap outside closes');
+
+  // v197 echo fold: a transcript line carrying the runner appendix renders as
+  // the clean bubble + a folded marker row, never a giant echo bubble
+  writeSession(h, 'T--e2e', 'at2', [
+    { type: 'user', timestamp: new Date(Date.now() - 110_000).toISOString(), cwd: h.tmp, origin: { kind: 'human' },
+      message: { role: 'user', content: '@README.md 看看\n\n[引用 @README.md]\n```\nfile body\n```' } },
+    assistant(4, [text('ok')]),
+    stop(5),
+  ]);
+  assert(await waitSession('at2'), 'echo session visible');
+  await page.open('at2');
+  assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.some(function(x){return x.textContent.indexOf("@README.md 看看")>=0 && x.textContent.indexOf("file body")<0})})()'), 'bubble shows tags+prose only, no appendix');
+  assert(await page.waitFor('(function(){return [].slice.call(document.querySelectorAll(".sysline")).some(function(x){return x.textContent.indexOf("已随消息附上 1 份")>=0})})()'), 'appendix folded into the marker row');
   assert(true, 'done');
 });

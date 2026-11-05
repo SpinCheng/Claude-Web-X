@@ -108,7 +108,7 @@ function applyEventToTurns(ev) {
     // v111: the executed command's stdout - its own right-aligned panel right
     // under the command bubble (never merges into a bot turn)
     T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
-  } else if (ev.k === 'compact' || ev.k === 'skill') {
+  } else if (ev.k === 'compact' || ev.k === 'skill' || ev.k === 'attref') {
     // v145: cost-state snapshots (k:'stats') no longer render a timeline
     // row - the user ruling killed the "成本 $x · in/out tok" reminder; the
     // number lives on in the header entry / cost panel via the sessions
@@ -185,11 +185,17 @@ function drainOrphanRes(turns) {
     }
   }
 }
-// folded marker lines (compaction summary / skill injection). Cost-state
-// snapshots stopped rendering here in v145 (see applyEventToTurns).
+// folded marker lines (compaction summary / skill injection / v197 attachment
+// appendix echo). Cost-state snapshots stopped rendering here in v145 (see
+// applyEventToTurns).
 function sysMarkerTurn(ev) {
   const wan = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字');
   if (ev.k === 'compact') return { role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + wan(ev.n || 0) + '，已折叠）' };
+  if (ev.k === 'attref') {
+    const names = (ev.files || []).map((f) => f.length > 42 ? f.slice(0, 39) + '…' : f);
+    const shown = names.slice(0, 4).join('、') + (names.length > 4 ? ' 等 ' + names.length + ' 项' : '');
+    return { role: 'sys', text: '📎 已随消息附上 ' + (names.length || '?') + ' 份内容（' + shown + '，已折叠）' };
+  }
   return { role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + wan(ev.n || 0) + '，已折叠）' };
 }
 // v165: goal 生命周期 → cmdout 面板文案（全文，用户裁定不折叠）
@@ -1073,7 +1079,7 @@ function parseOlderTurns(events) {
       if (i != null && T[i] && T[i].role === 'bot' && ev.ts) T[i].endTs = ev.ts;
     }
     else if (ev.k === 'cmdout') T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
-    else if (ev.k === 'compact' || ev.k === 'skill') {
+    else if (ev.k === 'compact' || ev.k === 'skill' || ev.k === 'attref') {
       const mk = sysMarkerTurn(ev); // stats rows are gone since v145 here too
       if (mk) T.push(mk);
     }

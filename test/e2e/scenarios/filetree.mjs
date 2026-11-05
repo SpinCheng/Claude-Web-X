@@ -65,11 +65,11 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('(function(){var t=[].slice.call(document.querySelectorAll(".frow")).map(function(x){return x.textContent}); return !t.some(function(x){return /skipme|node_modules/.test(x)}) && t.some(function(x){return /app\\.js/.test(x)}) && !t.some(function(x){return /extra\\.txt/.test(x)})})()'), 'tracked filter keeps only staged lineage');
   await page.ev('document.querySelector("#ft-seg button[data-f=all]").click(); true;');
 
-  // file actions: ⋯ -> insert @ ref into the composer, drawer closes
+  // file actions: ⋯ -> insert @ ref pins a dock TAG (v197 chip semantics), drawer closes
   await page.ev('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /app\\.js/.test(x.textContent)}); r.querySelector(".more").click(); return true;})()');
   assert(await page.waitFor('!document.getElementById("row-actions").classList.contains("hidden")'), 'actions bubble opens');
   await page.ev('(function(){var b=[].slice.call(document.querySelectorAll("#row-actions .act-row")).find(function(x){return /插入 @ 引用/.test(x.textContent)}); b.click(); return true;})()');
-  assert(await page.waitFor('document.getElementById("msg-input").value === "@src/app.js "'), 'insert writes @path at the caret');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return !c.classList.contains("hidden") && /@src\\/app\\.js/.test(c.textContent)})()'), 'insert pins the @src/app.js tag in the dock');
   assert(await page.waitFor('document.getElementById("ft-drawer").classList.contains("hidden")'), 'drawer closes after insert');
 
   // reopen + scrim tap closes
