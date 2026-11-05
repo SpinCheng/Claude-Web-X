@@ -51,7 +51,7 @@ export function insideRoot(root, p) {
 
 // ---- git 索引（per-cwd 3s TTL；新文件/新会话跑几轮自然刷新） ----
 const _idxCache = new Map(); // cwd -> { files: string[]|null, at }
-export function clearIndexCache() { _idxCache.clear(); } // tests
+export function clearIndexCache() { _idxCache.clear(); _stCache.clear(); } // tests（状态缓存同清）
 
 // 返回 string[]（仓库相对正斜杠路径）或 null（非 git 仓库 / git 不可用）。
 // include 文件逐行转 `--exclude=` 直传（命令行层优先级最高）——实测
@@ -184,7 +184,8 @@ export async function trackedFileList(cwd) {
 }
 
 // porcelain -z --ignored（折叠目录保持一行，node_modules 不会炸开）；
-// 3s TTL 缓存。返回 { unt:Set, ign:Set, u, i } 或 null（非 git）。
+// 3s TTL 缓存。v200 起全状态：XY 码 → mod/add/del（D 优先 > A > M/R），
+// unt/ign 维持独立集合；返回 {unt,ign,st:Map(path→code),u,i,m,a,d} 或 null。
 const _stCache = new Map(); // cwd -> {parsed, at}
 export async function gitStatusZ(cwd) {
   const hit = _stCache.get(cwd);
@@ -201,20 +202,25 @@ export async function gitStatusZ(cwd) {
   _stCache.set(cwd, { parsed, at: Date.now() });
   return parsed;
 }
-// porcelain -z：字段 = `XY <path>`\0；R/C 条目跟第二个 \0 字段（原路径）要跳过
+// porcelain -z：字段 = `XY <path>`\0；R/C 条目跟第二个 \0 字段（原路径）要跳过。
+// X=staged Y=unstaged：删（任一位 D）> 增（任一位 A）> 改（M/R/C）
 export function parseStatusZ(out) {
-  const unt = new Set(), ign = new Set();
+  const unt = new Set(), ign = new Set(), st = new Map();
+  let m = 0, a = 0, d = 0;
   const toks = String(out).split('\0');
   for (let k = 0; k < toks.length; k++) {
     const f = toks[k];
     if (!f) continue;
     const xy = f.slice(0, 2);
     const p = f.slice(3).replace(/\/$/, '');
-    if (xy === '??') unt.add(p);
-    else if (xy === '!!') ign.add(p);
-    else if (xy[0] === 'R' || xy[0] === 'C') k++; // 折掉 rename 原路径字段
+    if (xy === '??') { unt.add(p); continue; }
+    if (xy === '!!') { ign.add(p); continue; }
+    if (xy[0] === 'R' || xy[0] === 'C') k++; // 折掉 rename 原路径字段
+    if (xy.includes('D')) { st.set(p, 'del'); d++; }
+    else if (xy[0] === 'A' || xy[1] === 'A') { st.set(p, 'add'); a++; }
+    else { st.set(p, 'mod'); m++; } // M/R/C 及其余组合都按"改"着色
   }
-  return { unt, ign, u: unt.size, i: ign.size };
+  return { unt, ign, st, u: unt.size, i: ign.size, m, a, d };
 }
 
 // check-ignore 批查：stdin 喂 NUL 分隔路径，stdout 返回被忽略的路径集合。
@@ -243,59 +249,98 @@ export async function treeDir(cwd, rel = '') {
   if (!insideRoot(root, abs)) return null;
   const depth = rel.split('/').filter(Boolean).length;
   if (depth >= 12) return { entries: [], more: false, capped: true };
-  let names;
-  try { names = fs.readdirSync(abs, { withFileTypes: true }); } catch { return null; }
-  const dirs = [], files = [];
-  for (const e of names) {
-    try {
-      if (e.isDirectory()) dirs.push(e.name);
-      else if (e.isFile()) files.push(e.name);
-    } catch { /* raced away */ }
-  }
   const srt = (a, b) => a.toLowerCase().localeCompare(b.toLowerCase());
+  // v200 全状态：状态先取（幽灵删除行不依赖磁盘），readdir 失败也可服务
+  const tracked = await trackedFileList(cwd).catch(() => null);
+  const st = tracked ? await gitStatusZ(cwd).catch(() => null) : null;
+  const fileSt = st && st.st && st.st.size ? st.st : null;
+  const dirSt = new Map(); // 目录聚合：后代状态按 D>M>A 取最强
+  const RANK = { del: 4, mod: 3, add: 2 };
+  if (fileSt) {
+    for (const [p, code] of fileSt) {
+      let i = p.indexOf('/');
+      while (i > 0) {
+        const dir = p.slice(0, i);
+        const prev = dirSt.get(dir);
+        if (!prev || RANK[code] > RANK[prev]) dirSt.set(dir, code);
+        i = p.indexOf('/', i + 1);
+      }
+    }
+  }
+  const relOf = (n) => (rel ? rel.replace(/\/+$/, '') + '/' : '') + n;
+  const relPre = rel ? rel.replace(/\/+$/, '') + '/' : '';
+  // 幽灵删除行：porcelain 里有 D、磁盘上已不存在的直接子项（更深的路径折进
+  // 其首段作为幽灵目录行——展开时 readdir 失败但幽灵注入不依赖磁盘）
+  const ghosts = [], ghostDirs = new Set();
+  if (fileSt) {
+    for (const [p, code] of fileSt) {
+      if (code !== 'del' || !p.startsWith(relPre)) continue;
+      const base = p.slice(relPre.length);
+      if (!base) continue;
+      if (base.includes('/')) ghostDirs.add(base.slice(0, base.indexOf('/')));
+      else ghosts.push(base);
+    }
+  }
+  let names = null;
+  try { names = fs.readdirSync(abs, { withFileTypes: true }); } catch { /* 目录整体已删：只剩幽灵行 */ }
+  const dirs = [], files = [];
+  if (names) {
+    for (const e of names) {
+      try {
+        if (e.isDirectory()) dirs.push(e.name);
+        else if (e.isFile()) files.push(e.name);
+      } catch { /* raced away */ }
+    }
+    dirs.sort(srt); files.sort(srt);
+  }
+  const onDisk = new Set(dirs.concat(files));
+  for (const gName of ghosts) if (!onDisk.has(gName)) files.push(gName);
+  for (const gName of ghostDirs) if (!onDisk.has(gName)) dirs.push(gName);
   dirs.sort(srt); files.sort(srt);
   const all = dirs.concat(files);
   const more = all.length > 500;
   const shown = more ? all.slice(0, 500) : all;
 
-  const tracked = await trackedFileList(cwd).catch(() => null);
-  const relOf = (n) => (rel ? rel.replace(/\/+$/, '') + '/' : '') + n;
   let unt = null;
   let ignSet = new Set();
   if (tracked) {
-    const st = await gitStatusZ(cwd).catch(() => null);
     unt = st ? st.unt : new Set();
     if (shown.length) ignSet = await checkIgnore(cwd, shown.map(relOf)).catch(() => new Set());
   }
   const trackedSet = tracked ? new Set(tracked) : null;
+  const dirSet = new Set(dirs);
   const underUnt = (rp) => { // 自己或祖先被 ?? 折叠收录
     if (unt.has(rp)) return true;
     for (const e of unt) if (rp.startsWith(e + '/')) return true;
     return false;
   };
-  const entries = shown.map((n, idx) => {
+  const entries = shown.map((n) => {
     const rp = relOf(n);
-    const isDir = idx < dirs.length; // shown 保持 dirs 在前的顺序
+    const isDir = dirSet.has(n);
     if (isDir) {
       let c = 0;
       if (trackedSet) { const pre = rp + '/'; for (const f of tracked) if (f.startsWith(pre)) c++; }
       let g = null;
       if (tracked && unt.has(rp)) g = 'unt';            // 整目录未跟踪（?? 折叠行）
+      else if (dirSt && dirSt.has(rp)) g = dirSt.get(rp); // v200 聚合状态（含幽灵删除目录）
       else if (ignSet.has(rp)) g = 'ign';
       return { n, d: 1, g, c, t: c > 0 };
     }
     let g = null;
-    if (tracked && underUnt(rp)) g = 'unt';
+    if (fileSt && fileSt.has(rp)) g = fileSt.get(rp);     // v200 全状态（del=幽灵行）
+    else if (tracked && underUnt(rp)) g = 'unt';
     else if (ignSet.has(rp)) g = 'ign';
     return { n, d: 0, g, t: trackedSet ? trackedSet.has(rp) : false };
   });
+  // 目录在前、名称升序（幽灵行已并入 files，统一排序）
+  entries.sort((x, y) => (y.d - x.d) || srt(x.n, y.n));
   return { entries, more, capped: false };
 }
 
-// 项目根统计（ftbar）：跟踪=|staged 索引|、未跟踪/忽略=porcelain 计数；非 git -> null
+// 项目根统计（ftbar）：跟踪=|staged 索引|；v200 带全状态计数（改/增/删）；非 git -> null
 export async function repoStats(cwd) {
   const tracked = await trackedFileList(cwd).catch(() => null);
   if (!tracked) return null;
   const st = await gitStatusZ(cwd).catch(() => null);
-  return { t: tracked.length, u: st ? st.u : 0, i: st ? st.i : 0 };
+  return { t: tracked.length, u: st ? st.u : 0, i: st ? st.i : 0, m: st ? st.m : 0, a: st ? st.a : 0, d: st ? st.d : 0 };
 }

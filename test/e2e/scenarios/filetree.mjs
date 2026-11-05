@@ -26,6 +26,13 @@ await withEnv(async (h, page) => {
   execFileSync('git', ['init', '-q'], { cwd: h.tmp, env: GENV });
   execFileSync('git', ['config', 'core.excludesFile', emptyInc], { cwd: h.tmp, env: GENV });
   execFileSync('git', ['add', 'src/app.js', '.gitignore', '.no-global-ignore'], { cwd: h.tmp, env: GENV });
+  fs.writeFileSync(path.join(h.tmp, 'gone.txt'), 'x');
+  execFileSync('git', ['add', 'gone.txt'], { cwd: h.tmp, env: GENV });
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base'], { cwd: h.tmp, env: GENV });
+  // v200 states off a committed baseline: gone.txt deleted from disk (D),
+  // src/app.js gets a second write (unstaged M)
+  fs.rmSync(path.join(h.tmp, 'gone.txt'));
+  fs.writeFileSync(path.join(h.tmp, 'src', 'app.js'), 'x2');
 
   writeSession(h, 'T--e2e', 'ft1', [user(1, '文件树测试', h.tmp), assistant(2, [text('ok')]), stop(3)]);
   assert(await waitSession('ft1'), 'session visible');
@@ -35,13 +42,15 @@ await withEnv(async (h, page) => {
   assert(j.ok, 'tree ok');
   const byName = Object.fromEntries(j.entries.map((e) => [e.n, e]));
   assert(byName.src.d === 1, 'src is a dir');
-  assert(byName.src.t === true, 'src has staged descendants');
+  assert(byName.src.g === 'mod', 'src aggregates descendant M');
+  assert(byName['gone.txt'] && byName['gone.txt'].g === 'del', 'ghost row for deleted file');
   assert(byName.skipme.g === 'unt', 'untracked dir badge');
   assert(byName.node_modules.g === 'ign', 'ignored dir badge');
-  assert(j.stats.t === 3, 'staged count');
+  assert(j.stats.t === 4, 'staged count');
+  assert(j.stats.m === 1 && j.stats.d === 1, 'state counts ride stats');
   const sub = await (await api('/api/sessions/ft1/tree?p=src')).json();
   const b2 = Object.fromEntries(sub.entries.map((e) => [e.n, e]));
-  assert(b2['app.js'].t === true, 'staged file');
+  assert(b2['app.js'].g === 'mod', 'modified file state');
   assert(b2['extra.txt'].g === 'unt', 'untracked file badge');
   assert((await api('/api/sessions/ft1/tree?p=..')).status === 403, 'escape rejected');
 
@@ -56,7 +65,11 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /node_modules/.test(x.textContent)}); return r && r.classList.contains("un") && !r.querySelector(".gitb")})()'), 'ignored row dimmed, no badge');
   assert(await page.waitFor('!document.querySelector(".gitb.ign")'), 'no ign badges anywhere');
   assert(await page.waitFor('!document.getElementById("ft-bar").classList.contains("hidden")'), 'stat bar shows');
-  assert(await page.waitFor('/3 跟踪/.test(document.getElementById("ft-stats").textContent)'), 'tracked count in stat bar');
+  assert(await page.waitFor('/4 跟踪/.test(document.getElementById("ft-stats").textContent)'), 'tracked count in stat bar');
+  // v200: colored state counts + ghost/mod rows carry their color classes
+  assert(await page.waitFor('(function(){var t=document.getElementById("ft-stats"); return !!t.querySelector(".cm") && !!t.querySelector(".cd") && /M1/.test(t.textContent) && /D1/.test(t.textContent)})()'), 'colored M/D counts in stat bar');
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /gone\\.txt/.test(x.textContent)}); return r && r.classList.contains("del")})()'), 'ghost row carries del class');
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return x.classList.contains("mod")}); return !!r})()'), 'mod-colored rows render');
 
   // lazy expand: tap src -> children load with depth indent
   await page.ev('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /src/.test(x.textContent)}); r.click(); return true;})()');

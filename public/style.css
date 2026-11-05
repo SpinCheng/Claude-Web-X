@@ -809,8 +809,18 @@ button { font-family: inherit; }
 .frow.un .ic { color: var(--faint); }
 .frow .side { flex: none; display: flex; align-items: center; gap: 5px; }
 .gitb { font: 400 9px/1 var(--mono); border-radius: 5px; padding: 2.5px 5px; flex: none; }
-.gitb.unt { background: rgba(201, 163, 106, .14); color: #C9A36A; }
+.gitb.unt { background: rgba(143, 185, 141, .14); color: var(--ok); }
 .gitb.ign { background: var(--panel2); color: var(--dim); }
+/* v200 全状态着色（VSCode 语系）：改=琥珀 增/未跟踪=绿 删=红 忽略=置灰。
+   状态即颜色——v199 的 .un 置灰现在只属于 ign（unt 升绿不再置灰） */
+.frow.mod .nm, .frow.mod .ic { color: var(--warn); }
+.frow.add .nm, .frow.add .ic, .frow.unt .nm, .frow.unt .ic { color: var(--ok); }
+.frow.del .nm, .frow.del .ic { color: var(--err); }
+.frow.unt .nm { opacity: .85; }
+/* ftbar 状态计数（v200） */
+.ft-stat .cm { color: var(--warn); }
+.ft-stat .ca { color: var(--ok); }
+.ft-stat .cd { color: var(--err); }
 .cnt { font: 400 9.5px/1 var(--mono); color: var(--dim); background: var(--panel2); border-radius: 999px; padding: 2.5px 6px; flex: none; }
 .more { flex: none; color: var(--faint); display: flex; padding: 6px; cursor: pointer; }
 .more:active { color: var(--fg); }

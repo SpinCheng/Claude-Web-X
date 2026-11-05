@@ -131,7 +131,18 @@ function renderTree() {
   const bar = $('ft-bar');
   if (ftStats) {
     bar.classList.remove('hidden');
-    $('ft-stats').textContent = ftStats.t + ' 跟踪 · ' + ftStats.u + ' 未跟踪' + (ftStats.i ? ' · ' + ftStats.i + ' 忽略' : '');
+    const t = $('ft-stats');
+    t.textContent = '';
+    t.append(ftStats.t + ' 跟踪 · ' + ftStats.u + ' 未跟踪' + (ftStats.i ? ' · ' + ftStats.i + ' 忽略' : ''));
+    // v200 全状态彩色计数（旧桥响应无 m/a/d 字段时静默省略）
+    const colored = [['M', ftStats.m, 'cm'], ['A', ftStats.a, 'ca'], ['D', ftStats.d, 'cd']];
+    for (const [label, n, cls] of colored) {
+      if (!n) continue;
+      const s = document.createElement('span');
+      s.className = cls;
+      s.textContent = ' · ' + label + n;
+      t.appendChild(s);
+    }
   } else bar.classList.add('hidden');
 }
 
@@ -174,7 +185,9 @@ function ftRowEl(e, rel, depth) {
   const rp = ftRelOf(rel, e.n);
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'frow' + (e.d && ftExp.has(rp) ? ' open' : '') + (e.g ? ' un' : '');
+  // v200 全状态着色：ign 保持置灰（.un）；mod/add/del/unt 走各自颜色类
+  b.className = 'frow' + (e.d && ftExp.has(rp) ? ' open' : '')
+    + (e.g === 'ign' ? ' un' : (e.g ? ' ' + e.g : ''));
   b.style.setProperty('--ft-depth', depth);
   const tw = document.createElement('span');
   tw.className = 'tw' + (e.d && depth < FT_DEPTH_MAX ? '' : ' leaf');
@@ -185,8 +198,8 @@ function ftRowEl(e, rel, depth) {
   const nm = document.createElement('span');
   nm.className = 'nm';
   nm.textContent = e.n;
-  // v199 用户裁定：ignored 不带文字标签——行置灰（.un）即忽略语义；
-  // untracked 保留琥珀角标（两者灰度相同会不可分辨）
+  // v199 裁定：ignored 不带文字标签——置灰即语义。v200：unt 升绿（角标同绿，
+  // 「新增」色系）；mod/add/del 纯颜色无角标（VSCode 语系，状态即颜色）
   if (e.g === 'unt') {
     const g = document.createElement('span');
     g.className = 'gitb unt';
@@ -212,7 +225,10 @@ function ftRowEl(e, rel, depth) {
   b.append(tw, ic, nm, side);
   b.addEventListener('contextmenu', (ev) => { ev.preventDefault(); openFileActions(e, rp); });
   b.addEventListener('click', () => {
-    if (!e.d) { previewArtifact(rp); return; } // 点文件=预览（管线全复用）
+    if (!e.d) {
+      if (e.g === 'del') { toast('文件已删除（仅存于 git 记录）'); return; } // 幽灵行：磁盘上没有
+      previewArtifact(rp); return; // 点文件=预览（管线全复用）
+    }
     if (ftExp.has(rp)) { ftExp.delete(rp); renderTree(); return; } // 折叠：数据留缓存
     if (ftDir.has(rp)) { ftExp.add(rp); renderTree(); }
     else ftLoad(rp); // 首次展开=懒加载（ftLoad 完成后自行 add+render）
@@ -237,12 +253,16 @@ function openFileActions(e, rp) {
   sheet.querySelector('.act-sub').textContent = rp;
   const list = sheet.querySelector('.act-list');
   list.innerHTML = '';
-  list.appendChild(ftAct(I.eye, '预览', '支持类型 · ≤2MB · 项目目录内', () => { closeBubble('row-actions'); previewArtifact(rp); }));
-  list.appendChild(ftAct(I.at, '插入 @ 引用', '写入输入框光标处（发送时代附内容）', () => {
-    closeBubble('row-actions');
-    closeFileTree(); // 让用户看见引用落进输入框
-    insertRef(rp, !!e.d);
-  }));
+  if (e.g !== 'del') { // 幽灵删除行磁盘上没有，预览/插入无从谈起
+    list.appendChild(ftAct(I.eye, '预览', '支持类型 · ≤2MB · 项目目录内', () => { closeBubble('row-actions'); previewArtifact(rp); }));
+    list.appendChild(ftAct(I.at, '插入 @ 引用', '写入输入框光标处（发送时代附内容）', () => {
+      closeBubble('row-actions');
+      closeFileTree(); // 让用户看见引用落进输入框
+      insertRef(rp, !!e.d);
+    }));
+  } else {
+    list.appendChild(ftAct(I.eye, '文件已删除', '仅存于 git 记录，恢复请走 git 命令', () => closeBubble('row-actions')));
+  }
   const rec = state.sessions.find((x) => x.id === state.currentId);
   const abs = rec && rec.cwd ? rec.cwd.replace(/[\\/]+$/, '') + '/' + rp : rp;
   list.appendChild(ftAct(I.copy, '复制路径', abs, () => { closeBubble('row-actions'); ftCopy(abs, '路径'); }));

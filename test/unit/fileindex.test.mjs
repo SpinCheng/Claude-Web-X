@@ -171,6 +171,21 @@ test('parseStatusZ: ?? / !! sets, collapsed dirs, rename second field skipped', 
   assert.deepEqual([...p.ign].sort(), ['local.log', 'node_modules']);
   assert.equal(p.u, 2);
   assert.equal(p.i, 2);
+  assert.equal(p.st.get('a.js'), 'mod', 'rename colors as modified');
+});
+
+test('v200 parseStatusZ: D > A > M priority, XY combinations mapped', () => {
+  const out = [' M mod1.js', 'M  mod2.js', 'MM mod3.js', 'A  new.js', 'AM new2.js', 'D  del1.js', ' D del2.js', 'DM delmod.js'].map((l) => l + '\0').join('');
+  const p = parseStatusZ(out);
+  assert.equal(p.st.get('mod1.js'), 'mod');
+  assert.equal(p.st.get('mod2.js'), 'mod');
+  assert.equal(p.st.get('mod3.js'), 'mod');
+  assert.equal(p.st.get('new.js'), 'add');
+  assert.equal(p.st.get('new2.js'), 'add', 'staged-new wins over unstaged-mod');
+  assert.equal(p.st.get('del1.js'), 'del');
+  assert.equal(p.st.get('del2.js'), 'del', 'unstaged delete still del');
+  assert.equal(p.st.get('delmod.js'), 'del', 'D beats M');
+  assert.deepEqual([p.m, p.a, p.d], [3, 2, 3]);
 });
 
 test('treeDir: disk truth + tracked/untracked/ignored badges + counts', async () => {
@@ -193,7 +208,7 @@ test('treeDir: disk truth + tracked/untracked/ignored badges + counts', async ()
   const byName = Object.fromEntries(root.entries.map((e) => [e.n, e]));
   assert.equal(byName.src.d, 1, 'dir flag');
   assert.equal(byName.src.c, 1, 'dir tracked count = staged files under it (app.js only)');
-  assert.equal(byName.src.g, null, 'mixed dir: no badge');
+  assert.equal(byName.src.g, 'add', 'dir aggregates staged-new descendant (add-without-commit fixture)');
   assert.equal(byName.skipme.g, 'unt', 'fully untracked dir badge (?? collapse)');
   assert.equal(byName.skipme.c, 0, 'untracked dir count');
   assert.equal(byName.node_modules.g, 'ign', 'ignored dir badge (check-ignore)');
@@ -201,7 +216,7 @@ test('treeDir: disk truth + tracked/untracked/ignored badges + counts', async ()
   const src = await treeDir(dir, 'src');
   const b2 = Object.fromEntries(src.entries.map((e) => [e.n, e]));
   assert.equal(b2['app.js'].t, true, 'tracked');
-  assert.equal(b2['app.js'].g, null, 'tracked file: no badge');
+  assert.equal(b2['app.js'].g, 'add', 'staged-new colors as add (no commit in fixture)');
   assert.equal(b2['extra.txt'].t, false, 'untracked file not staged');
   assert.equal(b2['extra.txt'].g, 'unt', 'untracked badge');
   assert.equal(await treeDir(dir, '..'), null, 'escape rejected');
@@ -209,6 +224,49 @@ test('treeDir: disk truth + tracked/untracked/ignored badges + counts', async ()
   assert.equal(stats.t, 4, 'staged: .gitignore + neutralizer + README.md + src/app.js');
   assert.equal(stats.u, 2, 'untracked: skipme/ collapse + src/extra.txt');
   assert.equal(stats.i, 1, 'ignored: node_modules/');
+  clearIndexCache();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('v200 treeDir: mod/add/del states, dir aggregation, ghost deleted rows', async () => {
+  const dir = tmpRepo();
+  fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'mod.js'), 'v1');
+  fs.writeFileSync(path.join(dir, 'src', 'app.js'), 'v1');
+  fs.writeFileSync(path.join(dir, 'gone.js'), 'x');
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\n');
+  // staged baseline
+  git(['add', 'mod.js', 'src/app.js', 'gone.js', '.gitignore', '.e2e-no-global-ignore'], dir);
+  git(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base'], dir);
+  // states: modify mod.js + src/app.js (M), delete gone.js (D), add fresh.js (unt)
+  fs.writeFileSync(path.join(dir, 'mod.js'), 'v2');
+  fs.writeFileSync(path.join(dir, 'src', 'app.js'), 'v2');
+  fs.rmSync(path.join(dir, 'gone.js'));
+  fs.writeFileSync(path.join(dir, 'fresh.txt'), 'x');
+  clearIndexCache();
+  const root = await treeDir(dir, '');
+  const byName = Object.fromEntries(root.entries.map((e) => [e.n, e]));
+  assert.equal(byName['mod.js'].g, 'mod');
+  assert.equal(byName['src'].g, 'mod', 'dir aggregates descendant M');
+  assert.equal(byName['gone.js'].g, 'del', 'ghost row for deleted file');
+  assert.equal(byName['fresh.txt'].g, 'unt');
+  const src = await treeDir(dir, 'src');
+  const b2 = Object.fromEntries(src.entries.map((e) => [e.n, e]));
+  assert.equal(b2['app.js'].g, 'mod');
+  const stats = await repoStats(dir);
+  assert.equal(stats.m, 2, 'mod.js + src/app.js');
+  assert.equal(stats.d, 1, 'gone.js');
+  // dir fully deleted: parent readdir succeeds, ghost children injected under it
+  fs.mkdirSync(path.join(dir, 'victims'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'victims', 'x.txt'), 'x');
+  git(['add', 'victims/x.txt'], dir);
+  fs.rmSync(path.join(dir, 'victims'), { recursive: true });
+  clearIndexCache();
+  const r3 = await treeDir(dir, '');
+  const v = r3.entries.find((e) => e.n === 'victims');
+  assert.ok(v && v.d === 1 && v.g === 'del', 'ghost dir row for fully deleted dir');
+  const r4 = await treeDir(dir, 'victims');
+  assert.ok(r4 && r4.entries.some((e) => e.n === 'x.txt' && e.g === 'del'), 'ghost children served under deleted dir');
   clearIndexCache();
   fs.rmSync(dir, { recursive: true, force: true });
 });
