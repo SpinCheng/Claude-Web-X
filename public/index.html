@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=205">
+  <link rel="stylesheet" href="/style.css?v=206">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
     <header class="bar">
       <div class="brand small">
         <span class="mk"><span class="mark" id="conn-dot" title="连接状态"></span><span class="pb p2 p2s">P</span></span>
-        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v205</span></span>
+        <span class="brand-word t4">Claude</span><span class="brand-word t4 web">Web</span><span class="cap-en">Personal<span class="cap-sep">·</span><span id="build">v206</span></span>
       </div>
       <!-- v185 归档入口：顶栏图标组（低频靠左），组内间距收紧见 .ib-cluster -->
       <span class="ib-cluster">
@@ -239,11 +239,13 @@
       <div id="ft-tree" class="ft-tree"></div>
       <div id="ft-bar" class="ft-stat hidden"><span class="d"></span><span id="ft-stats"></span></div>
     </aside>
-    <!-- v195 宽屏空态：右栏常驻但未选会话（桌面首开）——覆盖整个右栏，会话动作不暴露 -->
+    <!-- v206 宽屏空态：右栏常驻但未选会话——覆盖整个右栏含 header；引导主钮 +
+         最近打开 3 条快速导航（updateDetailEmpty 渲染，sessions 帧刷新） -->
     <div id="detail-empty" class="detail-empty hidden">
       <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <p class="t">从左侧选择一个会话</p>
-      <p class="s">或点左上「新建任务」开始</p>
+      <button id="de-new" class="btn primary de-btn" type="button">新建任务</button>
+      <div id="de-recent" class="de-recent"></div>
     </div>
 
     <!-- v105 in-app preview page: same-origin http links AND artifact files
@@ -431,6 +433,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=205"></script>
+  <script type="module" src="/app.js?v=206"></script>
 </body>
 </html>

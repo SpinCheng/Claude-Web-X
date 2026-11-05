@@ -31,6 +31,15 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('!document.getElementById("detail-empty").classList.contains("hidden")'), 'right pane shows the empty state');
   // v204: the empty overlay covers the header too - no action icons peek out
   assert(await page.waitFor('(function(){var e=document.getElementById("detail-empty").getBoundingClientRect(); var d=document.getElementById("del").getBoundingClientRect(); return e.top<=d.top && e.right>=d.right})()'), 'empty overlay covers the header action icons');
+  // v206: empty guide - new-task button + recent list (top 3), tap navigates
+  assert(await page.waitFor('!!document.getElementById("de-new")'), 'new-task button on the empty guide');
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".de-item")); return r.length>=1 && r.length<=3})()'), 'recent list shows up to 3 items');
+  // click the FIRST item and require the detail to open exactly that session
+  // (which sessions make the top-3 depends on fixture timestamps - plt's
+  // paged lines reach into the future, so do not pin a specific title here)
+  assert(await page.waitFor('(function(){window.__deFirst=(document.querySelector(".de-item .de-t")||{}).textContent||""; var b=document.querySelector(".de-item"); if(!b) return false; b.click(); return true;})()'), 'recent item click');
+  assert(await page.waitFor('(function(){return document.getElementById("d-title").textContent === window.__deFirst})()'), 'recent item navigates to that session');
+  assert(await page.waitFor('document.getElementById("detail-empty").classList.contains("hidden")'), 'empty state gone after recent nav');
   assert(await page.waitFor('getComputedStyle(document.getElementById("back")).display === "none"'), 'back button hidden in wide');
 
   // open via left row: selection highlight + empty state gone
@@ -45,6 +54,16 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('/宽屏乙/.test(document.getElementById("d-title").textContent)'), 'pl2 opened');
   assert(await page.waitFor('(function(){var s=document.querySelector(".srow.on"); return s && /宽屏乙/.test(s.textContent)})()'), 'highlight flipped to pl2');
   assert((await page.ev('history.length')) === len1, 'replaceState: history depth unchanged');
+
+  // v206 regression: archive-open + back must NOT de-select the open detail -
+  // wide popstate only swaps the LEFT pane (arch -> list), detail stays
+  await page.ev('document.getElementById("list-archive").click(); true;');
+  assert(await page.waitFor('!document.getElementById("arch").classList.contains("hidden")'), 'archive page opens over the detail');
+  assert(await page.waitFor('document.getElementById("list").classList.contains("hidden")'), 'left pane swapped to archive');
+  await page.ev('history.back(); true;');
+  assert(await page.waitFor('document.getElementById("arch").classList.contains("hidden") && !document.getElementById("list").classList.contains("hidden")'), 'back returns the left pane to the list');
+  assert(await page.waitFor('/宽屏乙/.test(document.getElementById("d-title").textContent)'), 'detail session KEPT after archive back');
+  assert(await page.waitFor('(function(){var s=document.querySelector(".srow.on"); return s && /宽屏乙/.test(s.textContent)})()'), 'selection still on pl2');
 
   // content column cap (bar/background stay full-bleed, transcript column 860px)
   assert(await page.waitFor('getComputedStyle(document.getElementById("chat")).maxWidth === "860px"'), 'content column 860px');

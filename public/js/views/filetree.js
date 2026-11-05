@@ -288,9 +288,26 @@ function openFileActions(e, rp) {
   openBubble('row-actions');
 }
 function ftCopy(t, label) {
+  // v206：clipboard API 在局域网 HTTP（非 localhost）下缺失或被拒——
+  // 与 transcript.js copyText 同款兜底：writeText 竞速 1.2s 超时 → execCommand
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('已复制' + label);
+    } catch { toast('复制失败'); }
+  };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(t).then(() => toast('已复制' + label), () => toast('复制失败'));
-  } else toast('复制失败');
+    Promise.race([
+      navigator.clipboard.writeText(t).then(() => true, () => false),
+      new Promise((r) => setTimeout(() => r(false), 1200)),
+    ]).then((ok) => (ok ? toast('已复制' + label) : fallback()));
+  } else fallback();
 }
 
 /* ---------- wiring ---------- */

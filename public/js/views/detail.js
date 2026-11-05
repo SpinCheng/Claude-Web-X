@@ -13,16 +13,45 @@ import { auth, api } from '../api.js';
 import { sendWs } from '../ws.js';
 import { buildTurns, renderAllTurns, scrollBottom, updateJumpFab, parseOlderTurns, prependTurns, pushOptimisticUser } from './transcript.js';
 import { ensureModels, renderModelChip, updateTokenRing, openCostPanel, costDisplay } from './ctxring.js';
-import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork } from './composer.js';
+import { updateComposer, renderAttachChips, fetchQueue, setDraft, disarmFork, openNewModal } from './composer.js';
 import { seedActivity, resetActivity, refreshActivity } from './activity.js';
 import { resetFileTree, closeFileTree, openFileTree } from './filetree.js';
 import { syncSel } from './list.js';
 
 // v195 宽屏空态：右栏常驻但未选会话（覆盖右栏；窄屏永不可见）。
 // provisional（新建任务落座前的临时详情）不算"无会话"——遮罩必须让位。
+// v206：空态渲染新建任务主钮 + 最近打开 3 条（未归档、lastActive 降序）——
+// sessions 帧 handler 会再次调用本函数，晚到的会话数据自动补渲染
 function updateDetailEmpty() {
   const el = $('detail-empty');
-  if (el) el.classList.toggle('hidden', !(state.wide && !state.currentId && !state.provisional && state.token));
+  if (!el) return;
+  const on = state.wide && !state.currentId && !state.provisional && state.token;
+  el.classList.toggle('hidden', !on);
+  if (!on) return;
+  const list = el.querySelector('#de-recent');
+  if (!list) return;
+  list.innerHTML = '';
+  const recent = (state.sessions || []).filter((s) => !s.archived)
+    .sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0)).slice(0, 3);
+  if (!recent.length) return;
+  const head = document.createElement('p');
+  head.className = 'de-h';
+  head.textContent = '最近打开';
+  list.appendChild(head);
+  for (const s of recent) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'de-item';
+    const t = document.createElement('span');
+    t.className = 'de-t';
+    t.textContent = s.title || s.id.slice(0, 8);
+    const m = document.createElement('span');
+    m.className = 'de-m';
+    m.textContent = s.cwd || s.project || '';
+    b.append(t, m);
+    b.onclick = () => openDetail(s.id);
+    list.appendChild(b);
+  }
 }
 
 /* ---------------- history (system back = leave detail) ---------------- */
@@ -334,5 +363,8 @@ function renderWaitBanner() {
     ? '正在等待你在电脑端输入——会话已暂停'
     : '等待权限确认' + (w.tool ? ' · ' + w.tool : '') + '——在电脑端批准后自动继续';
 }
+
+// v206: 空态引导页「新建任务」主钮
+$('de-new').onclick = () => openNewModal();
 
 export { openDetail, openDetailProvisional, closeDetail, renderMeta, renderDriverChip, refreshDriver, updateRunStatus, renderWaitBanner, loadOlder, updateHistoryPill, updateDetailEmpty };

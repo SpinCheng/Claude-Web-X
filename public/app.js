@@ -66,6 +66,7 @@ function fetchSessions() {
       state.waits = {};
       for (const s of state.sessions) if (s.waiting) state.waits[s.id] = s.waiting;
       renderList(); renderMeta(); renderWaitBanner();
+      updateDetailEmpty(); // v206: 空态「最近打开」跟随会话数据刷新（HTTP bootstrap 晚于首次开关）
       // v102: an open detail view also refreshes its transcript - a
       // background turn may have finished while the PWA was suspended
       const cur = state.currentId;
@@ -179,16 +180,22 @@ window.addEventListener('popstate', (e) => {
   // system back inside detail returns to wherever it opened from (list or
   // archive) - the landed history entry decides (v185)
   if (state.currentId) {
+    if (state.wide) {
+      // v206 宽屏：右栏常驻不参与栈——详情是 replaceState，栈上的变化只有
+      // 归档 push，back 只切左栏（归档↔列表），详情保持开着
+      state.archOpen = !!(e.state && e.state.cr === 'arch');
+      $('arch').classList.toggle('hidden', !state.archOpen);
+      $('list').classList.toggle('hidden', state.archOpen);
+      if (state.archOpen) renderArchive();
+      syncSel(state.currentId);
+      return;
+    }
     sendWs({ type: 'unsubscribe' });
     state.currentId = null;
     state.turns = [];
     syncSel(null); // v195
     updateDetailEmpty(); // v195
     closeFileTree(); // v195：无会话即无 cwd，树随反选收起（不擦面板偏好）
-    if (state.wide) {
-      $('detail').classList.remove('hidden'); // 宽屏右栏常驻：反选=空态，左栏保持原状
-      return;
-    }
     $('detail').classList.add('hidden');
     state.archOpen = !!(e.state && e.state.cr === 'arch');
     if (state.archOpen) { $('arch').classList.remove('hidden'); renderArchive(); }
