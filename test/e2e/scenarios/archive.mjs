@@ -65,10 +65,17 @@ await withEnv(async (h, page) => {
   await page.ev(`document.getElementById('search-clear').click()`);
   assert(await page.waitFor(`document.querySelectorAll('#groups .srow').length === 2 && !document.querySelector('#groups .st-word.arc')`), 'both rows back, badge gone');
 
-  // running sessions hide the archive item (auto-unarchive is a net, not an invite)
+  // running sessions hide the archive item (auto-unarchive is a net, not an invite).
+  // fakeRun's WS frame races the immediate ctxmenu (openRowActions reads
+  // state.runs - a frame still in flight leaves the item out forever): re-fire
+  // the menu until the frame has landed (suite-load flake, 2x full-run misses)
   fakeRun(h, 'sid-ar2', 'running', 'ar-run');
-  await page.ev(ctxmenu(rowByTitle('归档乙')));
-  assert(await page.waitFor(`!!${findAct('停止运行')}`), 'running row menu open');
+  let menuHasStop = false;
+  for (let i = 0; i < 8 && !menuHasStop; i++) {
+    await page.ev(ctxmenu(rowByTitle('归档乙')));
+    menuHasStop = await page.waitFor(`!!${findAct('停止运行')}`, 1500);
+  }
+  assert(menuHasStop, 'running row menu open');
   assert(await page.ev(`!${findAct('归档会话')}`), 'archive item hidden while running');
   await page.ev(`document.getElementById('row-actions').click()`);
   fakeRun(h, 'sid-ar2', 'end', 'ar-run');

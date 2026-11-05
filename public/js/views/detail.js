@@ -18,10 +18,11 @@ import { seedActivity, resetActivity, refreshActivity } from './activity.js';
 import { resetFileTree, closeFileTree, openFileTree } from './filetree.js';
 import { syncSel } from './list.js';
 
-// v195 宽屏空态：右栏常驻但未选会话（覆盖右栏；窄屏永不可见）
+// v195 宽屏空态：右栏常驻但未选会话（覆盖右栏；窄屏永不可见）。
+// provisional（新建任务落座前的临时详情）不算"无会话"——遮罩必须让位。
 function updateDetailEmpty() {
   const el = $('detail-empty');
-  if (el) el.classList.toggle('hidden', !(state.wide && !state.currentId && state.token));
+  if (el) el.classList.toggle('hidden', !(state.wide && !state.currentId && !state.provisional && state.token));
 }
 
 /* ---------------- history (system back = leave detail) ---------------- */
@@ -153,9 +154,12 @@ function openDetailProvisional(text, cwd) {
   renderAttachChips();
   disarmFork();
   state.turns = [];
-  $('list').classList.add('hidden');
-  $('arch').classList.add('hidden'); // v185: uniform with openDetail
+  if (!state.wide) { // v195：宽屏左栏常驻不隐藏（同 openDetail）
+    $('list').classList.add('hidden');
+    $('arch').classList.add('hidden'); // v185: uniform with openDetail
+  }
   $('detail').classList.remove('hidden');
+  updateDetailEmpty(); // v195：provisional 不算空态，遮罩必须让位（曾盖住输入框）
   $('chat').innerHTML = '';
   $('d-title').textContent = truncTitle(text);
   $('d-meta').textContent = (cwd ? shortPath(cwd) + ' · ' : '') + '创建中…';

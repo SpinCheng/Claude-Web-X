@@ -831,6 +831,10 @@ body.wide #detail .wait-banner { max-width: 860px; margin-left: auto; margin-rig
 body.wide #detail .chat { padding-left: clamp(18px, 6%, 72px); padding-right: clamp(18px, 6%, 72px); }
 body.wide #act { right: max(20px, calc(50% - 430px)); } /* 锚 detail-main：内容列右缘，三栏时也不悬空 */
 body.wide #jump { position: absolute; left: auto; right: max(14px, calc(50% - 430px)); margin: 0; }
+/* composer 窄屏=视口级 fixed（chat 用 paddingBottom 补偿）——包含块是整窗，
+   宽屏必须转锚 detail-main（absolute bottom），否则 860 列按整窗居中、脱离
+   详情区（实测翻车：composer 恒 290/290 边距对齐视口中心而非内容列） */
+body.wide #detail .composer { position: absolute; left: 0; right: 0; bottom: 0; }
 body.wide .bubble.user { max-width: min(80%, 620px); }
 body.wide .final-card { max-width: min(100%, 700px); }
 /* 全宽模态收窄居中（防横跨双栏盖列表）；默认底 sheet 已 520px 居中无需动 */
@@ -861,8 +865,9 @@ body.wide #ft-scrim { display: none !important; }
   .at-row:hover, .frow:hover { background: rgba(46, 43, 38, .55); }
   .cm-row:hover, .opt:hover { background: var(--panel2); }
 }
-/* focus-visible 基线（roadmap 13 实现红线） */
-button:focus-visible, input:focus-visible, textarea:focus-visible, [role="button"]:focus-visible {
+/* focus-visible 基线（roadmap 13 实现红线）——只挂按钮类控件；输入框的焦点
+   由光标/占位符自证，挂 currentColor outline 在暖炭底上=白边刺眼（实测翻车） */
+button:focus-visible, [role="button"]:focus-visible {
   outline: 2px solid currentColor; outline-offset: -1px;
 }
 /* v111: executed-command stdout panel - right side, under the command bubble */

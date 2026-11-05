@@ -95,12 +95,22 @@ function applyWide() {
   state.wide = wide;
   document.body.classList.toggle('wide', wide);
   syncFtMode(); // v195：文件树第三栏形态钩子（body.ft-open）
+  const busy = !!(state.currentId || state.provisional);
   if (wide) {
-    if (!state.currentId) $('detail').classList.remove('hidden'); // 右栏上屏（空态）
-  } else if (!state.currentId) {
-    // 回窄屏且无会话：恢复互斥（列表页独占）
+    $('detail').classList.remove('hidden'); // 右栏常驻（无会话=空态）
+    // 跨断点修复：窄屏里开会话/新建曾把左栏隐藏，宽屏必须恢复常驻
+    // （左槽内容跟 state.archOpen：归档页开着就显示归档，否则列表）
+    $('arch').classList.toggle('hidden', !state.archOpen);
+    $('list').classList.toggle('hidden', !!state.archOpen);
+  } else if (busy) {
+    // 回窄屏且有会话：恢复互斥（详情独占）
+    $('list').classList.add('hidden');
+    $('arch').classList.add('hidden');
+  } else {
+    // 回窄屏且无会话：列表页独占
     $('detail').classList.add('hidden');
     $('list').classList.remove('hidden');
+    $('arch').classList.add('hidden');
   }
   updateDetailEmpty();
   if (state.currentId) markCapped(); // 跨断点：可见节点重跑限高测量

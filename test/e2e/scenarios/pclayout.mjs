@@ -44,6 +44,14 @@ await withEnv(async (h, page) => {
 
   // content column cap (bar/background stay full-bleed, transcript column 860px)
   assert(await page.waitFor('getComputedStyle(document.getElementById("chat")).maxWidth === "860px"'), 'content column 860px');
+  // v196 regression: the composer is viewport-level fixed in narrow - in wide it
+  // MUST re-anchor to #detail-main, else its column centers on the whole window
+  // (misaligned with the chat column)
+  assert(await page.waitFor('(function(){var c=document.getElementById("chat").getBoundingClientRect(); var m=document.getElementById("composer").getBoundingClientRect(); return Math.round(c.left)===Math.round(m.left) && Math.round(c.width)===Math.round(m.width)})()'), 'composer column aligned with chat (anchored to detail-main)');
+  // v196 regression: inputs must NOT carry the focus-visible outline (white-ish
+  // box around the textarea while typing - caret is the focus affordance)
+  assert(await page.waitFor('(function(){var i=document.getElementById("msg-input"); i.focus(); return getComputedStyle(i).outlineStyle==="none"})()'), 'no focus outline on the textarea');
+  await page.ev('document.getElementById("msg-input").blur(); true;');
 
   // ft third pane: 242px static column, no scrim shape, pref persisted
   await page.ev('document.getElementById("ft-toggle").click(); true;');
@@ -71,5 +79,26 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('(function(){var r=document.getElementById("html-prev").getBoundingClientRect(); return Math.round(r.width)===1280})()'), 'preview covers the full wide viewport');
   await page.ev('document.getElementById("hp-back").click(); true;');
   assert(await page.waitFor('document.getElementById("html-prev").classList.contains("hidden")'), 'preview closed');
+
+  // v196 regression: provisional detail (new task) must clear the empty overlay
+  // (it used to sit on top of the composer) and keep the left pane mounted
+  await page.ev('(function(){var orig=window.fetch; window.fetch=function(u,o){ if(String(u).indexOf("/api/sessions/new")>=0) return Promise.resolve({ok:true,json:function(){return Promise.resolve({ok:true,runId:"dbg-run"})}}); return orig(u,o); }; return true;})()');
+  await page.ev('document.getElementById("new-session").click(); true;');
+  await page.waitFor('!document.getElementById("new-modal").classList.contains("hidden")');
+  await page.ev('(function(){var t=document.getElementById("new-text"); t.value="宽屏新建"; return true;})()');
+  await page.ev('document.getElementById("new-go").click(); true;');
+  await new Promise((r) => setTimeout(r, 300));
+  assert(await page.waitFor('document.getElementById("detail-empty").classList.contains("hidden")'), 'provisional clears the empty overlay');
+  assert(await page.waitFor('(function(){var o=document.getElementById("detail-empty"); var m=document.getElementById("composer").getBoundingClientRect(); var r=o.getBoundingClientRect(); return r.width===0 || !function(){var x=m.left; return x>=r.left && x<=r.right}()})()'), 'overlay no longer covers the composer');
+
+  // v196 regression: crossing narrow->wide WITH a session open must restore the
+  // left pane (narrow's detail-open had hidden #list; wide keeps it mounted)
+  await page.resize(800, 800);
+  assert(await page.waitFor('!document.body.classList.contains("wide")'), 'back to narrow');
+  await new Promise((r) => setTimeout(r, 150));
+  assert(await page.waitFor('document.getElementById("list").classList.contains("hidden")'), 'narrow: detail full-screen, list hidden');
+  await page.resize(1280, 800);
+  assert(await page.waitFor('document.body.classList.contains("wide")'), 'wide again');
+  assert(await page.waitFor('(function(){var l=document.getElementById("list").getBoundingClientRect(); return l.width>300})()'), 'left pane restored on breakpoint cross');
   assert(true, 'done');
 });
