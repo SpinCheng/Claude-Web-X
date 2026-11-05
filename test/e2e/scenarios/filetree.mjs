@@ -71,9 +71,13 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /gone\\.txt/.test(x.textContent)}); return r && r.classList.contains("del")})()'), 'ghost row carries del class');
   assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return x.classList.contains("mod")}); return !!r})()'), 'mod-colored rows render');
 
-  // lazy expand: tap src -> children load with depth indent
+  // lazy expand: tap src -> children load with depth indent + open-folder glyph
   await page.ev('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /src/.test(x.textContent)}); r.click(); return true;})()');
   assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")); return r.some(function(x){return /app\\.js/.test(x.textContent)}) && r.some(function(x){return /extra\\.txt/.test(x.textContent)})})()'), 'src children lazy-load');
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return x.classList.contains("open")}); return r && r.querySelector(".ic").innerHTML.indexOf("1.94 2.5")>=0})()'), 'expanded dir shows the OPEN folder glyph');
+  // v201: per-type glyphs - .js=code <>, .txt=file-text, dotfiles=braces
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /app\\.js/.test(x.textContent)}); return r.querySelector(".ic").innerHTML.indexOf("m16 18")>=0})()'), 'js file shows the code glyph');
+  assert(await page.waitFor('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /extra\\.txt/.test(x.textContent)}); return r.querySelector(".ic").innerHTML.indexOf("M9 13h6")>=0})()'), 'txt file shows the file-text glyph');
   assert(await page.waitFor('(function(){var r=document.querySelector(".frow"); return getComputedStyle(r).getPropertyValue("--ft-depth")==="0"})()'), 'depth var drives indent');
 
   // seg filter: 已跟踪 hides untracked/ignored rows but keeps the staged file

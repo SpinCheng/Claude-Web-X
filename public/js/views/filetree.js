@@ -14,10 +14,28 @@ import { toast } from './toast.js';
 import { openBubble, closeBubble, previewArtifact } from './overlays.js';
 import { insertRef } from './composer.js';
 
-// v199 图标语系对齐文件树惯例（VSCode set）：closed-folder + file-text（页+行），
-// 旋箭头只表开合状态，不靠图标变形表达
-const FT_DIR_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>';
-const FT_DOC_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>';
+// v201 图标：真·文件树标准语系（VSCode seti 的单色版）——文件夹开/合双态
+// （展开=开口文件夹，与旋箭头双重状态表达），文件按类型 5 族字形：
+// 代码 <> / 文档=页+行 / 配置={} / 图片=相框 / 默认=素页。全部 currentColor，
+// 不引入新色相（珊瑚纪律不破）。
+const FT_DIR_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
+const FT_DIR_OPEN_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>';
+const FT_DOC_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+const FT_CODE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>';
+const FT_TEXT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>';
+const FT_CONF_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>';
+const FT_IMG_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+const FT_CODE_RE = /\.(js|mjs|cjs|ts|jsx|tsx|vue|svelte|astro|html?|css|scss|sass|less|py|rb|go|rs|java|kt|swift|c|h|cpp|hpp|cs|php|lua|r|m|pl|sh|bash|zsh|fish|ps1|psm1|bat|cmd|sql)$/i;
+const FT_TEXT_RE = /\.(md|markdown|txt|log|csv|tsv|diff|patch)$/i;
+const FT_CONF_RE = /(^|\/)(\.[\w.-]+|[\w-]+\.(json|jsonc|ya?ml|toml|ini|cfg|conf|env|xml|lock|properties))$/i;
+const FT_IMG_RE = /\.(png|jpe?g|webp|gif|svg|ico|bmp)$/i;
+function ftFileIcon(name) {
+  if (FT_CODE_RE.test(name)) return FT_CODE_ICON;
+  if (FT_TEXT_RE.test(name)) return FT_TEXT_ICON;
+  if (FT_CONF_RE.test(name)) return FT_CONF_ICON;
+  if (FT_IMG_RE.test(name)) return FT_IMG_ICON;
+  return FT_DOC_ICON;
+}
 const FT_TW = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>';
 const FT_MORE = '<svg viewBox="0 0 24 24" width="14" height="14"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>';
 const FT_DEPTH_MAX = 11; // 深度上限 12（桥侧同限）：第 12 层不再给展开箭头
@@ -194,7 +212,7 @@ function ftRowEl(e, rel, depth) {
   if (e.d && depth < FT_DEPTH_MAX) tw.innerHTML = FT_TW;
   const ic = document.createElement('span');
   ic.className = 'ic';
-  ic.innerHTML = e.d ? FT_DIR_ICON : FT_DOC_ICON;
+  ic.innerHTML = e.d ? (e.d && ftExp.has(rp) ? FT_DIR_OPEN_ICON : FT_DIR_ICON) : ftFileIcon(e.n);
   const nm = document.createElement('span');
   nm.className = 'nm';
   nm.textContent = e.n;

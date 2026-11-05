@@ -126,8 +126,8 @@ button { font-family: inherit; }
 .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(54, 51, 45, .6); }
 .bar .brand { flex: 1; min-width: 0; }
 .detail-bar { padding-left: 4px; }
-/* v199: 详情 header 右侧图标簇间距参考列表页 .ib-cluster（1px）收紧 */
-.detail-bar > #ft-toggle, .detail-bar > #del { margin-left: -5px; }
+/* v201: 详情 header 右侧图标簇间距对齐列表页 .ib-cluster（1px 有效间距） */
+.detail-bar > #ft-toggle, .detail-bar > #del { margin-left: -7px; }
 .d-title { flex: 1; min-width: 0; }
 .d-title b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .d-title span { font-size: 10.5px; font-family: var(--mono); color: var(--faint); letter-spacing: .02em; }
