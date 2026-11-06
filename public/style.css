@@ -675,8 +675,19 @@ button { font-family: inherit; }
 .cost-hero b { font: 700 26px/1 var(--mono); font-variant-numeric: tabular-nums; }
 .cost-cap { color: var(--faint); font-size: 11.5px; }
 .tok-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 12px; }
-/* v191 结算输出速率：muted 一行（静态数字、tabular-nums、无动画） */
-.cost-rate { margin: -4px 2px 12px; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+/* v209 结算速率卡（方案D 用户裁定）：卡头总均值 + 分模型相对速率横条；最快模型数值=珊瑚（随 D 裁定的例外）；静态数字 tabular-nums */
+.rate-card { background: var(--panel2); border-radius: 14px; padding: 12px 14px 10px; margin: -5px 0 12px; box-shadow: inset 0 1px 0 var(--ink-hi); }
+.rate-card .rc-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.rate-card .rc-label { color: var(--faint); font-size: 10px; letter-spacing: .04em; }
+.rate-card .rc-num { font: 700 24px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.rate-card .rc-unit { font: 600 11px var(--mono); color: var(--dim); }
+.rate-card .rc-sub { color: var(--dim); font-size: 10.5px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.rate-card .rc-row { display: flex; align-items: center; gap: 9px; padding: 5px 0 0; }
+.rate-card .rc-name { flex: none; width: 86px; color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rate-card .rc-track { flex: 1; height: 8px; border-radius: 4px; background: var(--bg); overflow: hidden; }
+.rate-card .rc-fill { display: block; height: 100%; border-radius: 4px; background: var(--raise); }
+.rate-card .rc-val { flex: none; width: 40px; text-align: right; font: 600 11.5px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--dim); }
+.rate-card .rc-val.hot { color: var(--acc-strong); }
 .tok-grid .cell { background: var(--panel2); border-radius: 10px; padding: 8px 4px 7px; text-align: center; }
 .tok-grid .tv { font: 600 13px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
 .tok-grid .tk { color: var(--faint); font-size: 10px; margin-top: 2px; }

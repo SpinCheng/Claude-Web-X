@@ -169,6 +169,40 @@ test('v191 settle rate: no accumulation -> stats carry no rate key', () => {
   assert.equal(st.stats.rate, undefined);
 });
 
+// v209: same message.id split across part lines (thinking/tool_use/text) with
+// the WHOLE message's usage repeated on every line - count out once, close the
+// interval at the LAST part line
+const asstPart = (ts, model, out, id) => ({ type: 'assistant', timestamp: ts, message: { role: 'assistant', id, model, usage: { input_tokens: 1, output_tokens: out }, content: [{ type: 'text', text: 'ok' }] } });
+
+test('v209: split message.id lines count once - out once, ms closed at last part', () => {
+  const rec = {};
+  const { events } = run([
+    tsUser(ISO(0)),
+    asstPart(ISO(10), 'm1', 120, 'msg_1'),   // first part opens the group (usage repeated but counted once)
+    asstPart(ISO(16), 'm1', 120, 'msg_1'),   // same message, later part: extends completion only
+    tsToolRes(ISO(30), 't1'),
+    asstPart(ISO(40), 'm1', 80, 'msg_2'),
+    costState(1, 1, 0.01),
+  ], rec);
+  // group1: out 120 once, 0s->16s = 16s; group2: out 80, 30s->40s = 10s
+  assert.deepEqual(rec._rate, { m1: { out: 200, ms: 26000 } });
+  const st = events[events.length - 1];
+  assert.deepEqual(st.stats.rate.models, { m1: { out: 200, ms: 26000 } });
+});
+
+test('v209: back-to-back messages without an intervening line chain the base (no overlap)', () => {
+  const rec = {};
+  run([
+    tsUser(ISO(0)),
+    asstPart(ISO(10), 'm1', 100, 'msg_1'),
+    asstPart(ISO(10), 'm1', 100, 'msg_1'),   // same ts as the first part: still the same group (end unchanged)
+    asstPart(ISO(20), 'm1', 50, 'msg_2'),    // NEW message directly after: base must be 10s, not 0s
+    costState(1, 1, 0.01),
+  ], rec);
+  // group1: 0->10s out 100; group2: 10->20s out 50
+  assert.deepEqual(rec._rate, { m1: { out: 150, ms: 20000 } });
+});
+
 test('tool_use carries id (pairing key); toolres items extract text/err/images', () => {
   const { events } = run([
     assistant([{ type: 'tool_use', id: 'tu9', name: 'Bash', input: { command: 'ls' } }]),

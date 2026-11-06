@@ -329,17 +329,44 @@ function renderCostSheet() {
     const hit = cell(pct.toFixed(1) + '%', '缓存命中');
     grid.append(hit);
   }
-  // v191: 结算输出速率（Σout ÷ Σ生成间隔，解析层随 cost-state 结算刷新）——
-  // muted 一行；实时速率不做（弹窗是瞬态的，裁定见 roadmap 05 定稿）
-  const rateRow = $('cost-rate');
+  // v209 结算速率（方案D 用户裁定）：全宽速率卡——卡头总均值大数字 + 分模型
+  // 相对速率横条（按速度选模型的决策视图）；最快模型数值=珊瑚高亮（随 D 方案
+  // 一并裁定的例外）；单模型退化为只有卡头。实时速率不做（roadmap 05 定稿）。
+  const rateCard = $('cost-rate');
   const rt = c.rate;
+  rateCard.textContent = '';
+  rateCard.hidden = !(rt && rt.ms > 0);
   if (rt && rt.ms > 0) {
     const tps = Math.round(rt.out / (rt.ms / 1000));
     const mins = rt.ms / 60000;
-    rateRow.hidden = false;
-    rateRow.textContent = '输出均值 ' + tps.toLocaleString() + ' tok/s · 计时 ' +
-      (mins >= 1 ? mins.toFixed(1) + ' 分钟' : Math.round(rt.ms / 1000) + ' 秒');
-  } else rateRow.hidden = true;
+    const top = document.createElement('div');
+    top.className = 'rc-top';
+    const mk = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; return s; };
+    top.append(mk('rc-label', '输出速率'), mk('rc-num', tps.toLocaleString()), mk('rc-unit', 'tok/s'),
+      mk('rc-sub', (mins >= 1 ? mins.toFixed(1) + ' 分钟' : Math.round(rt.ms / 1000) + ' 秒') + ' · ' + fmtTokens(rt.out || 0) + ' tok'));
+    rateCard.append(top);
+    const rms = Object.entries(rt.models || {}).filter(([, b]) => b.ms > 0);
+    if (rms.length > 1) {
+      const max = Math.max(...rms.map(([, b]) => b.out / b.ms));
+      for (const [name, b] of rms) {
+        const r = b.out / b.ms; // tok/ms
+        const row = document.createElement('div');
+        row.className = 'rc-row';
+        const nm = mk('rc-name', modelLabel(name));
+        nm.title = name;
+        const track = document.createElement('span');
+        track.className = 'rc-track';
+        const fill = document.createElement('span');
+        fill.className = 'rc-fill';
+        fill.style.width = Math.round(r / max * 100) + '%';
+        track.append(fill);
+        const val = mk('rc-val', Math.round(r * 1000).toLocaleString());
+        if (r === max) val.classList.add('hot'); // 最快模型
+        row.append(nm, track, val);
+        rateCard.append(row);
+      }
+    }
+  }
   // per-model rows only when the session actually switched models
   const box = $('cost-models');
   box.textContent = '';
@@ -360,12 +387,8 @@ function renderCostSheet() {
       row.append(nm, us);
       const sub = document.createElement('div'); sub.className = 'c-msub';
       const share = c.usd ? Math.round((m.usd || 0) / c.usd * 100) : 0;
-      // v191: 该模型行尾补结算速率（分桶键=assistant 显示模型，与 cost-state
-      // 的 API id 键可能不同名——查不到就不补，不为对齐而猜）
-      const rb = (c.rate && c.rate.models && c.rate.models[name]) || null;
       sub.textContent = '输入 ' + fmtTokens(m.inTok || 0) + ' · 输出 ' + fmtTokens(m.outTok || 0)
-        + ' · 缓存读 ' + fmtTokens(m.cacheRead || 0) + ' · 占 ' + share + '%'
-        + (rb && rb.ms > 0 ? ' · ' + Math.round(rb.out / (rb.ms / 1000)).toLocaleString() + ' tok/s' : '');
+        + ' · 缓存读 ' + fmtTokens(m.cacheRead || 0) + ' · 占 ' + share + '%'; // v209: 行尾 tok/s 移入速率卡
       box.append(row, sub);
     }
   }

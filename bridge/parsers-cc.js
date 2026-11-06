@@ -38,6 +38,23 @@ const OUTCOME_SUBTYPES = {
   stop_hook_summary: 'ok',
 };
 
+// v209: close the open assistant message group into the per-model rate
+// buckets. dur = last part's ts - the base captured at group open; the base
+// then advances to the group end so a directly-following group never overlaps
+// the span (a later non-assistant line's fresher ts still wins, as usual).
+export function commitRateGroup(rec) {
+  if (!rec || !rec._rateMsg) return;
+  const dur = (rec._rateEnd || 0) - (rec._rateStartBase || 0);
+  if (dur > 0 && rec._rateOut > 0) {
+    rec._rate = rec._rate || {};
+    const bk = rec._rate[rec._rateModel] || (rec._rate[rec._rateModel] = { out: 0, ms: 0 });
+    bk.out += rec._rateOut;
+    bk.ms += dur;
+  }
+  if ((rec._rateEnd || 0) > (rec._rateBase || 0)) rec._rateBase = rec._rateEnd;
+  rec._rateMsg = ''; rec._rateModel = ''; rec._rateOut = 0; rec._rateStartBase = 0; rec._rateEnd = 0;
+}
+
 export function applyLine(id, obj, patch, events, rec) {
     // cwd rides on several line types (user, system/local_command, ...):
     // harvest from ANY of them - a transcript that only ever carries cwd on
@@ -48,10 +65,11 @@ export function applyLine(id, obj, patch, events, rec) {
     // the expanded prompt body". Any NON-user line disarms - a local-type
     // command (no body) must not swallow the human's next real message.
     if (obj.type !== 'user' && rec) rec._cmdEnv = false;
-    // v191 结算速率（roadmap 05）：非 assistant 行的 ts = 下一段模型输出的
-    // 计时起点（通常是 tool_result / api-request——间隔≈收到输入到吐完本行
-    // 的真实耗时，含 thinking）。累加挂 rec（跨行状态，_cmdEnv 先例）。
+    // v209 结算速率：非 assistant 行的 ts = 下一段模型输出的计时起点（通常
+    // 是 tool_result / api-request——间隔≈收到输入到吐完输出的真实耗时）。
+    // 先收口上一个 message 组，再推进基点；累加挂 rec（_cmdEnv 先例）。
     if (obj.type !== 'assistant' && rec) {
+      commitRateGroup(rec);
       const bt = Date.parse(obj.timestamp || '');
       if (Number.isFinite(bt)) rec._rateBase = bt;
     }
@@ -292,22 +310,36 @@ export function applyLine(id, obj, patch, events, rec) {
             patch.usageFirst = total;
             patch.fixedTok = Math.min(200_000, Math.max(0, Math.round(total - fu / 2.5)));
           }
-          // v191 结算速率累加：Σout / Σ间隔，按 message.model 分桶（与圆环/
-          // 模型标签同源）。链式基点——assistant 行自己也成为下一行的基点，
-          // 连续 assistant 行绝不重叠计时；无 ts / 无基点 / 非正间隔整行跳过
-          // 速率贡献（token 计量不受影响，那是 cost-state 的账）。
+          // v209 结算速率累加（v191 修正案）：同一条 API message 被 CLI 按
+          // content part 拆成多行 assistant（message.id 相同，且每行都重复
+          // 整条消息的 usage——实测三转录 708 个多行组 100% 逐行同值，逐行
+          // 累加会把 out 记 ~2.5 倍）。按 message.id 分组：out 只在组首计一次、
+          // 间隔=基点(上一非 assistant 行 ts)→组末行 ts（组末≈整条完成时刻）；
+          // 无 id 的行（拆行时代之前）按单行组内联累计。无 ts / 无基点 / 非正
+          // 间隔整组跳过（token 计量不受影响，那是 cost-state 的账）。
           if (rec) {
             const at = Date.parse(obj.timestamp || '');
             if (Number.isFinite(at)) {
-              const base = rec._rateBase;
-              if (Number.isFinite(base) && at > base) {
-                const name = String((obj.message && obj.message.model) || '');
-                rec._rate = rec._rate || {};
-                const bk = rec._rate[name] || (rec._rate[name] = { out: 0, ms: 0 });
-                bk.out += u.output_tokens || 0;
-                bk.ms += at - base;
+              const mid = (obj.message && obj.message.id) || '';
+              if (mid && rec._rateMsg === mid) {
+                rec._rateEnd = at; // same message, later part: extend to real completion
+              } else {
+                commitRateGroup(rec);
+                if (Number.isFinite(rec._rateBase) && at > rec._rateBase) {
+                  const name = String((obj.message && obj.message.model) || '');
+                  const out = u.output_tokens || 0;
+                  if (mid) {
+                    rec._rateMsg = mid; rec._rateModel = name;
+                    rec._rateStartBase = rec._rateBase; rec._rateEnd = at; rec._rateOut = out;
+                  } else {
+                    rec._rate = rec._rate || {};
+                    const bk = rec._rate[name] || (rec._rate[name] = { out: 0, ms: 0 });
+                    bk.out += out;
+                    bk.ms += at - rec._rateBase;
+                    rec._rateBase = at;
+                  }
+                }
               }
-              rec._rateBase = at;
             }
           }
         }
