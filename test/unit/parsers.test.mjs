@@ -562,7 +562,7 @@ test('v178: cmdout is the sole set display source - position rides the command b
   assert.equal(rec2._goalLive, true, 'but goal is tracked live for the panel');
 });
 
-// ---------- v197: 代附/附件回显附录折叠 ----------
+// ---------- v197: 代附/附件回显附录折叠（v208 起附录无围栏；围栏=旧形态兼容） ----------
 test('v197: @-ref appendix folds to an attref marker; tags+prose stay the bubble text', () => {
   const { events } = run([user({ message: { role: 'user', content: '@foo.js @bar.md 看看\n\n[引用 @foo.js]\n```\nbody\n```\n\n[引用 @bar.md]\n```\nmore\n```' } })]);
   const u = events.find((e) => e.k === 'user');
@@ -571,6 +571,15 @@ test('v197: @-ref appendix folds to an attref marker; tags+prose stay the bubble
   assert.equal(events.indexOf(u) < events.indexOf(m), true, 'marker renders below the bubble');
   assert.equal(u.text, '@foo.js @bar.md 看看', 'exact tags+prose = optimistic-twin-precise');
   assert.deepEqual(m.files, ['@foo.js', '@bar.md']);
+});
+
+test('v208: fenceless appendix (label + blank line + raw text) folds identically', () => {
+  const { events } = run([user({ message: { role: 'user', content: '@a.md 看看\n\n[引用 @a.md]\n\n# 标题\n\n- 列表项\n正文带 markdown，无围栏不破坏结构' } })]);
+  const u = events.find((e) => e.k === 'user');
+  const m = events.find((e) => e.k === 'attref');
+  assert.ok(u && m, 'both events');
+  assert.equal(u.text, '@a.md 看看');
+  assert.deepEqual(m.files, ['@a.md']);
 });
 
 test('v197: upload labels ride along (incl. the saved-to variant, name trimmed)', () => {

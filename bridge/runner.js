@@ -317,9 +317,11 @@ export class Runner extends EventEmitter {
           const full = a.abs || path.join(this.uploadsDir, a.file);
           const buf = fs.readFileSync(full);
           // v197: @ refs label as [引用 @path] (distinct from upload [附件
-          // name]) - the parser folds BOTH appendix labels out of the timeline
+          // name]) - the parser folds BOTH appendix labels out of the timeline.
+          // v208 用户裁定：附录不用代码围栏包裹（``` 会污染内容里的 Markdown
+          // 结构）——标签行 + 一空行 + 原文，解析层对围栏/无围栏双格式兼容
           if (buf.length <= 24 * 1024) {
-            prompt += '\n\n' + (a.at ? '[引用 @' + a.name + ']\n```\n' : '[附件 ' + a.name + ']\n```\n') + buf.toString('utf8').slice(0, 24 * 1024) + '\n```';
+            prompt += '\n\n' + (a.at ? '[引用 @' + a.name + ']' : '[附件 ' + a.name + ']') + '\n\n' + buf.toString('utf8').slice(0, 24 * 1024);
           } else {
             prompt += '\n\n[附件 ' + a.name + ' 已保存到 ' + full + '，可用 Read 查看]';
           }

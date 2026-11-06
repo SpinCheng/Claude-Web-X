@@ -249,11 +249,13 @@ export function applyLine(id, obj, patch, events, rec) {
         // /name args means this line IS an envelope; the NEXT plain user
         // line (if nothing else intervenes) is its expanded prompt body
         if (rawText !== text && /^\/[^\/\s]/.test(text) && rec) rec._cmdEnv = true;
-        // v197: 代附/附件回显折叠。runner 在正文后追加 `\n\n[引用 @x]\n```…```
-        // （或 `[附件 name]`）机器附录，CLI 把整段 prompt 原样写进 user 行——
-        // 不折叠就多出一个非用户输入的大气泡。词法切分：首个附录标记前=
-        // 用户文本（含 @ 标签——乐观孪生因此仍精确匹配），其后=机器附录。
-        // 锚定完整机器格式（标记行以 \n\n 开头），正文撞上≈主动伪造（v145 先例）。
+        // v197: 代附/附件回显折叠。runner 在正文后追加 `\n\n[引用 @x]\n\n…`（v208
+        // 起无围栏；旧围栏形态 ```` ```…``` ```` 由同一标记截断——附录标签本身
+        // 不会出现在用户正文里，切分点仍取首个标记前）机器附录，CLI 把整段
+        // prompt 原样写进 user 行——不折叠就多出一个非用户输入的大气泡。
+        // 词法切分：首个附录标记前=用户文本（含 @ 标签——乐观孪生因此仍精确
+        // 匹配），其后=机器附录。锚定完整机器格式（标记行以 \n\n 开头），
+        // 正文撞上≈主动伪造（v145 先例）。
         const AP_M = text.match(/\n\n\[(引用 @[^\]\n]+|附件[^\]\n]+)\]/);
         if (AP_M && AP_M.index > 0) {
           const appendix = text.slice(AP_M.index);

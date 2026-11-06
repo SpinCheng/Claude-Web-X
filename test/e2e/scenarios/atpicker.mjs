@@ -96,13 +96,13 @@ await withEnv(async (h, page) => {
   // the clean bubble + a folded marker row, never a giant echo bubble
   writeSession(h, 'T--e2e', 'at2', [
     { type: 'user', timestamp: new Date(Date.now() - 110_000).toISOString(), cwd: h.tmp, origin: { kind: 'human' },
-      message: { role: 'user', content: '@README.md 看看\n\n[引用 @README.md]\n```\nfile body\n```' } },
+      message: { role: 'user', content: '@README.md 看看\n\n[引用 @README.md]\n\nfile body v208 fenceless' } },
     assistant(4, [text('ok')]),
     stop(5),
   ]);
   assert(await waitSession('at2'), 'echo session visible');
   await page.open('at2');
-  assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.some(function(x){return x.textContent.indexOf("@README.md 看看")>=0 && x.textContent.indexOf("file body")<0})})()'), 'bubble shows tags+prose only, no appendix');
+  assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.some(function(x){return x.textContent.indexOf("@README.md 看看")>=0 && x.textContent.indexOf("fenceless")<0})})()'), 'bubble shows tags+prose only, no appendix');
   assert(await page.waitFor('(function(){return [].slice.call(document.querySelectorAll(".sysline")).some(function(x){return x.textContent.indexOf("已随消息附上 1 份")>=0})})()'), 'appendix folded into the marker row');
   assert(true, 'done');
 });
