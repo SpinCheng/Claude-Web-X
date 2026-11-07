@@ -67,9 +67,11 @@ function openTextPreview(name, text, path) {
 // v146: the rollup's +/- stats open a diff of that file's edits in the turn -
 // the bridge re-reads the transcript (display events truncate inputs) and
 // synthesizes unified-diff text, which rides the ordinary diffDoc dual tab.
-async function previewFileDiff(p) {
+async function previewFileDiff(p, fromMs) {
   try {
-    const r = await api('/api/sessions/' + encodeURIComponent(state.currentId) + '/filediff?p=' + encodeURIComponent(p));
+    // v218: from=turn 起点——详情只合成本轮编辑，与列表的 turn 级 ± 恒等
+    const q = fromMs ? '&from=' + encodeURIComponent(fromMs) : '';
+    const r = await api('/api/sessions/' + encodeURIComponent(state.currentId) + '/filediff?p=' + encodeURIComponent(p) + q);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     openHtmlPreview({ name: (j.name || 'diff') + ' · 本轮编辑', text: diffDoc(j.text), srcText: j.text.slice(0, 128 * 1024), path: p });

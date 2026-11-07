@@ -301,6 +301,16 @@ test('v215 trim: pure insertion keeps empty del side (blank line must not become
   assert.ok(!txt.includes('@@ Edit @@\n\n'), 'no phantom blank ctx line after the header');
 });
 
+test('v218 from window: only calls at/after the timestamp are synthesized (turn scope parity)', () => {
+  const mk = (ts, o, n) => ({ type: 'assistant', timestamp: ts, message: { role: 'assistant', model: 'm', content: [{ type: 'tool_use', id: 'e' + ts, name: 'Edit', input: { file_path: 'D:\\e2e\\g.js', old_string: o, new_string: n } }] } });
+  const lines = [mk('2026-11-07T10:00:00.000Z', 'a', 'a1'), mk('2026-11-07T11:00:00.000Z', 'b', 'b1')];
+  const all = synthesizeFileDiff(lines, 'd:\\e2e\\g.js');
+  assert.ok(all.includes('-a') && all.includes('-b'), 'no from = full history');
+  const win = synthesizeFileDiff(lines, 'd:\\e2e\\g.js', Date.parse('2026-11-07T10:30:00.000Z'));
+  assert.ok(win.includes('-b'), 'window keeps the later call');
+  assert.ok(!win.includes('-a'), 'window drops the earlier call');
+});
+
 test('tool_result text is capped at 4000 chars', () => {
   const { events } = run([toolResultLine('t1', 'x'.repeat(9000))]);
   assert.ok(events[0].items[0].text.length < 4100);

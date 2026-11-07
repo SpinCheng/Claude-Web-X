@@ -101,7 +101,11 @@ export function register(router, ctx) {
     if (!guard(req, res, r)) return;
     if (!store.get(r.params.id)) { json(res, 404, { error: 'not found' }); return; }
     const p = r.url.searchParams.get('p') || '';
-    const text = adapter.fileDiff(r.params.id, p);
+    // v218: from=毫秒 ts——只合成该时刻之后的调用（前端传 turn 起点，
+    // 详情作用域与列表的 turn 级聚合对齐）
+    const fromRaw = Number(r.url.searchParams.get('from'));
+    const from = Number.isFinite(fromRaw) && fromRaw > 0 ? fromRaw : 0;
+    const text = adapter.fileDiff(r.params.id, p, from || undefined);
     if (!text) { json(res, 404, { error: 'no edits recorded for this file' }); return; }
     json(res, 200, { name: p.split(/[\\/]/).pop(), text });
   });

@@ -933,7 +933,7 @@ function renderTurn(t) {
           const fe = document.createElement('i'); fe.className = 'dele'; fe.textContent = '−' + f.del;
           db.append(fi, fe);
           fd.append(db);
-          fd.onclick = (e) => { e.stopPropagation(); previewFileDiff(f.path); };
+          fd.onclick = (e) => { e.stopPropagation(); previewFileDiff(f.path, t.startTs ? Date.parse(t.startTs) : 0); };
           row.onclick = () => previewArtifact(f.path);
           row.append(info, fd);
           det.appendChild(row);

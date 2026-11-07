@@ -551,7 +551,7 @@ export function pathInAnchor(anchor, filePath, ci) {
 }
 
 const FILEDIFF_MAX = 256 * 1024;
-export function synthesizeFileDiff(lines, matchPath) {
+export function synthesizeFileDiff(lines, matchPath, fromMs) {
   const want = String(matchPath || '').toLowerCase();
   if (!want) return '';
   const name = String(matchPath).split(/[\\/]/).pop();
@@ -574,6 +574,13 @@ export function synthesizeFileDiff(lines, matchPath) {
   let out = '', toolN = 0;
   for (const obj of lines) {
     if (!obj || obj.type !== 'assistant' || !obj.message) continue;
+    // v218 作用域对齐：from 之后的调用才计入——列表 ± 是 turn 级聚合，详情
+    // 曾扫全转录（历史所有轮次的同文件编辑全混进来），数字恒不等（watchdog
+    // ps1 实证：本轮 +1−1 vs 全历史 +51−12）。无 from = 全量（旧现状兜底）。
+    if (fromMs) {
+      const ts = Date.parse(obj.timestamp || '');
+      if (!Number.isFinite(ts) || ts < fromMs) continue;
+    }
     const parts = obj.message.content;
     if (!Array.isArray(parts)) continue;
     for (const p of parts) {

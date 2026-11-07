@@ -456,7 +456,7 @@ export class CcAdapter extends EventEmitter {
   // v146: per-file diff text for the rollup's +/- tap. Re-reads the RAW
   // transcript (the display events truncate tool inputs at 300 chars, which
   // would gut every real edit); one pass, no state kept.
-  fileDiff(id, p) {
+  fileDiff(id, p, fromMs) {
     const rec = this.store.get(id);
     if (!rec || !rec.transcriptPath) return '';
     const lines = [];
@@ -464,7 +464,7 @@ export class CcAdapter extends EventEmitter {
       let obj; try { obj = JSON.parse(line); } catch { continue; }
       lines.push(obj);
     }
-    return synthesizeFileDiff(lines, p);
+    return synthesizeFileDiff(lines, p, fromMs);
   }
 }
 
