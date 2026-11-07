@@ -31,7 +31,7 @@ await withEnv(async (h, page) => {
   await sleep(400);
   assert(await page.waitFor('!document.getElementById("detail").classList.contains("hidden")'), 'provisional detail open');
 
-  writeSession(h, 'T--e2e', 'adopt1', timelineLines());
+  writeSession(h, 'T--e2e', 'adopt1', timelineLines(h.tmp));
   await sleep(600);
   fakeRun(h, 'adopt1', 'running', 'e2e-run'); // adoption
   await sleep(1200);
@@ -92,8 +92,7 @@ await withEnv(async (h, page) => {
   await page.ev('document.getElementById("ag-close").click()');
 
   // ---- preview failure reasons + a real open, all against the session cwd ----
-  // (cwd rides on any transcript line - the adapter harvests it, switching the
-  // record to h.tmp so the preview endpoint resolves there)
+  // (v212 cwd 锁定：首锚=h.tmp 经 timelineLines 首行传入；后补 cwd 行不改写)
   const gone = path.join(h.tmp, 'gone-file.txt');
   const real = path.join(h.tmp, 'notes.txt');
   const outside = 'C:\\Users\\someone\\outside.txt';

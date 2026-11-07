@@ -149,6 +149,9 @@ export class CcAdapter extends EventEmitter {
       // running transcript-composition estimate (chars), for the context sheet;
       // store.upsert merges shallowly, so seed from the record then accumulate
       est: { tools: (rec.est && rec.est.tools) || 0, think: (rec.est && rec.est.think) || 0, prose: (rec.est && rec.est.prose) || 0 },
+      // v212 cwd 锁定的跨 drain 锚：记录已有归属（首见锚定）就沿用到本批，
+      // 模型 shell 中途 cd 的行永不改写（parsers applyLine 尊重 cwdSet）
+      cwdSet: rec.cwd || '',
     };
     const events = [];
     let latestTs = 0;
@@ -243,9 +246,13 @@ export class CcAdapter extends EventEmitter {
   // called by the rename route right after the transcript append: pin the new
   // title + the value it replaces so Desktop's cached-title re-emits can't
   // revert it. prev='' when the record had no usable title yet.
-  pinRename(id, title) {
+  // prevOverride (v212): caller KNOWS the echoed value (fork: the copied
+  // parent header title) - record may not be parsed yet at pin time, so the
+  // deterministic value beats a record read that can race the boot backfill.
+  pinRename(id, title, prevOverride) {
     const rec = this.store.get(id) || {};
-    const prev = rec.title && rec.title !== '(loading)' ? rec.title : '';
+    const prev = prevOverride !== undefined ? prevOverride
+      : (rec.title && rec.title !== '(loading)' ? rec.title : '');
     this.renames.set(id, { title, prev });
     this._saveRenames();
   }
@@ -359,15 +366,26 @@ export class CcAdapter extends EventEmitter {
   // transcript may copy the source's custom-title line, so ours must be
   // appended AFTER adoption (it is the last custom-title in file order and
   // wins). The record may not exist yet when the init line lands; retry
-  // until the adapter discovers the file. Not pinned: Desktop has no cached
-  // title for a brand-new session id, so nothing can echo over it.
+  // until the adapter discovers the file.
+  // v212: PIN the fork title (manual-rename path). The old "not pinned"
+  // assumption - nothing can echo over a brand-new session id - is false for
+  // forks: the transcript IS a copy of the parent, so every later --resume
+  // makes the CLI flush its cached (parent) title back over ours (real-find
+  // 4aa28a42: "Fork-…" was written once then overwritten 19x by echo flushes).
+  // prev = the copied parent title the echo carries, so fenceTitle's stale
+  // branch eats exactly that value.
   titleFork(forkFrom, newId) {
     if (!newId || this.forkTitled.has(newId)) return;
     this.forkTitled.add(newId);
     const src = this.store.get(forkFrom) || {};
     let base = src.title && src.title !== '(loading)' ? src.title : '';
     if (!base && src.cwd) base = src.cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
-    this._appendTitleWithRetry(newId, 'Fork-' + String(base || '会话').replace(/^(Fork-)+/, ''), 0);
+    const title = 'Fork-' + String(base || '会话').replace(/^(Fork-)+/, '');
+    // prev = the copied parent title: the echo flush will carry exactly that
+    // value, so fenceTitle's stale branch eats it deterministically (no race
+    // with the boot backfill that seeds the record)
+    this.pinRename(newId, title, src.title && src.title !== '(loading)' ? src.title : '');
+    this._appendTitleWithRetry(newId, title, 0);
   }
   _appendTitleWithRetry(id, title, attempt) {
     if (this.appendTitle(id, title)) return;

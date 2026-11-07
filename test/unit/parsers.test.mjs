@@ -352,6 +352,36 @@ test('cwd is harvested from non-user lines (ctxprobe sidecar shape)', () => {
   assert.equal(patch.cwd, 'D:\\x\\y');
 });
 
+// v212 用户裁定：cwd 首见锚定后锁定——模型 shell 中途 cd 的行不改写归属
+test('cwd locks on first anchor - later cd lines cannot re-anchor the session', () => {
+  const { patch } = run([
+    user(), // cwd D:\x anchors
+    user({ cwd: 'D:\\x\\sub\\deeper' }), // model cd'd into a subdir mid-session
+    { type: 'system', subtype: 'stop', timestamp: 't', cwd: 'D:\\x\\sub\\deeper' },
+  ]);
+  assert.equal(patch.cwd, 'D:\\x');
+  assert.equal(patch.cwdSet, 'D:\\x');
+});
+
+// ---------- v212: 改动文件汇总只收会话项目内的文件 ----------
+test('file rollup f: temp-dir edits are dropped when an anchor exists', () => {
+  const { events } = run([
+    user(), // anchors D:\x  -> events[0] = user bubble
+    assistant([{ type: 'tool_use', id: 't1', name: 'Write', input: { file_path: 'C:\\Users\\Administrator\\AppData\\Local\\Temp\\shot-x.png', content: 'ab\n' } }]), // events[1]
+    assistant([{ type: 'tool_use', id: 't2', name: 'Edit', input: { file_path: 'D:\\x\\src\\a.js', old_string: 'a', new_string: 'ab' } }]), // events[2]
+  ]);
+  assert.equal(events[1].parts[0].f, undefined, 'Temp 中间件不进汇总');
+  assert.deepEqual(events[2].parts[0].f, [{ path: 'D:\\x\\src\\a.js', add: 1, del: 1 }]);
+});
+
+test('file rollup f: no anchor -> unfiltered (legacy shape)', () => {
+  const { events } = run([
+    { type: 'mode', sessionId: 's' }, // no cwd anywhere
+    assistant([{ type: 'tool_use', id: 't1', name: 'Write', input: { file_path: 'C:\\Temp\\x.md', content: 'ab\n' } }]),
+  ]);
+  assert.ok(events[0].parts[0].f, '无锚不滤（转录从未带 cwd 行）');
+});
+
 // ---------- v154: 待办板（Task* / TodoWrite） ----------
 const tbTool = (name, input, id = 'tu1') => assistant([{ type: 'tool_use', id, name, input }]);
 

@@ -28,6 +28,23 @@ test('fence: historical replay never disarms the pin and never wins the title', 
   assert.equal(patch.title, '新', 'historical value must not win the title');
 });
 
+// v212: fork titles must be PINNED - the fork transcript is a parent copy, so
+// every later --resume makes the CLI flush its cached parent title back over
+// the Fork- brand (real-find 4aa28a42: written once, overwritten 19x).
+test('titleFork pins the Fork- title so CLI echo flushes fence out', () => {
+  // record shape at pin time: the copied parent header is already parsed
+  const a = new CcAdapter({ get: (id) => (id === 'src' ? { title: '源标题', lines: 1 } : { title: '源标题', lines: 1 }) }, 'Z:\\nonexistent', '', '');
+  a.titleFork('src', 'fork1');
+  assert.ok(a.renames.has('fork1'), 'fork title must land in the pin registry');
+  assert.equal(a.renames.get('fork1').title, 'Fork-源标题');
+  assert.equal(a.renames.get('fork1').prev, '源标题', 'prev = the copied parent title (deterministic)');
+  // the echo flush carrying the copied parent title must fence as STALE
+  const patch = {};
+  a._applyLine('fork1', titleLine('源标题'), patch, [], true);
+  assert.equal(patch.title, 'Fork-源标题', 'parent-title echo must not win');
+  assert.ok(a.renames.has('fork1'), 'stale echo must not disarm the pin');
+});
+
 test('fence: historical stale echo is swallowed (title pinned)', () => {
   const a = mkAdapter();
   a.renames.set('s', { title: '新', prev: '旧' });

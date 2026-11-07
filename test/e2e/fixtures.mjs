@@ -44,14 +44,16 @@ export const caveatLine = (i) =>
 
 // scenario: chronological timeline with tool result pairing; a second turn
 // carries an Edit so the conclusion-card file rollup (v45 fsum) is exercised
-export function timelineLines() {
+// v212: cwd 锁定后首见锚即会话归属——场景要自定义 cwd 必须从首行传，
+// 后补的 cwd 行不再改写（titlelive 的 preview 断言依赖 h.tmp 锚）
+export function timelineLines(cwd = 'D:\\e2e') {
   return [
-    user(1, '做时间轴测试'),
+    user(1, '做时间轴测试', cwd),
     assistant(2, [text('开始'), toolUse('t1', 'Bash', { command: 'echo timeline-order-ok' })]),
     toolResult(3, 't1', 'timeline-order-ok'),
     assistant(4, [text('命令输出：timeline-order-ok')]),
     stop(5),
-    user(6, '改文件汇总'),
+    user(6, '改文件汇总', cwd),
     assistant(7, [toolUse('t2', 'Edit', { file_path: 'D:\\e2e\\a.txt', old_string: 'x\ny', new_string: 'x1\ny1\nz' }), text('已修改 a.txt')]),
     stop(8),
   ];

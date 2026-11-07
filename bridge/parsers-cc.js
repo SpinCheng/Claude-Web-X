@@ -59,8 +59,15 @@ export function applyLine(id, obj, patch, events, rec) {
     // cwd rides on several line types (user, system/local_command, ...):
     // harvest from ANY of them - a transcript that only ever carries cwd on
     // system lines (e.g. a leaked ctxprobe sidecar) must still group by its
-    // real project instead of falling back to the workspace slug
-    if (obj.cwd) patch.cwd = obj.cwd;
+    // real project instead of falling back to the workspace slug.
+    // v212 用户裁定：首次锚定后锁定——CLI 会把模型 shell 的 cd 跟踪为会话
+    // cwd 写进后续行（fork 4aa28a42 实证：改 docs/design 时 149 行 cwd 变
+    // 子目录，「最后胜出」把会话甩进了新项目组）。归属项目=创建时的事实，
+    // 中途 cd 不改写。锁定值经 patch 传递，drain/重放两条路都幂等。
+    if (obj.cwd) {
+      if (patch.cwdSet) patch.cwd = patch.cwdSet;
+      else { patch.cwd = obj.cwd; patch.cwdSet = obj.cwd; }
+    }
     // v114 command-block state: an envelope line arms "next plain user line is
     // the expanded prompt body". Any NON-user line disarms - a local-type
     // command (no body) must not swallow the human's next real message.
@@ -368,8 +375,21 @@ export function applyLine(id, obj, patch, events, rec) {
             // which used to silently drop every edit whose input exceeded
             // the cap from the conclusion-card rollup.
             const part = { t: 'tool', name: p.name, id: p.id || '', v: briefJson(p.input) };
+            // v212 用户裁定：改动文件汇总只收会话项目内的文件——Temp 里的
+            // 截图/探针脚本等临时中间件不进汇总。锚=锁定 cwd（cwdSet，与
+            // 归组同源）；大小写不敏感前缀（Windows 盘符不分大小，产物
+            // 预览守卫同语义）；无锚（罕见：转录没有任何 cwd 行）不滤。
             const f = editDelta(p.name, p.input);
-            if (f) part.f = f;
+            if (f && patch.cwdSet) {
+              const anchor = patch.cwdSet.replace(/[\\/]+$/, '');
+              const lcAnchor = anchor.toLowerCase();
+              const inProj = (fp) => {
+                const lfp = String(fp).replace(/[\\/]+$/, '').toLowerCase();
+                return lfp.startsWith(lcAnchor + '\\') || lfp.startsWith(lcAnchor + '/') || lfp === lcAnchor;
+              };
+              const kept = f.filter((x) => inProj(x.path));
+              if (kept.length) part.f = kept;
+            } else if (f) part.f = f;
             // v154: 待办板结构化载荷照同一先例随事件下发（tb）——前端禁 parse
             // chip 文本；会话级板状态由 adapter 用 applyBoard 累积
             const tb = taskPart(p.name, p.input);
