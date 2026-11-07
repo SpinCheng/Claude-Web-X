@@ -131,7 +131,7 @@ sequenceDiagram
 ```
 claude-web/
 ├── README.md / README.en.md / SECURITY.md / CONTRIBUTING.md / LICENSE
-├── CLAUDE.md                   # 工程事实与约定全集（机器无关部分；本机细节在 LOCAL.md，不入库）
+├── CLAUDE.md                   # 纪律+分区路由表+铁律+红线（分区规则在 docs/rules/，改码前按路由必读）
 ├── package.json                # 仅 ws 一个运行时依赖，Node ≥ 20 ESM
 ├── bridge/                     # 常驻 daemon（HTTP+WS+静态+鉴权）
 │   ├── index.js / server.js    # 入口（配置迁移/事件接线/双开保护）/ 组装根（路由+静态+探针）

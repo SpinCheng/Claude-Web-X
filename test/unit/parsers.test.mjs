@@ -1,5 +1,5 @@
 // test/unit/parsers.test.mjs - pure-function coverage for the transcript
-// judgment pitfalls documented in CLAUDE.md (转录格式 section).
+// judgment pitfalls documented in docs/rules/transcript-format.md.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyLine, fenceTitle, synthesizeFileDiff, taskPart, applyBoard, bindCreated, boardSnapshot, GOAL_CANCEL_DIRECTIVE } from '../../bridge/parsers-cc.js';

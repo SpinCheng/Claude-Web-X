@@ -548,7 +548,7 @@ export function synthesizeFileDiff(lines, matchPath) {
   const minus = (v) => (v && v.length ? v.map((l) => '-' + l).join('\n') : '');
   const plus = (v) => (v && v.length ? v.map((l) => '+' + l).join('\n') : '');
   // v215: ctx 行加前导空格（标准 unified diff 语义）——内容自带 -/+ 开头的行
-  // （markdown 列表符）不加空格会被 diffRows 误判成 del/add（CLAUDE.md 实证）
+  // （markdown 列表符）不加空格会被 diffRows 误判成 del/add
   const ctx = (v) => (v && v.length ? v.map((l) => ' ' + l).join('\n') : '');
   // v215: hunk = 前缀共享行(ctx) + del 块 + add 块 + 后缀共享行(ctx)；空段
   // 不产空行（空行会被 diffRows 当 ctx 幽灵行）。与 editDelta 同用

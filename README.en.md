@@ -128,7 +128,7 @@ Sessions are files: desktop, terminal and phone all write the same transcripts; 
 ```
 claude-web/
 ├── README.md / README.en.md / SECURITY.md / CONTRIBUTING.md / LICENSE
-├── CLAUDE.md                   # engineering facts & conventions
+├── CLAUDE.md                   # discipline + area routing + red lines (area rules in docs/rules/)
 ├── package.json                # single runtime dep (ws), Node >= 20 ESM
 ├── bridge/                     # daemon: HTTP+WS + static + auth
 │   ├── index.js / server.js    # entry / composition root (routes, static, probe)
