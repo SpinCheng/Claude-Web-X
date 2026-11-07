@@ -415,7 +415,7 @@ test('cwd locks on first anchor - later cd lines cannot re-anchor the session', 
 test('file rollup f: temp-dir edits are dropped when an anchor exists', () => {
   const { events } = run([
     user(), // anchors D:\x  -> events[0] = user bubble
-    assistant([{ type: 'tool_use', id: 't1', name: 'Write', input: { file_path: 'C:\\Users\\Administrator\\AppData\\Local\\Temp\\shot-x.png', content: 'ab\n' } }]), // events[1]
+    assistant([{ type: 'tool_use', id: 't1', name: 'Write', input: { file_path: 'C:\\Temp\\shot-x.png', content: 'ab\n' } }]), // events[1]
     assistant([{ type: 'tool_use', id: 't2', name: 'Edit', input: { file_path: 'D:\\x\\src\\a.js', old_string: 'a', new_string: 'ab' } }]), // events[2]
   ]);
   assert.equal(events[1].parts[0].f, undefined, 'Temp 中间件不进汇总');
