@@ -245,6 +245,25 @@ export function diffDoc(src) {
   const ZWSP = '&#8203;'; // keep empty lines one row tall
   const cell = (s, cls) => '<div class="dc ' + cls + '">' + (ESC(s) || ZWSP) + '</div>';
   const GAP = '<div class="dc gap">' + ZWSP + '</div>';
+  // v217: mod 对的行内字符级分段——公共前/后缀弱化、只差异段保底色（单行内
+  // 改几个字的 Edit 曾整行红绿，眼睛抓不到对齐点）。上下式 del/add 行同享。
+  const intra = (l, r, cls) => {
+    let p = 0;
+    const min = Math.min(l.length, r.length);
+    while (p < min && l[p] === r[p]) p++;
+    let s = 0;
+    while (s < l.length - p && s < r.length - p && l[l.length - 1 - s] === r[r.length - 1 - s]) s++;
+    const lm = l.slice(p, l.length - s), rm = r.slice(p, r.length - s);
+    const open = '<span class="eq">' + ESC(l.slice(0, p)) + '</span>';
+    const close = '<span class="eq">' + ESC(l.slice(l.length - s)) + '</span>';
+    const mid = '<span class="ne">' + ESC(lm) + '</span>';
+    if (cls === 'del') return open + mid + close;
+    return '<span class="eq">' + ESC(r.slice(0, p)) + '</span><span class="ne">' + ESC(rm) + '</span><span class="eq">' + ESC(r.slice(r.length - s)) + '</span>';
+  };
+  const modCells = (l, r) => ({
+    stacked: '<div class="dl del">' + intra(l, r, 'del') + '</div><div class="dl add">' + intra(l, r, 'add') + '</div>',
+    pair: '<div class="drow"><div class="dc del">' + intra(l, r, 'del') + '</div><div class="dc add">' + intra(l, r, 'add') + '</div></div>',
+  });
   const rowHtml = (r) => {
     const t = (s) => ESC(s) || ZWSP;
     if (r.k === 'file') return ['<div class="dl dfile">' + t(r.l) + '</div>', '<div class="drow full">' + cell(r.l, 'dfile') + '</div>'];
@@ -253,8 +272,8 @@ export function diffDoc(src) {
     if (r.k === 'ctx') return ['<div class="dl ctx">' + t(r.l) + '</div>', '<div class="drow">' + cell(r.l, 'ctx') + cell(r.r, 'ctx') + '</div>'];
     if (r.k === 'del') return ['<div class="dl del">' + t(r.l) + '</div>', '<div class="drow">' + cell(r.l, 'del') + GAP + '</div>'];
     if (r.k === 'add') return ['<div class="dl add">' + t(r.r) + '</div>', '<div class="drow">' + GAP + cell(r.r, 'add') + '</div>'];
-    return ['<div class="dl del">' + t(r.l) + '</div><div class="dl add">' + t(r.r) + '</div>',
-      '<div class="drow">' + cell(r.l, 'del') + cell(r.r, 'add') + '</div>']; // mod: stacked vs pair
+    const m = modCells(r.l, r.r);
+    return [m.stacked, m.pair]; // mod: stacked vs pair
   };
   let un = '', sp = '';
   const first = rows.slice(0, DIFF_CHUNK).map(rowHtml);
@@ -295,6 +314,7 @@ export function diffDoc(src) {
     '.dl{padding:2.5px 10px;white-space:pre-wrap;overflow-wrap:anywhere}' +
     '.dl.dfile{color:#A79F92;padding-top:8px}.dl.hunk{color:#E8926F;background:rgba(217,119,87,.08)}' +
     '.dl.add{background:rgba(143,185,141,.10)}.dl.del{background:rgba(219,107,94,.10)}.dl.ctx{color:#C9C2B6}' +
+    '.dl .ne{font-weight:600}.dl .eq{opacity:.45}.dc .ne{font-weight:600}.dc .eq{opacity:.45}' +
     '.dsplit{font:11.5px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;background:#171613;border-radius:10px;overflow:hidden}' +
     '.drow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}' +
     '.drow.full{grid-template-columns:1fr}' +

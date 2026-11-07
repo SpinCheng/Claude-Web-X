@@ -288,7 +288,7 @@ test('v215 trim: equal old/new (no-op edit) yields empty hunk body and zero delt
   const { events } = run(lines);
   assert.deepEqual(events[0].parts[0].f, [{ path: 'D:\\e2e\\f.js', add: 0, del: 0 }]);
   const txt = synthesizeFileDiff(lines, 'd:\\e2e\\f.js');
-  assert.ok(txt.includes('@@ Edit @@'), 'hunk header still marks the call');
+  assert.ok(!txt.includes('@@ Edit @@'), 'v217: no-op edit emits no hunk header at all');
   assert.ok(!/\n-a\b|\n\+a\b/.test(txt), 'no del/add rows for identical strings');
 });
 

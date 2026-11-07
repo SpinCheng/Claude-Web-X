@@ -566,6 +566,8 @@ export function synthesizeFileDiff(lines, matchPath) {
   // trimCommonLines → 详情 ± 与列表 ± 恒等。
   const hunkFor = (oldStr, newStr, head) => {
     const t = trimCommonLines(oldStr, newStr);
+    // v217: trim 后零差异（no-op edit / 纯空串互换）不出 hunk——空盒头曾成串刷屏
+    if (!t.del.length && !t.add.length) return '';
     const segs = [ctx(t.pre), minus(t.del), plus(t.add), ctx(t.post)].filter(Boolean);
     return head + (segs.length ? segs.join('\n') + '\n' : '');
   };
