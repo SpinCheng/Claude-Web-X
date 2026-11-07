@@ -284,7 +284,10 @@ export function costDisplay(stats, mode, mult, prices) {
   return Number(stats.usd) || 0;
 }
 function modelLabel(name) {
-  const hit = (state.modelCatalog || []).find((x) => x.id === name);
+  // v210: case-insensitive id match - settings 目录 id 是 [1M]，cost-state 键
+  // 落 [1m]，一字之差整个映射失灵让费用段裸显 API id（模型 id 本不区分大小写）
+  const n = String(name || '').toLowerCase();
+  const hit = (state.modelCatalog || []).find((x) => String(x.id).toLowerCase() === n);
   return hit ? hit.label : name;
 }
 // 转录体积构成 + counts - char-share estimate straight off the turn model
@@ -337,13 +340,17 @@ function renderCostSheet() {
   rateCard.textContent = '';
   rateCard.hidden = !(rt && rt.ms > 0);
   if (rt && rt.ms > 0) {
-    const tps = Math.round(rt.out / (rt.ms / 1000));
+    // v210 用户裁定：分子统一走 cost-state 官方账（c.outTok，与五格「输出」
+    // 恒等），解析层只出时长——最近一轮未结算不计入速率（快照时点差曾让
+    // 卡头与五格差 2.4%）。分模型行仍用桶内 out（桶间相对比例不受时点差影响）。
+    const headOut = Number(c.outTok) || 0 || rt.out;
+    const tps = Math.round(headOut / (rt.ms / 1000));
     const mins = rt.ms / 60000;
     const top = document.createElement('div');
     top.className = 'rc-top';
     const mk = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; return s; };
     top.append(mk('rc-label', '输出速率'), mk('rc-num', tps.toLocaleString()), mk('rc-unit', 'tok/s'),
-      mk('rc-sub', (mins >= 1 ? mins.toFixed(1) + ' 分钟' : Math.round(rt.ms / 1000) + ' 秒') + ' · ' + fmtTokens(rt.out || 0) + ' tok'));
+      mk('rc-sub', (mins >= 1 ? mins.toFixed(1) + ' 分钟' : Math.round(rt.ms / 1000) + ' 秒') + ' · ' + fmtTokens(headOut) + ' tok'));
     rateCard.append(top);
     const rms = Object.entries(rt.models || {}).filter(([, b]) => b.ms > 0);
     if (rms.length > 1) {
