@@ -330,6 +330,14 @@ export function applyLine(id, obj, patch, events, rec) {
               const mid = (obj.message && obj.message.id) || '';
               if (mid && rec._rateMsg === mid) {
                 rec._rateEnd = at; // same message, later part: extend to real completion
+              } else if (mid && rec._rateSeen && rec._rateSeen[mid]) {
+                // v213: 2.1.308 把同一条 message 的后段 tool_use 写在该消息的
+                // tool_result 之后（真-find 7f1b929b：127 个 id 非连续，含 4 段
+                // 的三拆）——上面的 commit 已按整条 usage 计过一次，这里若再开
+                // 新组会把满额 out 与工具执行时长双双重复（Σout 曾虚高 30%+）。
+                // 迟到片段=落盘滞后（生成早已完成）：整行跳过——不重计 out、
+                // 不延时长、不推基点。seen 表有界（>2048 清零防膨胀；需在同
+                // 一窗内被拆两次的 id 概率趋零）。
               } else {
                 commitRateGroup(rec);
                 if (Number.isFinite(rec._rateBase) && at > rec._rateBase) {
@@ -338,6 +346,9 @@ export function applyLine(id, obj, patch, events, rec) {
                   if (mid) {
                     rec._rateMsg = mid; rec._rateModel = name;
                     rec._rateStartBase = rec._rateBase; rec._rateEnd = at; rec._rateOut = out;
+                    rec._rateSeen = rec._rateSeen || {};
+                    if (Object.keys(rec._rateSeen).length > 2048) rec._rateSeen = {};
+                    rec._rateSeen[mid] = 1;
                   } else {
                     rec._rate = rec._rate || {};
                     const bk = rec._rate[name] || (rec._rate[name] = { out: 0, ms: 0 });

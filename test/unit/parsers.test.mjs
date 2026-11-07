@@ -203,6 +203,23 @@ test('v209: back-to-back messages without an intervening line chain the base (no
   assert.deepEqual(rec._rate, { m1: { out: 150, ms: 20000 } });
 });
 
+test('v213: same-id part AFTER its tool_result is a late disk-write - skip entirely (no double out, no tool-time ms)', () => {
+  const rec = {};
+  const { events } = run([
+    tsUser(ISO(0)),
+    asstPart(ISO(10), 'm1', 120, 'msg_1'),   // thinking
+    asstPart(ISO(12), 'm1', 120, 'msg_1'),   // tool_use part (group end)
+    tsToolRes(ISO(30), 't1'),                // commits msg_1: 0->12s
+    asstPart(ISO(45), 'm1', 120, 'msg_1'),   // LATE part of the same message: skip (was double-counted in v209)
+    asstPart(ISO(50), 'm1', 60, 'msg_2'),    // next message opens from the tool_result base (30->50s)
+    costState(1, 1, 0.01),
+  ], rec);
+  // msg_1 counted ONCE (0->12s out 120); tool exec time 12->30 belongs to nobody; msg_2 30->50s out 60
+  assert.deepEqual(rec._rate, { m1: { out: 180, ms: 32000 } });
+  const st = events[events.length - 1];
+  assert.deepEqual(st.stats.rate.models, { m1: { out: 180, ms: 32000 } });
+});
+
 test('tool_use carries id (pairing key); toolres items extract text/err/images', () => {
   const { events } = run([
     assistant([{ type: 'tool_use', id: 'tu9', name: 'Bash', input: { command: 'ls' } }]),
