@@ -545,8 +545,19 @@ export function synthesizeFileDiff(lines, matchPath) {
   if (!want) return '';
   const name = String(matchPath).split(/[\\/]/).pop();
   const lc = (v) => (typeof v === 'string' ? v.split('\n') : []);
-  const minus = (v) => (v ? lc(v).map((l) => '-' + l).join('\n') : '');
-  const plus = (v) => (v ? lc(v).map((l) => '+' + l).join('\n') : '');
+  const minus = (v) => (v && v.length ? v.map((l) => '-' + l).join('\n') : '');
+  const plus = (v) => (v && v.length ? v.map((l) => '+' + l).join('\n') : '');
+  // v215: ctx 行加前导空格（标准 unified diff 语义）——内容自带 -/+ 开头的行
+  // （markdown 列表符）不加空格会被 diffRows 误判成 del/add（CLAUDE.md 实证）
+  const ctx = (v) => (v && v.length ? v.map((l) => ' ' + l).join('\n') : '');
+  // v215: hunk = 前缀共享行(ctx) + del 块 + add 块 + 后缀共享行(ctx)；空段
+  // 不产空行（空行会被 diffRows 当 ctx 幽灵行）。与 editDelta 同用
+  // trimCommonLines → 详情 ± 与列表 ± 恒等。
+  const hunkFor = (oldStr, newStr, head) => {
+    const t = trimCommonLines(oldStr, newStr);
+    const segs = [ctx(t.pre), minus(t.del), plus(t.add), ctx(t.post)].filter(Boolean);
+    return head + (segs.length ? segs.join('\n') + '\n' : '');
+  };
   let out = '', toolN = 0;
   for (const obj of lines) {
     if (!obj || obj.type !== 'assistant' || !obj.message) continue;
@@ -554,6 +565,9 @@ export function synthesizeFileDiff(lines, matchPath) {
     if (!Array.isArray(parts)) continue;
     for (const p of parts) {
       if (!p || p.type !== 'tool_use' || !p.input) continue;
+      // v215: 白名单同 rollup（EDIT_TOOLS）——Read/Grep 的 input 也带
+      // file_path/path，不过滤会混进调用序列（9c150709 实证 34 vs 29 错位）
+      if (!EDIT_TOOLS[p.name]) continue;
       const inp = p.input;
       const fp = inp.file_path || inp.path || inp.notebook_path;
       if (typeof fp !== 'string' || fp.toLowerCase() !== want) continue;
@@ -561,15 +575,14 @@ export function synthesizeFileDiff(lines, matchPath) {
       let hunk = '';
       if (Array.isArray(inp.edits)) {
         inp.edits.forEach((e, i) => {
-          hunk += '@@ MultiEdit ' + (i + 1) + '/' + inp.edits.length + ' @@\n' +
-            minus(e && e.old_string) + '\n' + plus(e && e.new_string) + '\n';
+          hunk += hunkFor(e && e.old_string, e && e.new_string, '@@ MultiEdit ' + (i + 1) + '/' + inp.edits.length + ' @@\n');
         });
       } else if (typeof inp.content === 'string') {
-        hunk += '@@ Write · 全文 ' + lc(inp.content).length + ' 行 @@\n' + plus(inp.content) + '\n';
+        hunk += '@@ Write · 全文 ' + lc(inp.content).length + ' 行 @@\n' + plus(inp.content.split('\n')) + '\n';
       } else if (typeof inp.new_source === 'string') {
-        hunk += '@@ NotebookEdit · 全文 ' + lc(inp.new_source).length + ' 行 @@\n' + plus(inp.new_source) + '\n';
+        hunk += '@@ NotebookEdit · 全文 ' + lc(inp.new_source).length + ' 行 @@\n' + plus(inp.new_source.split('\n')) + '\n';
       } else {
-        hunk += '@@ Edit @@\n' + minus(inp.old_string) + '\n' + plus(inp.new_string) + '\n';
+        hunk += hunkFor(inp.old_string, inp.new_string, '@@ Edit @@\n');
       }
       out += hunk;
       if (out.length > FILEDIFF_MAX) { out = out.slice(0, FILEDIFF_MAX) + '\n…（过大截断，完整编辑记录见转录）'; break; }
@@ -585,19 +598,34 @@ export function synthesizeFileDiff(lines, matchPath) {
 // the previous content is unknowable from the input alone). Called only for
 // file-edit tools; everything else returns null and carries no f.
 const EDIT_TOOLS = { Edit: 1, Write: 1, MultiEdit: 1, NotebookEdit: 1 };
+// v215 用户裁定：old/new 的公共前后缀行剥离——模型为唯一匹配常带未改动
+// 上下文行，整块 del+add 曾让详情页大量「左右一样却标红绿」的假修改对
+// （agents.js 实证 53 个 mod 对里 32 个逐字相同）。剥离后共享行走 ctx、
+// 只有真差异进 ±；editDelta 与 synthesizeFileDiff 共用本函数，两口径恒等。
+function trimCommonLines(oldStr, newStr) {
+  // '' -> []：空串=0 行（旧口径 ''.split('\n')=[''] 曾把纯插入计成 −1 行，
+  // 且与 synthesized hunk 的 minus('')='' 不一致——两口径分歧实例之一）
+  const rows = (v) => (typeof v === 'string' && v !== '' ? v.split('\n') : []);
+  const o = rows(oldStr), n = rows(newStr);
+  let pre = 0;
+  while (pre < o.length && pre < n.length && o[pre] === n[pre]) pre++;
+  let suf = 0;
+  while (suf < o.length - pre && suf < n.length - pre && o[o.length - 1 - suf] === n[n.length - 1 - suf]) suf++;
+  return { pre: o.slice(0, pre), del: o.slice(pre, o.length - suf), add: n.slice(pre, n.length - suf), post: o.slice(o.length - suf) };
+}
 function editDelta(name, input) {
   if (!EDIT_TOOLS[name] || !input || typeof input !== 'object') return null;
   const p = input.file_path || input.path || input.notebook_path;
   if (typeof p !== 'string' || !p) return null;
-  const lc = (v) => (typeof v === 'string' ? v.split('\n').length : 0);
+  const cnt = (v) => (Array.isArray(v) ? v.length : 0);
   if (Array.isArray(input.edits)) {
     let add = 0, del = 0;
-    for (const e of input.edits) { add += lc(e && e.new_string); del += lc(e && e.old_string); }
+    for (const e of input.edits) { const t = trimCommonLines(e && e.old_string, e && e.new_string); add += cnt(t.add); del += cnt(t.del); }
     return [{ path: p, add, del }];
   }
-  if (typeof input.content === 'string') return [{ path: p, add: lc(input.content), del: 0 }];
-  return [{ path: p, add: lc(input.new_string) + lc(input.new_str) + lc(input.new_source),
-    del: lc(input.old_string) + lc(input.old_str) + lc(input.old_source) }];
+  if (typeof input.content === 'string') return [{ path: p, add: input.content.split('\n').length, del: 0 }];
+  const t = trimCommonLines(input.old_string ?? input.old_str ?? input.old_source, input.new_string ?? input.new_str ?? input.new_source);
+  return [{ path: p, add: cnt(t.add), del: cnt(t.del) }];
 }
 
 // Drop <system-reminder>...</system-reminder> blocks (huge injected context).

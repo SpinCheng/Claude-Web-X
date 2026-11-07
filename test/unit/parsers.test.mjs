@@ -264,10 +264,41 @@ test('synthesizeFileDiff builds chronological hunks from raw tool_use inputs (v1
   ];
   const txt = synthesizeFileDiff(lines, 'd:\\e2e\\a.ts');
   assert.ok(txt.startsWith('--- a/a.ts\n+++ b/a.ts'), 'file header');
+  // v215 trim: old 'x\ny' vs new 'x1' share nothing -> full del+add (unchanged case)
   assert.ok(txt.indexOf('@@ Edit @@\n-x\n-y\n+x1') >= 0, 'edit hunk old->new');
   assert.ok(txt.indexOf('@@ Write · 全文 2 行 @@\n+full\n+new') >= 0, 'write = whole content as adds (case-insensitive match)');
   assert.ok(!txt.includes('other.ts'), 'other files excluded');
   assert.equal(synthesizeFileDiff(lines, 'd:\\e2e\\none.ts'), '', 'no match -> empty');
+});
+
+// ---------- v215: 公共前后缀行修剪（用户裁定：明显相同的部分必须识别为 ctx） ----------
+test('v215 trim: shared prefix/suffix lines become ctx, only real diff counts', () => {
+  const oldS = 'head\nkeep-a\nCHANGED\nkeep-b\ntail';
+  const newS = 'head\nkeep-a\nchanged!\nkeep-b\ntail';
+  const lines = [assistant([{ type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: 'D:\\e2e\\f.js', old_string: oldS, new_string: newS } }])];
+  const { events } = run(lines);
+  assert.deepEqual(events[0].parts[0].f, [{ path: 'D:\\e2e\\f.js', add: 1, del: 1 }], 'rollup counts only the diff');
+  const txt = synthesizeFileDiff(lines.map((l, i) => i === 0 ? JSON.parse(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: 'D:\\e2e\\f.js', old_string: oldS, new_string: newS } }] } })) : l), 'd:\\e2e\\f.js');
+  assert.ok(txt.indexOf(' head\n keep-a\n-CHANGED\n+changed!\n keep-b\n tail') >= 0, 'ctx rows carry a leading space (unified-diff semantics)');
+  assert.ok(!txt.includes('-head') && !txt.includes('-tail'), 'shared lines are NOT del');
+});
+
+test('v215 trim: equal old/new (no-op edit) yields empty hunk body and zero delta', () => {
+  const lines = [assistant([{ type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: 'D:\\e2e\\f.js', old_string: 'a\nb', new_string: 'a\nb' } }])];
+  const { events } = run(lines);
+  assert.deepEqual(events[0].parts[0].f, [{ path: 'D:\\e2e\\f.js', add: 0, del: 0 }]);
+  const txt = synthesizeFileDiff(lines, 'd:\\e2e\\f.js');
+  assert.ok(txt.includes('@@ Edit @@'), 'hunk header still marks the call');
+  assert.ok(!/\n-a\b|\n\+a\b/.test(txt), 'no del/add rows for identical strings');
+});
+
+test('v215 trim: pure insertion keeps empty del side (blank line must not become ctx)', () => {
+  const lines = [assistant([{ type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: 'D:\\e2e\\f.js', old_string: '', new_string: 'new1\nnew2' } }])];
+  const { events } = run(lines);
+  assert.deepEqual(events[0].parts[0].f, [{ path: 'D:\\e2e\\f.js', add: 2, del: 0 }]);
+  const txt = synthesizeFileDiff(lines, 'd:\\e2e\\f.js');
+  assert.ok(txt.includes('\n+new1\n+new2'), 'adds present');
+  assert.ok(!txt.includes('@@ Edit @@\n\n'), 'no phantom blank ctx line after the header');
 });
 
 test('tool_result text is capped at 4000 chars', () => {
