@@ -85,5 +85,24 @@ await withEnv(async (h, page) => {
   assert(await page.waitFor('(function(){var t=[].slice.call(document.querySelectorAll(".frow")).map(function(x){return x.textContent}); return !t.some(function(x){return /skipme|node_modules/.test(x)}) && t.some(function(x){return /app\\.js/.test(x)}) && !t.some(function(x){return /extra\\.txt/.test(x)})})()'), 'tracked filter keeps only staged lineage');
   await page.ev('document.querySelector("#ft-seg button[data-f=all]").click(); true;');
 
-  console.log('SKIP-REST');
+  // file actions: ⋯ -> insert @ ref pins a dock TAG (v197 chip semantics), drawer closes
+  await page.ev('(function(){var r=[].slice.call(document.querySelectorAll(".frow")).find(function(x){return /app\\.js/.test(x.textContent)}); r.querySelector(".more").click(); return true;})()');
+  assert(await page.waitFor('!document.getElementById("row-actions").classList.contains("hidden")'), 'actions bubble opens');
+  await page.ev('(function(){var b=[].slice.call(document.querySelectorAll("#row-actions .act-row")).find(function(x){return /插入 @ 引用/.test(x.textContent)}); b.click(); return true;})()');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return !c.classList.contains("hidden") && !!c.querySelector(".at-ref") && /app\\.js/.test(c.querySelector(".at-rf1").textContent) && /src/.test(c.querySelector(".at-rf2").textContent)})()'), 'insert pins the src/app.js ref card in the dock');
+  assert(await page.waitFor('document.getElementById("ft-drawer").classList.contains("hidden")'), 'drawer closes after insert');
+
+  // reopen + scrim tap closes
+  await page.ev('document.getElementById("ft-toggle").click(); true;');
+  assert(await page.waitFor('!document.getElementById("ft-drawer").classList.contains("hidden")'), 'reopened');
+  // v215: filter input clear button - appears on input, clears and hides on tap
+  await page.ev('document.getElementById("ft-find").click(); true;');
+  assert(await page.waitFor('!document.getElementById("ft-find-row").classList.contains("hidden")'), 'find row opens');
+  await page.ev('(function(){var q=document.getElementById("ft-q"); q.value="app"; q.dispatchEvent(new Event("input",{bubbles:true})); return true;})()');
+  assert(await page.waitFor('(function(){return !document.getElementById("ft-q-x").classList.contains("hidden") && document.querySelectorAll(".frow").length < 8})()'), 'clear button appears and filter narrows');
+  await page.ev('document.getElementById("ft-q-x").click(); true;');
+  assert(await page.waitFor('(function(){return document.getElementById("ft-q-x").classList.contains("hidden") && document.getElementById("ft-q").value==="" && document.querySelectorAll(".frow").length >= 8})()'), 'clear button resets the filter');
+  await page.ev('document.getElementById("ft-scrim").click(); true;');
+  assert(await page.waitFor('document.getElementById("ft-drawer").classList.contains("hidden")'), 'scrim tap closes');
+  assert(true, 'done');
 });

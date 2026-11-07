@@ -82,6 +82,7 @@ function closeFileTree() {
   ftDir = new Map(); ftExp = new Set(); ftLoading = new Set();
   ftFilter = 'all'; ftQuery = ''; ftStats = null;
   $('ft-q').value = '';
+  $('ft-q-x').classList.add('hidden');
   $('ft-find-row').classList.add('hidden');
   syncSeg();
 }
@@ -241,7 +242,7 @@ function ftRowEl(e, rel, depth) {
   more.setAttribute('role', 'button');
   more.title = '文件操作';
   more.innerHTML = FT_MORE;
-  more.addEventListener('click', (ev) => { ev.stopPropagation(); openFileActions(e, rp); });
+  more.addEventListener('click', (ev) => { document.title = 'MORE-CLICKED:' + rp; ev.stopPropagation(); openFileActions(e, rp); });
   side.appendChild(more);
   b.append(tw, ic, nm, side);
   b.addEventListener('contextmenu', (ev) => { ev.preventDefault(); openFileActions(e, rp); });
@@ -265,10 +266,11 @@ function ftAct(icon, label, sub, fn) {
   el.innerHTML = '<span class="o-ico">' + icon + '</span><span class="o-main"><span class="o-label"></span><span class="o-sub"></span></span>';
   el.querySelector('.o-label').textContent = label;
   el.querySelector('.o-sub').textContent = sub;
-  el.onclick = function (ev) { window.__dbg = (window.__dbg || []); window.__dbg.push('ftAct:' + (ev && ev.constructor ? ev.constructor.name : '?')); return fn(ev); };
+  el.onclick = fn;
   return el;
 }
 function openFileActions(e, rp) {
+  document.title = 'OFA-REACHED:' + e.n;
   const sheet = document.querySelector('#row-actions .act-bubble');
   sheet.querySelector('.act-title').textContent = e.n;
   sheet.querySelector('.act-sub').textContent = rp;
@@ -387,7 +389,18 @@ $('ft-find').onclick = () => {
   if (row.classList.contains('hidden')) { row.classList.remove('hidden'); $('ft-q').focus(); }
   else { row.classList.add('hidden'); $('ft-q').value = ''; ftQuery = ''; renderTree(); }
 };
-$('ft-q').addEventListener('input', () => { ftQuery = $('ft-q').value.trim(); renderTree(); });
+$('ft-q').addEventListener('input', () => {
+  ftQuery = $('ft-q').value.trim();
+  $('ft-q-x').classList.toggle('hidden', !ftQuery); // v215: 有输入才显形清除钮
+  renderTree();
+});
+$('ft-q-x').onclick = () => {
+  $('ft-q').value = '';
+  ftQuery = '';
+  $('ft-q-x').classList.add('hidden');
+  renderTree();
+  $('ft-q').focus();
+};
 $('ft-seg').querySelectorAll('button').forEach((b) => {
   b.onclick = () => { ftFilter = b.dataset.f || 'all'; syncSeg(); renderTree(); };
 });
