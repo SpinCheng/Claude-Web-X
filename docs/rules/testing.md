@@ -1,6 +1,6 @@
 # rules/testing — 写/跑测试前必读
 
-`npm test` = 125 单测（parsers/turns/adapter/cost/commands/agents/titlegen/runner/md/archives）+ 14 e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）。
+`npm test` = 单测套件 + e2e（隔离桥 :3799 + 合成转录 + headless Edge CDP）；用例数量以 npm test 输出为准，文档勿钉死计数。
 
 - fixture 勿走 bash 内联（反斜杠被吃）——一律 Write 写文件再读。
 - harness 的 api() 头必须合并非替换。

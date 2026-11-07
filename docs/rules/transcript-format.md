@@ -14,7 +14,7 @@
 
 ## 改动文件汇总与 filediff
 
-- ± 摘要在**解析层**算好随事件下发（`f:[{path,add,del}]`，Edit/Write/MultiEdit/NotebookEdit）——chip 文本 `v` 被 briefJson 截到 300 字符，**勿在前端 JSON.parse(v) 做汇总**；**汇总只收会话 cwd 锚内的文件**（Temp 等中间件不进；锚=锁定 cwdSet 大小写不敏感前缀，无锚不滤）。
+- ± 摘要在**解析层**算好随事件下发（`f:[{path,add,del}]`，Edit/Write/MultiEdit/NotebookEdit）——chip 文本 `v` 被 briefJson 截到 300 字符，**勿在前端 JSON.parse(v) 做汇总**；**汇总只收会话 cwd 锚内的文件**（Temp 等中间件不进；锚=锁定 cwdSet 前缀，大小写随 CI_PATHS——NTFS/APFS 折叠、Linux 严格，与预览守卫同语义；无锚不滤）。
 - **公共前后缀行修剪（勿回退）**：`trimCommonLines` 剥离 old_string 里未改动的上下文行（editDelta 与 synthesizeFileDiff 共用 → 列表 ± 与详情 ± 恒等；空串=0 行）。
 - synthesize 三禁：**①只收 EDIT_TOOLS 白名单**（Read/Grep 的 input 也带 file_path，混入错位）；**②ctx 行加前导空格**（unified 语义——markdown 列表行自带 `- ` 会被 diffRows 误判 del）；**③filediff 合成与汇总同锚**。
 - CLI 合成哨兵行（text 精确等于「No response requested.」）=被杀 turn 的记账，**解析层已折叠**（长回复含该短语不折）。

@@ -3,6 +3,8 @@
 // (compaction/skill), tool_result pairing, cost-state collapse, stop markers.
 // All the v22/v24/v28 judgment pitfalls live here, unit-tested in
 // test/unit/parsers.test.mjs - importable without any Tailer/Store.
+// (CI_PATHS is a pure platform constant - the one sanctioned OS branch point.)
+import { CI_PATHS } from './lib/platform.js';
 
 // Phone-rename write-fence (v39): the Desktop app re-emits its CACHED
 // (pre-rename) custom-title every time it flushes session metadata, instantly
@@ -388,17 +390,12 @@ export function applyLine(id, obj, patch, events, rec) {
             const part = { t: 'tool', name: p.name, id: p.id || '', v: briefJson(p.input) };
             // v212 用户裁定：改动文件汇总只收会话项目内的文件——Temp 里的
             // 截图/探针脚本等临时中间件不进汇总。锚=锁定 cwd（cwdSet，与
-            // 归组同源）；大小写不敏感前缀（Windows 盘符不分大小，产物
-            // 预览守卫同语义）；无锚（罕见：转录没有任何 cwd 行）不滤。
+            // 归组同源）；大小写敏感性随 CI_PATHS（NTFS/APFS 折叠、Linux
+            // 严格，与产物预览守卫同语义）；无锚（罕见：转录没有任何 cwd
+            // 行）不滤。
             const f = editDelta(p.name, p.input);
             if (f && patch.cwdSet) {
-              const anchor = patch.cwdSet.replace(/[\\/]+$/, '');
-              const lcAnchor = anchor.toLowerCase();
-              const inProj = (fp) => {
-                const lfp = String(fp).replace(/[\\/]+$/, '').toLowerCase();
-                return lfp.startsWith(lcAnchor + '\\') || lfp.startsWith(lcAnchor + '/') || lfp === lcAnchor;
-              };
-              const kept = f.filter((x) => inProj(x.path));
+              const kept = f.filter((x) => pathInAnchor(patch.cwdSet, x.path, CI_PATHS));
               if (kept.length) part.f = kept;
             } else if (f) part.f = f;
             // v154: 待办板结构化载荷照同一先例随事件下发（tb）——前端禁 parse
@@ -539,6 +536,17 @@ function briefJson(input) {
 // as additions (the previous content is unknowable from the input). Hunk
 // headers only need to LOOK like @@ markers - the PWA renderer never reads
 // the numbers. Returns '' when no tool_use targeted the file.
+// Anchor prefix match for the rollup filter: equal-or-under the anchor,
+// separator-tolerant (\ or /), sibling dirs excluded (anchor + '/'). Case
+// rules ride the `ci` param (NTFS/APFS fold case, Linux strict) so unit
+// tests pin both modes without depending on the host OS.
+export function pathInAnchor(anchor, filePath, ci) {
+  const fold = (s) => (ci ? s.toLowerCase() : s);
+  const a = fold(String(anchor).replace(/[\\/]+$/, ''));
+  const p = fold(String(filePath).replace(/[\\/]+$/, ''));
+  return p.startsWith(a + '\\') || p.startsWith(a + '/') || p === a;
+}
+
 const FILEDIFF_MAX = 256 * 1024;
 export function synthesizeFileDiff(lines, matchPath) {
   const want = String(matchPath || '').toLowerCase();

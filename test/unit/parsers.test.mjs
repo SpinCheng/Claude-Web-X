@@ -2,7 +2,7 @@
 // judgment pitfalls documented in docs/rules/transcript-format.md.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLine, fenceTitle, synthesizeFileDiff, taskPart, applyBoard, bindCreated, boardSnapshot, GOAL_CANCEL_DIRECTIVE } from '../../bridge/parsers-cc.js';
+import { applyLine, fenceTitle, synthesizeFileDiff, pathInAnchor, taskPart, applyBoard, bindCreated, boardSnapshot, GOAL_CANCEL_DIRECTIVE } from '../../bridge/parsers-cc.js';
 
 const run = (lines, rec = {}) => { // rec defaults to a seeded (empty) record like _ensureSession creates
   const events = []; const patch = { est: { tools: 0, think: 0, prose: 0 } };
@@ -430,6 +430,21 @@ test('file rollup f: POSIX anchor - /tmp edits dropped, /proj edits kept', () =>
   ]);
   assert.equal(events[1].parts[0].f, undefined, 'POSIX 锚外不进汇总');
   assert.deepEqual(events[2].parts[0].f, [{ path: '/proj/src/a.js', add: 1, del: 1 }]);
+});
+
+// anchor case rules follow CI_PATHS semantics (NTFS/APFS fold, Linux strict) -
+// both modes pinned explicitly so the suite is host-OS-independent
+test('pathInAnchor: ci mode folds case on both sides, sibling dirs excluded', () => {
+  assert.ok(pathInAnchor('D:\\x', 'd:\\X\\SRC\\a.js', true));
+  assert.ok(pathInAnchor('/proj', '/PROJ/src/a.js', true));
+  assert.ok(!pathInAnchor('D:\\x', 'D:\\xy\\a.js', true));
+  assert.ok(!pathInAnchor('D:\\x', 'C:\\Temp\\shot-x.png', true));
+});
+
+test('pathInAnchor: strict mode keeps case distinct (ext4 semantics)', () => {
+  assert.ok(pathInAnchor('/proj', '/proj/src/a.js', false));
+  assert.ok(!pathInAnchor('/proj', '/Proj/src/a.js', false));
+  assert.ok(!pathInAnchor('/proj', '/projection/a.js', false));
 });
 
 test('file rollup f: no anchor -> unfiltered (legacy shape)', () => {

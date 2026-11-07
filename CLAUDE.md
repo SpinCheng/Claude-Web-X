@@ -15,7 +15,7 @@
 ## 架构
 
 - README「架构与消息流」双 mermaid 图 + 目录树。后端 `bridge/`：`server.js` 组装根 + `lib/`（router/wshub/auth/mime/models/**platform**=OS 差异单点，勿在其他模块分支 process.platform）+ `routes/` + `parsers-cc.js`（转录行判定纯函数，有单测）。前端 `public/` 免构建 vanilla JS：`app.js` 组装根（boot/gate/路由/WS 帧语义）→ `js/` + `js/views/`。函数级循环 import（求值期零交叉）：composer↔detail、list↔sessops、detail↔ctxring、transcript↔agentview。
-- 测试：`npm test` = 156 单测 + 17 e2e（写/跑前必读 [testing](docs/rules/testing.md)）。
+- 测试：`npm test` = 单测 + e2e（写/跑前必读 [testing](docs/rules/testing.md)）。
 
 ## 快速开始
 
