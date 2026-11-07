@@ -120,39 +120,38 @@ test('v190: transcript text carrying an inline image marker folds into the typed
   assert.equal(userTurns()[0].optimistic, false);
 });
 
-test('fileChanges merges edits per file (case-insensitive) with ± lines', () => {
+test('fileChanges merges bridge-side f per file (case-insensitive); v-parse legacy path is gone', () => {
   const t = { steps: [
-    { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'D:\\x\\A.ts', old_string: 'a\nb', new_string: 'a1\nb1\nc1' }) } },
-    { t: 'tool', tool: { name: 'MultiEdit', v: JSON.stringify({ file_path: 'D:\\X\\a.ts', edits: [
-      { old_string: 'p', new_string: 'q\nr' },
-      { old_string: 's\nt', new_string: 'u' },
-    ] }) } },
-    { t: 'tool', tool: { name: 'Write', v: JSON.stringify({ file_path: 'D:\\x\\b.md', content: 'l1\nl2' }) } },
-    { t: 'tool', tool: { name: 'Bash', v: JSON.stringify({ command: 'echo hi' }) } },
-    { t: 'tool', tool: { name: 'Edit', v: 'not-json' } },
+    { t: 'tool', tool: { name: 'Edit', f: [{ path: 'D:\\x\\A.ts', add: 3, del: 2 }] } },
+    { t: 'tool', tool: { name: 'MultiEdit', f: [{ path: 'D:\\X\\a.ts', add: 3, del: 3 }] } },
+    { t: 'tool', tool: { name: 'Write', f: [{ path: 'D:\\x\\b.md', add: 2, del: 0 }] } },
+    { t: 'tool', tool: { name: 'Bash', f: [{ path: 'D:\\x\\c.sh', add: 1, del: 1 }] } },
+    // v216: everything anchor-filtered -> f:[] (truthy empty) contributes nothing
+    { t: 'tool', tool: { name: 'Write', f: [] } },
+    // no f at all (older-bridge shape): contributes nothing - legacy v-parse is gone
+    { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'D:\\x\\A.ts', old_string: 'a', new_string: 'b' }) } },
   ] };
   const files = fileChanges(t);
-  assert.equal(files.length, 2, 'case-insensitive merge; non-edit tools / bad json ignored');
+  assert.equal(files.length, 2, 'case-insensitive merge; Bash/empty-f/no-f steps ignored');
   const a = files.find((f) => /a\.ts$/i.test(f.path));
-  assert.deepEqual([a.add, a.del], [6, 5], 'edit + multiedit hunks merged (+3-2 then +3-3)');
+  assert.deepEqual([a.add, a.del], [6, 5], 'edit + multiedit f entries merged');
   const b = files.find((f) => /b\.md$/i.test(f.path));
-  assert.deepEqual([b.add, b.del], [2, 0], 'write counts every line as an addition');
+  assert.deepEqual([b.add, b.del], [2, 0]);
 });
 
-test('fileChanges prefers bridge-side f deltas (v145) and mixes with legacy v-parse', () => {
+test('fileChanges trusts bridge f exclusively (v145/v216): truncated v never resurrects counts', () => {
   const t = { steps: [
-    // bridge precomputed: a huge Write whose briefJson v is truncated (and
-    // thus unparseable) still counts via f
+    // huge Write whose briefJson v is truncated (unparseable) counts via f
     { t: 'tool', tool: { name: 'Write', v: '{"file_path":"D:\\x\\big.txt","content":"' + 'x'.repeat(400), f: [{ path: 'D:\\x\\big.txt', add: 900, del: 0 }] } },
-    // legacy part (older bridge): still parsed from v
-    { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'D:\\x\\big.txt', old_string: 'a', new_string: 'b\nc' }) } },
+    // small input whose v IS parseable but f was anchor-filtered to [] -> must stay out
+    { t: 'tool', tool: { name: 'Edit', v: JSON.stringify({ file_path: 'C:\\Temp\\t.txt', old_string: 'a', new_string: 'b' }), f: [] } },
     // f wins even when v happens to be parseable
     { t: 'tool', tool: { name: 'Write', v: JSON.stringify({ file_path: 'D:\\x\\c.md', content: 'zz' }), f: [{ path: 'D:\\x\\c.md', add: 7, del: 4 }] } },
   ] };
   const files = fileChanges(t);
-  assert.equal(files.length, 2);
+  assert.equal(files.length, 2, 'f:[] and legacy-only steps contribute nothing');
   const big = files.find((f) => /big\.txt$/i.test(f.path));
-  assert.deepEqual([big.add, big.del], [902, 1], 'f (900+) + legacy edit (+2-1) merge on one file');
+  assert.deepEqual([big.add, big.del], [900, 0]);
   const c = files.find((f) => /c\.md$/i.test(f.path));
   assert.deepEqual([c.add, c.del], [7, 4], 'f takes precedence over parseable v');
 });

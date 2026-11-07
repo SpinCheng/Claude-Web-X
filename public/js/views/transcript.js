@@ -388,12 +388,12 @@ function toolDiff(t) {
 // v145: the ± numbers come PRE-COMPUTED from the bridge (tool.f) - the chip
 // text v is briefJson-capped at 300 chars, and JSON.parse on a truncated
 // string used to silently drop every edit whose input exceeded the cap
-// (only tiny files made it into the rollup). The legacy v-parse path stays
-// as a fallback for inputs produced by older bridges. Path identity is
-// case-insensitive (Windows); Write counts every line as an addition (the
-// old content is unknowable from the input).
+// (only tiny files made it into the rollup). v216 guarantees the bridge
+// ALWAYS emits f (f:[] when everything is anchor-filtered), so there is no
+// legacy chip-parse fallback anymore - it resurrected out-of-anchor files
+// with old-semantics counts (real find: Temp ps1 rollup +1/-1 vs filediff
+// +51/-12). Path identity is case-insensitive (Windows).
 const EDIT_TOOLS = { Edit: 1, Write: 1, MultiEdit: 1 };
-const lineCount = (v) => (typeof v === 'string' ? v.split('\n').length : 0);
 function fileChanges(t) {
   const byKey = new Map();
   const bump = (p, add, del) => {
@@ -408,19 +408,6 @@ function fileChanges(t) {
     if (s.t !== 'tool' || !EDIT_TOOLS[s.tool.name]) continue;
     if (Array.isArray(s.tool.f)) {
       for (const r of s.tool.f) bump(r.path, r.add || 0, r.del || 0);
-      continue;
-    }
-    let input = null;
-    try { input = JSON.parse(s.tool.v); } catch { continue; }
-    if (!input || typeof input !== 'object') continue;
-    const p = input.file_path || input.path || input.notebook_path;
-    if (typeof p !== 'string' || !p) continue;
-    if (Array.isArray(input.edits)) {
-      for (const e of input.edits) bump(p, lineCount(e && e.new_string), lineCount(e && e.old_string));
-    } else if (typeof input.content === 'string') {
-      bump(p, lineCount(input.content), 0);
-    } else {
-      bump(p, lineCount(input.new_string), lineCount(input.old_string));
     }
   }
   return [...byKey.values()];
