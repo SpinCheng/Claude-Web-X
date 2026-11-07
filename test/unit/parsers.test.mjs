@@ -422,6 +422,16 @@ test('file rollup f: temp-dir edits are dropped when an anchor exists', () => {
   assert.deepEqual(events[2].parts[0].f, [{ path: 'D:\\x\\src\\a.js', add: 1, del: 1 }]);
 });
 
+test('file rollup f: POSIX anchor - /tmp edits dropped, /proj edits kept', () => {
+  const { events } = run([
+    user({ cwd: '/proj' }),
+    assistant([{ type: 'tool_use', id: 'p1', name: 'Write', input: { file_path: '/tmp/shot-x.png', content: 'ab\n' } }]), // events[1]
+    assistant([{ type: 'tool_use', id: 'p2', name: 'Edit', input: { file_path: '/proj/src/a.js', old_string: 'a', new_string: 'ab' } }]), // events[2]
+  ]);
+  assert.equal(events[1].parts[0].f, undefined, 'POSIX 锚外不进汇总');
+  assert.deepEqual(events[2].parts[0].f, [{ path: '/proj/src/a.js', add: 1, del: 1 }]);
+});
+
 test('file rollup f: no anchor -> unfiltered (legacy shape)', () => {
   const { events } = run([
     { type: 'mode', sessionId: 's' }, // no cwd anywhere
