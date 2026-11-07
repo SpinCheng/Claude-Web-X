@@ -60,15 +60,15 @@ await withEnv(async (h, page) => {
   await typeAt('看 @bri');
   assert(await page.waitFor('(function(){var r=document.querySelector(".at-row"); return r && r.classList.contains("dir") && /bridge/.test(r.textContent)})()'), 'dirs rank first in hits');
   await page.ev('document.querySelector(".at-row").click(); true;');
-  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /@bridge\\//.test(c.textContent)})()'), 'dir pick pins @bridge/ tag');
+  assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /bridge\\//.test(c.textContent)})()'), 'dir pick pins the bridge/ card');
 
   // tag x removes it (target the bridge tag specifically - README stays)
-  await page.ev('(function(){var t=[].slice.call(document.querySelectorAll("#at-chips .cmd-tag")).find(function(x){return /bridge/.test(x.textContent)}); t.querySelector(".x").click(); return true;})()');
+  await page.ev('(function(){var t=[].slice.call(document.querySelectorAll("#at-chips .at-ref")).find(function(x){return /bridge/.test(x.textContent)}); t.querySelector(".at-rx").click(); return true;})()');
   assert(await page.waitFor('(function(){var c=document.getElementById("at-chips"); return !/bridge/.test(c.textContent) && /README\\.md/.test(c.textContent)})()'), 'tag x removes the bridge ref, README stays');
   await typeAt('看 @bri');
   await page.waitFor('(function(){var r=document.querySelector(".at-row"); return r && r.classList.contains("dir")})()');
   await page.ev('document.querySelector(".at-row").click(); true;');
-  await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /@bridge\\//.test(c.textContent)})()');
+  await page.waitFor('(function(){var c=document.getElementById("at-chips"); return /bridge\\//.test(c.textContent)})()');
 
   // v198 no-hit ruling: the menu hides outright (no empty-state list);
   // the @token text still rides the message verbatim
@@ -102,7 +102,9 @@ await withEnv(async (h, page) => {
   ]);
   assert(await waitSession('at2'), 'echo session visible');
   await page.open('at2');
-  assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.some(function(x){return x.textContent.indexOf("@README.md 看看")>=0 && x.textContent.indexOf("file body")<0})})()'), 'bubble shows tags+prose only, no appendix');
-  assert(await page.waitFor('(function(){return [].slice.call(document.querySelectorAll(".sysline")).some(function(x){return x.textContent.indexOf("已随消息附上 1 份")>=0})})()'), 'appendix folded into the marker row');
+  assert(await page.waitFor('(function(){var b=[].slice.call(document.querySelectorAll(".bubble.user")); return b.some(function(x){return /看看/.test(x.textContent) && x.textContent.indexOf("file body")<0 && !!x.querySelector(".at-ref")})})()'), 'bubble shows prose + ref card, no appendix');
+  // v214: fold line gone; the bubble renders the @ ref as a card instead
+  assert(await page.waitFor('document.querySelectorAll(".sysline").length === 0'), 'no fold line anymore');
+  assert(await page.waitFor('(function(){var c=[].slice.call(document.querySelectorAll(".bubble.user .at-ref")); return c.length===1 && /README\.md/.test(c[0].textContent) && /docs|项目根/.test(c[0].textContent)})()'), 'bubble renders the ref card');
   assert(true, 'done');
 });

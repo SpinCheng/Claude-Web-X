@@ -14,6 +14,11 @@ import { toast } from './toast.js';
 import { openBubble, closeBubble, openLightbox, openFilePreview, showConfirm } from './overlays.js';
 import { pushOptimisticUser, retractOptimisticUser } from './transcript.js';
 import { renderDriverChip, openDetailProvisional, closeDetail } from './detail.js';
+import { ftFileIcon } from './filetree.js'; // v214: 同一套树字形（函数级循环：filetree->composer insertRef，求值期零交叉）
+import { previewArtifact } from './overlays.js';
+
+// v214: 树内目录图标字形（filetree.js 的 FT_DIR_ICON 未导出，内联同形）
+const AT_DIR_GLYPH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
 
 /* ---------------- permission mode ---------------- */
 function setPerm(v) {
@@ -701,19 +706,47 @@ function renderAtTags() {
   if (!row) return;
   row.innerHTML = '';
   for (const t of atTags) {
-    const tag = document.createElement('span');
-    tag.className = 'cmd-tag';
-    const nm = document.createElement('b'); nm.textContent = '@' + t;
-    nm.title = '@' + t; // 长路径悬停看全名（行内截断）
-    tag.appendChild(nm);
-    const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
-    x.setAttribute('role', 'button'); x.title = '移除引用';
-    x.addEventListener('click', (e) => { e.stopPropagation(); atTags = atTags.filter((v) => v !== t); renderAtTags(); });
-    tag.appendChild(x);
-    row.appendChild(tag);
+    row.appendChild(atRefCard(t, true));
   }
   row.classList.toggle('hidden', !atTags.length);
   updateComposer();
+}
+/* v214 共享卡构建器：dock 标签与气泡引用同一视觉（icon + 文件名/路径双行）。
+   removable=true 时带 ✕（dock 态）；false（气泡态）点卡=预览。rel 末尾 /
+   = 目录引用（文件夹图标、无预览点击）。 */
+function atRefCard(rel, removable) {
+  const isDir = rel.endsWith('/');
+  const clean = isDir ? rel.slice(0, -1) : rel;
+  const card = document.createElement('span');
+  card.className = 'at-ref';
+  const ic = document.createElement('span');
+  ic.className = 'at-ric';
+  ic.innerHTML = isDir ? AT_DIR_GLYPH : ftFileIcon(clean);
+  const tw = document.createElement('span');
+  tw.className = 'at-rtw';
+  const base = clean.split('/').pop() || clean;
+  const f1 = document.createElement('span');
+  f1.className = 'at-rf1';
+  f1.textContent = base + (isDir ? '/' : '');
+  const f2 = document.createElement('span');
+  f2.className = 'at-rf2';
+  const slash = clean.lastIndexOf('/');
+  f2.textContent = slash >= 0 ? clean.slice(0, slash + 1) : '项目根';
+  tw.append(f1, f2);
+  card.append(ic, tw);
+  if (removable) {
+    const x = document.createElement('span');
+    x.className = 'at-rx';
+    x.setAttribute('role', 'button');
+    x.title = '移除引用';
+    x.textContent = '✕';
+    x.addEventListener('click', (e) => { e.stopPropagation(); atTags = atTags.filter((v) => v !== rel); renderAtTags(); });
+    card.appendChild(x);
+  } else {
+    card.title = '预览 ' + rel;
+    if (!isDir) card.addEventListener('click', () => previewArtifact(rel));
+  }
+  return card;
 }
 // 文件树（roadmap 12）借力：与 @ 选择器同一标签语义（v197 起不再插文本）
 function insertRef(rel, isDir) { addAtTag(rel, isDir); }

@@ -11,6 +11,7 @@ const fakeEl = () => ({
   addEventListener: () => {},
   classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
   querySelectorAll: () => [], // filetree.js wires #ft-seg at module scope (detail -> filetree)
+  dataset: {}, // composer.setPerm runs at module scope (transcript -> filetree -> composer cycle, v214)
 });
 globalThis.matchMedia = globalThis.matchMedia || (() => ({ matches: false }));
 globalThis.localStorage = globalThis.localStorage || {

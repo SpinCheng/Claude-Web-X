@@ -29,7 +29,7 @@ const FT_CODE_RE = /\.(js|mjs|cjs|ts|jsx|tsx|vue|svelte|astro|html?|css|scss|sas
 const FT_TEXT_RE = /\.(md|markdown|txt|log|csv|tsv|diff|patch)$/i;
 const FT_CONF_RE = /(^|\/)(\.[\w.-]+|[\w-]+\.(json|jsonc|ya?ml|toml|ini|cfg|conf|env|xml|lock|properties))$/i;
 const FT_IMG_RE = /\.(png|jpe?g|webp|gif|svg|ico|bmp)$/i;
-function ftFileIcon(name) {
+export function ftFileIcon(name) {
   if (FT_CODE_RE.test(name)) return FT_CODE_ICON;
   if (FT_TEXT_RE.test(name)) return FT_TEXT_ICON;
   if (FT_CONF_RE.test(name)) return FT_CONF_ICON;
@@ -265,7 +265,7 @@ function ftAct(icon, label, sub, fn) {
   el.innerHTML = '<span class="o-ico">' + icon + '</span><span class="o-main"><span class="o-label"></span><span class="o-sub"></span></span>';
   el.querySelector('.o-label').textContent = label;
   el.querySelector('.o-sub').textContent = sub;
-  el.onclick = fn;
+  el.onclick = function (ev) { window.__dbg = (window.__dbg || []); window.__dbg.push('ftAct:' + (ev && ev.constructor ? ev.constructor.name : '?')); return fn(ev); };
   return el;
 }
 function openFileActions(e, rp) {
@@ -399,4 +399,4 @@ document.addEventListener('keydown', (e) => {
   closeFileTree();
 });
 
-export { openFileTree, closeFileTree, resetFileTree };
+export { openFileTree, closeFileTree, resetFileTree }; // ftFileIcon exported at declaration (v214)

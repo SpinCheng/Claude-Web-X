@@ -8,6 +8,7 @@ import { $, fmtTs } from '../util.js';
 import { state } from '../state.js';
 import { miniMd, linkifyPaths, linkifyDom } from '../md.js';
 import { openLightbox, previewArtifact, previewFileDiff, openHtmlPreview } from './overlays.js';
+import { ftFileIcon } from './filetree.js'; // v214: 同一树字形（函数级循环：filetree->transcript? 无——filetree 只进 composer/detail）
 // v112 function-level cycle (same pattern as composer<->detail): the agent
 // live-line/chip open the bubble; agentview imports the node renderers back.
 // Zero cross-calls at module-evaluation time.
@@ -108,11 +109,13 @@ function applyEventToTurns(ev) {
     // v111: the executed command's stdout - its own right-aligned panel right
     // under the command bubble (never merges into a bot turn)
     T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
-  } else if (ev.k === 'compact' || ev.k === 'skill' || ev.k === 'attref') {
+  } else if (ev.k === 'compact' || ev.k === 'skill') {
     // v145: cost-state snapshots (k:'stats') no longer render a timeline
     // row - the user ruling killed the "成本 $x · in/out tok" reminder; the
     // number lives on in the header entry / cost panel via the sessions
     // frame, so this display removal loses nothing.
+    // v214: attref no longer renders either - the @ ref cards inside the
+    // user bubble carry the "what was attached" info now.
     const mk = sysMarkerTurn(ev);
     if (mk) T.push(mk);
   } else if (ev.k === 'goal') {
@@ -185,17 +188,14 @@ function drainOrphanRes(turns) {
     }
   }
 }
-// folded marker lines (compaction summary / skill injection / v197 attachment
-// appendix echo). Cost-state snapshots stopped rendering here in v145 (see
-// applyEventToTurns).
+// folded marker lines (compaction summary / skill injection). v214: the
+// attachment appendix echo line is GONE - @ ref cards inside the user bubble
+// carry that info (click-through preview). Cost-state snapshots stopped
+// rendering here in v145 (see applyEventToTurns).
 function sysMarkerTurn(ev) {
   const wan = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + ' 万字' : n + ' 字');
   if (ev.k === 'compact') return { role: 'sys', text: '⟲ 上下文已压缩（续传摘要 ' + wan(ev.n || 0) + '，已折叠）' };
-  if (ev.k === 'attref') {
-    const names = (ev.files || []).map((f) => f.length > 42 ? f.slice(0, 39) + '…' : f);
-    const shown = names.slice(0, 4).join('、') + (names.length > 4 ? ' 等 ' + names.length + ' 项' : '');
-    return { role: 'sys', text: '📎 已随消息附上 ' + (names.length || '?') + ' 份内容（' + shown + '，已折叠）' };
-  }
+  if (ev.k === 'attref') return null; // v214: cards in the bubble replaced this line
   return { role: 'sys', text: '✧ 技能 ' + (ev.name || '?') + ' 已注入（' + wan(ev.n || 0) + '，已折叠）' };
 }
 // v165: goal 生命周期 → cmdout 面板文案（全文，用户裁定不折叠）
@@ -735,6 +735,51 @@ function renderTurn(t) {
     d.append(b, document.createTextNode(rest));
     return d;
   }
+  // v214: @ 引用行卡（气泡态）——与 composer dock 标签同一视觉（icon+名/路径），
+  // 无 ✕、点卡=预览。token 文法与桥侧 scanAtTokens 镜像：词边界 @ +
+  // prose 标点截断。仅呈现层——t.text 原文仍是复制/孪生/代附的唯一锚。
+  const AT_STOP_RE = /[,;:!?'"‘’“”…—·，。、；：！？（）【】《》〈〉「」『』]/u;
+  function userRefTokens(text) {
+    const out = [];
+    const re = /(^|[^A-Za-z0-9_一-鿿])@([^\s@]+)/gu;
+    let m;
+    while ((m = re.exec(text))) {
+      const stop = m[2].search(AT_STOP_RE);
+      const tok = stop < 0 ? m[2] : m[2].slice(0, stop);
+      if (tok) out.push({ start: m.index + m[1].length, end: m.index + m[1].length + 1 + tok.length, rel: tok });
+    }
+    return out;
+  }
+  function appendUserTextWithRefs(host, text) {
+    const toks = userRefTokens(text);
+    if (!toks.length) { host.textContent = text; return; }
+    let pos = 0;
+    for (const tk of toks) {
+      if (tk.start > pos) host.appendChild(document.createTextNode(text.slice(pos, tk.start)));
+      const isDir = tk.rel.endsWith('/');
+      const clean = isDir ? tk.rel.slice(0, -1) : tk.rel;
+      const card = document.createElement('span');
+      card.className = 'at-ref';
+      const ic = document.createElement('span');
+      ic.className = 'at-ric';
+      ic.innerHTML = ftFileIcon(clean);
+      const tw = document.createElement('span');
+      tw.className = 'at-rtw';
+      const f1 = document.createElement('span');
+      f1.className = 'at-rf1';
+      f1.textContent = (clean.split('/').pop() || clean) + (isDir ? '/' : '');
+      const f2 = document.createElement('span');
+      f2.className = 'at-rf2';
+      const slash = clean.lastIndexOf('/');
+      f2.textContent = slash >= 0 ? clean.slice(0, slash + 1) : '项目根';
+      tw.append(f1, f2);
+      card.append(ic, tw);
+      if (!isDir) card.addEventListener('click', () => previewArtifact(tk.rel));
+      host.appendChild(card);
+      pos = tk.end;
+    }
+    if (pos < text.length) host.appendChild(document.createTextNode(text.slice(pos)));
+  }
   if (t.role === 'user') {
     // v40: wrapper keeps renderTail's 1:1 child/turn invariant while adding
     // the meta row (time extracted OUT of the bubble + copy) BELOW it
@@ -751,7 +796,12 @@ function renderTurn(t) {
       d.appendChild(tag);
       if (cm[2]) d.appendChild(document.createTextNode(' ' + cm[2]));
     } else {
-      d.textContent = t.text;
+      // v214: @ refs render as ref cards (icon + name/path, tap = preview) -
+      // same visual as the composer's dock tags. The verbatim text stays in
+      // t.text (copy-original / optimistic twin / bridge scan all key off it);
+      // this is presentation only. Token grammar mirrors the bridge's
+      // scanAtTokens: word-boundary @, prose-punctuation terminator.
+      appendUserTextWithRefs(d, t.text || '');
     }
     for (const im of t.images || []) {
       const img = document.createElement('img');
@@ -1079,8 +1129,8 @@ function parseOlderTurns(events) {
       if (i != null && T[i] && T[i].role === 'bot' && ev.ts) T[i].endTs = ev.ts;
     }
     else if (ev.k === 'cmdout') T.push({ role: 'cmdout', text: ev.text, ts: ev.ts });
-    else if (ev.k === 'compact' || ev.k === 'skill' || ev.k === 'attref') {
-      const mk = sysMarkerTurn(ev); // stats rows are gone since v145 here too
+    else if (ev.k === 'compact' || ev.k === 'skill') {
+      const mk = sysMarkerTurn(ev); // stats rows gone since v145; attref cards live in the bubble since v214
       if (mk) T.push(mk);
     }
     else if (ev.k === 'goal') { state.goal = goalStateAfter(ev); T.push({ role: 'goalmk', st: ev.st, cond: ev.cond || '', ts: ev.ts }); }
