@@ -56,6 +56,7 @@ npm start          # node bridge/index.js，端口 3742
 - 模型产物一律先转义或 createElement/textContent 构建，禁拼 HTML；禁 window.confirm/alert（用 showConfirm）。
 - sessions 帧必须走 `mergedSessions()`；未注册非 GET 一律 405——新端点必须重启桥才加载。
 - 人类输入逐字原样：绝不剥离/改写/占位符化（用户裁定）。
+- 测试夹具的合成绝对路径（`D:\x`、`C:\Temp\shot-x.png` 类）豁免隐私红线：它们是纯字符串标签、全程无 fs 访问，但必须是通用合成形状（禁本机用户名/真实路径），且勿用 path.join——分隔符随宿主 OS 变，夹具就失去跨平台确定性。
 - fork 转录是父会话拷贝：fork 标题必须用显式 prev 钉住。
 - CSS 只认 `body.wide` 类名，勿写重复媒体查询。
 
