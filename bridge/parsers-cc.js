@@ -396,7 +396,10 @@ export function applyLine(id, obj, patch, events, rec) {
             const f = editDelta(p.name, p.input);
             if (f && patch.cwdSet) {
               const kept = f.filter((x) => pathInAnchor(patch.cwdSet, x.path, CI_PATHS));
-              if (kept.length) part.f = kept;
+              // v216: 锚内全滤空时发 f:[]——空数组为真值，封死前端 legacy
+              // 兜底（芯片 ≤300 字可 JSON.parse 时按旧口径把锚外文件复活
+              // 进汇总，真机截图实证 +1−1 vs 详情 +51−12）
+              part.f = kept;
             } else if (f) part.f = f;
             // v154: 待办板结构化载荷照同一先例随事件下发（tb）——前端禁 parse
             // chip 文本；会话级板状态由 adapter 用 applyBoard 累积
