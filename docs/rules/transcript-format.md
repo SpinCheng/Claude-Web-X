@@ -18,4 +18,4 @@
 - **公共前后缀行修剪（勿回退）**：`trimCommonLines` 剥离 old_string 里未改动的上下文行（editDelta 与 synthesizeFileDiff 共用 → 列表 ± 与详情 ± 恒等；空串=0 行）。
 - synthesize 三禁：**①只收 EDIT_TOOLS 白名单**（Read/Grep 的 input 也带 file_path，混入错位）；**②ctx 行加前导空格**（unified 语义——markdown 列表行自带 `- ` 会被 diffRows 误判 del）；**③filediff 合成与汇总同锚**。
 - CLI 合成哨兵行（text 精确等于「No response requested.」）=被杀 turn 的记账，**解析层已折叠**（长回复含该短语不折）。
-- 汇总行 ± 点击=`GET /api/sessions/:id/filediff`——重读 JSONL **原文**现场合成该文件全部编辑的 unified diff（Write/NotebookEdit 只出新增侧；不读盘故无 cwd 锁），前端走 diffDoc 双 tab。
+- 汇总行 ± 点击=`GET /api/sessions/:id/filediff?p&from=<turn 起点毫秒>`（v218）——重读 JSONL 原文现场合成 unified diff，**作用域=turn 时间窗**（前端传 t.startTs）：列表 ± 是 turn 级聚合，详情曾扫全转录（多轮同文件历史全混入），数字恒不等（watchdog ps1 实证 +1−1 vs +51−12）；无 from=全量兜底（Write/NotebookEdit 只出新增侧；不读盘故无 cwd 锁），前端走 diffDoc 双 tab。
