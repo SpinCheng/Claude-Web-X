@@ -70,4 +70,4 @@ npm start          # node bridge/index.js，端口 3742
 
 ## 路线图
 
-**已裁定不做**：锁屏/推送通知。下一步：Phase 3（Cowork 数据面）→ Phase 4（Cowork 控制面，UIA）。
+**已裁定不做**：锁屏/推送通知。下一步：Phase 3（Cowork 数据面）→ Phase 4（Cowork 控制面，UIA）。候选功能与 bug/优化待办清单：本地 `docs/roadmap.md`（gitignored，按条目追加）。
