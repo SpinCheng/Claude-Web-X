@@ -668,7 +668,9 @@ button { font-family: inherit; }
 @keyframes costPulse { 0% { transform: scale(1); } 35% { transform: scale(1.22); color: #fff; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .cost-entry.pulse { animation: none; } }
 .overlay.top { align-items: flex-start; padding-top: calc(58px + env(safe-area-inset-top)); }
-.overlay.top .sheet { flex: 1 1 auto; margin: 0 12px; border-radius: 0 0 20px 20px; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); animation: topIn .3s cubic-bezier(.22, 1, .36, 1); transform-origin: 50% 0; }
+/* v210 兜底修复：长内容（多模型速率卡/分模型段）曾无 max-height 溢出屏外且不可达；
+   整卡滚动，内嵌滚动器纪律 overscroll auto（链到页级滚动器） */
+.overlay.top .sheet { flex: 1 1 auto; margin: 0 12px; border-radius: 0 0 20px 20px; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); animation: topIn .3s cubic-bezier(.22, 1, .36, 1); transform-origin: 50% 0; max-height: calc(100dvh - 58px - env(safe-area-inset-top) - 12px); overflow-y: auto; overscroll-behavior-y: auto; -webkit-overflow-scrolling: touch; }
 @keyframes topIn { from { transform: translateY(-16px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .overlay.top .sheet { animation: none; } }
 .cost-hero { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 12px; }
