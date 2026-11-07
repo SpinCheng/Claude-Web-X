@@ -882,7 +882,7 @@ body.wide #detail .composer,
 body.wide #detail .hist-more,
 body.wide #detail .wait-banner { max-width: 860px; margin-left: auto; margin-right: auto; width: 100%; }
 body.wide #detail .chat { padding-left: clamp(18px, 6%, 72px); padding-right: clamp(18px, 6%, 72px); }
-body.wide #act { right: 20px; } /* v203：以整个详情页为基准（#act 已是 #detail 直接子节点），不再锚内容列 */
+body.wide #act { right: 20px; } /* v216：回到 #detail-main（文件树面板/抽屉打开时胶囊自动避开面板区域） */
 body.wide #jump { position: absolute; left: 50%; right: auto; margin: 0 0 0 -14px; transform: none; }
 /* v199 拖宽手柄：#list(260-600, #arch 同步) 与 #ft-drawer(180-480)，localStorage 持久；
    负 margin 与两栏各叠 3px，不占布局宽；hover/拖拽中亮 1px 珊瑚线 */
